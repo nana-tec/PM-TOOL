@@ -7,7 +7,7 @@ import useWebSockets from "@/hooks/useWebSockets";
 import Layout from "@/layouts/MainLayout";
 import { DragDropContext, Droppable } from "@hello-pangea/dnd";
 import { usePage } from "@inertiajs/react";
-import { Button, Grid } from "@mantine/core";
+import { Button, Grid, Stack, Box } from "@mantine/core";
 import { IconPlus } from "@tabler/icons-react";
 import { useEffect } from "react";
 import { CreateTaskDrawer } from "./Drawers/CreateTaskDrawer";
@@ -19,6 +19,7 @@ import Header from "./Index/Header";
 import CreateTasksGroupModal from "./Index/Modals/CreateTasksGroupModal";
 import TaskGroup from "./Index/TaskGroup";
 import classes from "./css/Index.module.css";
+import NotesPanel from "@/pages/Projects/Notes/Panel";
 
 let currentProject = null;
 
@@ -125,10 +126,22 @@ const TasksIndex = () => {
         )}
         {tasksView === "list" ? (
           <Grid.Col span={3}>
-            <Filters />
+            <Stack>
+              <Filters />
+              <Box mt="md">
+                <NotesPanel projectId={project.id} />
+              </Box>
+            </Stack>
           </Grid.Col>
         ) : (
-          <FiltersDrawer />
+          <>
+            <Grid.Col span={12}>
+              <FiltersDrawer />
+            </Grid.Col>
+            <Grid.Col span={12}>
+              <NotesPanel projectId={project.id} />
+            </Grid.Col>
+          </>
         )}
       </Grid>
     </>
