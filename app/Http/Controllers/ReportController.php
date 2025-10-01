@@ -159,6 +159,7 @@ class ReportController extends Controller
         $weeks = $days / 7;
         $weeklyCapacity = (float) ($request->get('weekly_capacity', 40));
         $capacityHours = $weeklyCapacity * $weeks;
+        $rankBy = in_array($request->get('rank_by'), ['performance','planned','actual']) ? $request->get('rank_by') : 'performance';
 
         // Users to include (exclude clients by default)
         $usersQuery = User::query()->withoutRole('client');
@@ -283,18 +284,23 @@ class ReportController extends Controller
                 'actual_utilization' => $actualUtil,
                 'availability_hours' => $availabilityHours,
                 'completion_rate' => $completionRate,
-                'throughput_per_week' => $throughput
-            ];
-        }
-        )->values();
-
-        // Ranking: by completion rate desc then throughput desc
-        $ranked = $items->sortByDesc(function ($i) {
-            return [
-                $i['completion_rate'] ?? -1,
-                $i['throughput_per_week'],
-            ];
+                'throughput_per_week' => $throughput,
+                ];
         })->values();
+
+        // Ranking
+        if ($rankBy === 'planned') {
+            $ranked = $items->sortByDesc(fn ($i) => $i['planned_utilization'] ?? -1)->values();
+        } elseif ($rankBy === 'actual') {
+            $ranked = $items->sortByDesc(fn ($i) => $i['actual_utilization'] ?? -1)->values();
+        } else { // performance (default)
+            $ranked = $items->sortByDesc(function ($i) {
+                return [
+                    $i['completion_rate'] ?? -1,
+                    $i['throughput_per_week'],
+                ];
+            })->values();
+        }
 
         // Attach rank
         $ranked = $ranked->map(function ($i, $idx) {
@@ -309,10 +315,52 @@ class ReportController extends Controller
                 'end' => $end->toDateString(),
                 'capacity_hours' => $capacityHours,
                 'weekly_capacity' => $weeklyCapacity,
+                'rank_by' => $rankBy,
             ],
             'dropdowns' => [
                 'users' => User::userDropdownValues(['client']),
             ],
         ]);
+    }
+
+    public function userTasks(Request $request)
+    {
+        Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
+
+        $request->validate([
+            'user_id' => ['required','integer','exists:users,id'],
+            'status' => ['required','in:pending,overdue,completed'],
+            'dateRange' => ['array','size:2'],
+        ]);
+
+        $userId = (int) $request->user_id;
+        $status = $request->status;
+        $start = $request->dateRange ? Carbon::parse($request->dateRange[0])->startOfDay() : now()->startOfWeek();
+        $end = $request->dateRange ? Carbon::parse($request->dateRange[1])->endOfDay() : now()->endOfWeek();
+
+        $q = DB::table('tasks')
+            ->join('projects', 'projects.id', '=', 'tasks.project_id')
+            ->where('tasks.assigned_to_user_id', $userId)
+            ->whereNull('tasks.archived_at')
+            ->select([
+                'tasks.id', 'tasks.name', 'tasks.due_on', 'tasks.estimation', 'tasks.completed_at', 'tasks.created_at',
+                'projects.id as project_id', 'projects.name as project_name',
+            ])
+            ->orderByDesc('tasks.created_at');
+
+        if ($status === 'pending') {
+            $q->whereNull('tasks.completed_at');
+        } elseif ($status === 'overdue') {
+            $q->whereNull('tasks.completed_at')
+              ->whereNotNull('tasks.due_on')
+              ->whereDate('tasks.due_on', '<', now()->toDateString());
+        } else { // completed
+            $q->whereNotNull('tasks.completed_at')
+              ->whereBetween('tasks.completed_at', [$start, $end]);
+        }
+
+        $tasks = $q->limit(100)->get();
+
+        return response()->json(['tasks' => $tasks]);
     }
 }
