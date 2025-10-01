@@ -4,6 +4,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
+import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { forwardRef, useImperativeHandle } from "react";
@@ -21,6 +22,7 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       Underline,
       Link,
       Highlight,
+      HorizontalRule,
       Placeholder.configure({ placeholder }),
       Mention.configure({
         HTMLAttributes: {
@@ -57,6 +59,12 @@ const RichTextEditor = forwardRef(function RichTextEditor(
         <Editor.ControlsGroup>
           <Editor.BulletList />
           <Editor.OrderedList />
+          <Editor.Hr />
+        </Editor.ControlsGroup>
+
+        <Editor.ControlsGroup>
+          <Editor.H1 />
+          <Editor.H2 />
         </Editor.ControlsGroup>
 
         <Editor.ControlsGroup>

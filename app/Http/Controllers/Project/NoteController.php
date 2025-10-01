@@ -7,6 +7,7 @@ use App\Http\Requests\ProjectNote\StoreProjectNoteRequest;
 use App\Http\Requests\ProjectNote\UpdateProjectNoteRequest;
 use App\Models\Project;
 use App\Models\ProjectNote;
+use App\Services\HtmlSanitizer;
 
 class NoteController extends Controller
 {
@@ -42,9 +43,12 @@ class NoteController extends Controller
     {
         $this->authorize('create', [ProjectNote::class, $project]);
 
-        $note = $project->notes()->create(
-            $request->validated() + ['user_id' => auth()->id()]
-        );
+        $sanitized = app(HtmlSanitizer::class)->sanitize($request->validated()['content'] ?? '');
+
+        $note = $project->notes()->create([
+            'user_id' => auth()->id(),
+            'content' => $sanitized,
+        ]);
 
         return response()->json(['note' => $note->load(['user:id,name,avatar,job_title'])]);
     }
@@ -53,7 +57,9 @@ class NoteController extends Controller
     {
         $this->authorize('update', [$note, $project]);
 
-        $note->update($request->validated());
+        $sanitized = app(HtmlSanitizer::class)->sanitize($request->validated()['content'] ?? '');
+
+        $note->update(['content' => $sanitized]);
 
         return response()->json(['note' => $note->refresh()->load(['user:id,name,avatar,job_title'])]);
     }

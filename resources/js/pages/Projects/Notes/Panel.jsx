@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, Group, Loader, Paper, Stack, Text, Title, ActionIcon, Pagination } from '@mantine/core';
-import { IconPencil, IconTrash, IconX, IconCheck } from '@tabler/icons-react';
+import { Box, Button, Group, Loader, Modal, Paper, ScrollArea, Stack, Text, Title, ActionIcon, Pagination, Divider, Badge } from '@mantine/core';
+import { IconPencil, IconTrash, IconX, IconCheck, IconHistory } from '@tabler/icons-react';
 import axios from 'axios';
 import RichTextEditor from '@/components/RichTextEditor';
 
@@ -20,6 +20,9 @@ export default function NotesPanel({ projectId }) {
   const [editContent, setEditContent] = useState('');
   const [can, setCan] = useState({ create: false, edit: false, delete: false });
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 10, total: 0 });
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const fetchNotes = async (page = 1) => {
     setLoading(true);
@@ -88,6 +91,17 @@ export default function NotesPanel({ projectId }) {
       await fetchNotes(meta.current_page);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openHistory = async (noteId) => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const { data } = await axios.get(route('projects.notes.history', [projectId, noteId]));
+      setHistoryItems(data.history || []);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -160,6 +174,7 @@ export default function NotesPanel({ projectId }) {
                         <div dangerouslySetInnerHTML={{ __html: note.content }} />
                       </Stack>
                       <Group gap={6}>
+                        <ActionIcon variant="subtle" color="gray" onClick={() => openHistory(note.id)} title="View history"><IconHistory size={16} /></ActionIcon>
                         {can.edit && (
                           <ActionIcon variant="subtle" color="blue" onClick={() => startEdit(note)}><IconPencil size={16} /></ActionIcon>
                         )}
@@ -180,6 +195,45 @@ export default function NotesPanel({ projectId }) {
           </>
         )}
       </Box>
+
+      <Modal opened={historyOpen} onClose={() => setHistoryOpen(false)} title="Note history" size="lg">
+        {historyLoading ? (
+          <Group justify="center" my="md"><Loader size="sm" /></Group>
+        ) : historyItems.length === 0 ? (
+          <Text c="dimmed">No history available.</Text>
+        ) : (
+          <ScrollArea.Autosize mah={400} type="scroll">
+            <Stack>
+              {historyItems.map((h) => (
+                <div key={h.id}>
+                  <Group gap="xs" mb={6}>
+                    <Badge size="xs" variant="light" color={h.event === 'created' ? 'green' : h.event === 'updated' ? 'blue' : 'gray'}>
+                      {h.event}
+                    </Badge>
+                    <Text size="xs" c="dimmed">{new Date(h.created_at).toLocaleString()}</Text>
+                  </Group>
+                  {h.event === 'created' && h.new_values?.content && (
+                    <div dangerouslySetInnerHTML={{ __html: h.new_values.content }} />
+                  )}
+                  {h.event === 'updated' && (
+                    <Group align="flex-start" grow wrap="nowrap">
+                      <Stack gap={4}>
+                        <Text size="sm" fw={600}>Old</Text>
+                        <div dangerouslySetInnerHTML={{ __html: h.old_values?.content || '' }} />
+                      </Stack>
+                      <Stack gap={4}>
+                        <Text size="sm" fw={600}>New</Text>
+                        <div dangerouslySetInnerHTML={{ __html: h.new_values?.content || '' }} />
+                      </Stack>
+                    </Group>
+                  )}
+                  <Divider my="sm" />
+                </div>
+              ))}
+            </Stack>
+          </ScrollArea.Autosize>
+        )}
+      </Modal>
     </Paper>
   );
 }
