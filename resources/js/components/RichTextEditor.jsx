@@ -54,6 +54,7 @@ const RichTextEditor = forwardRef(function RichTextEditor(
           <Editor.Underline />
           <Editor.Strikethrough />
           <Editor.Highlight />
+          <Editor.Code />
         </Editor.ControlsGroup>
 
         <Editor.ControlsGroup>
@@ -65,16 +66,17 @@ const RichTextEditor = forwardRef(function RichTextEditor(
         <Editor.ControlsGroup>
           <Editor.H1 />
           <Editor.H2 />
+          <Editor.H3 />
+        </Editor.ControlsGroup>
+
+        <Editor.ControlsGroup>
+          <Editor.CodeBlock />
+          <Editor.Blockquote />
         </Editor.ControlsGroup>
 
         <Editor.ControlsGroup>
           <Editor.Link />
           <Editor.Unlink />
-        </Editor.ControlsGroup>
-
-        <Editor.ControlsGroup>
-          <Editor.Code />
-          <Editor.Blockquote />
         </Editor.ControlsGroup>
       </Editor.Toolbar>
 

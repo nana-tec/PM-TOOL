@@ -45,6 +45,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::put('{project}/notes/{note}', [NoteController::class, 'update'])->name('notes.update')->scopeBindings();
         Route::delete('{project}/notes/{note}', [NoteController::class, 'destroy'])->name('notes.destroy')->scopeBindings();
         Route::get('{project}/notes/{note}/history', [NoteController::class, 'history'])->name('notes.history')->scopeBindings();
+        Route::post('{project}/notes/{note}/history/{auditId}/restore', [NoteController::class, 'restore'])->name('notes.history.restore')->scopeBindings();
 
         // TASK GROUPS
         Route::post('{project}/task-groups', [GroupController::class, 'store'])->name('task-groups.store');

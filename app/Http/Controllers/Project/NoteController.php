@@ -8,6 +8,8 @@ use App\Http\Requests\ProjectNote\UpdateProjectNoteRequest;
 use App\Models\Project;
 use App\Models\ProjectNote;
 use App\Services\HtmlSanitizer;
+use Illuminate\Http\Request;
+use OwenIt\Auditing\Models\Audit;
 
 class NoteController extends Controller
 {
@@ -82,5 +84,19 @@ class NoteController extends Controller
             ->get(['id', 'event', 'old_values', 'new_values', 'created_at']);
 
         return response()->json(['history' => $audits]);
+    }
+
+    public function restore(Project $project, ProjectNote $note, int $auditId)
+    {
+        $this->authorize('update', [$note, $project]);
+
+        $audit = $note->audits()->where('id', $auditId)->firstOrFail();
+
+        $target = $audit->new_values['content'] ?? ($audit->old_values['content'] ?? '');
+        $sanitized = app(HtmlSanitizer::class)->sanitize($target);
+
+        $note->update(['content' => $sanitized]);
+
+        return response()->json(['note' => $note->refresh()->load(['user:id,name,avatar,job_title'])]);
     }
 }

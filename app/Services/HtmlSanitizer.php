@@ -23,9 +23,10 @@ class HtmlSanitizer
         'code' => [],
         'p' => [],
         'br' => [],
-        'span' => [],
+        'span' => ['class'],
         'h1' => [],
         'h2' => [],
+        'h3' => [],
         'hr' => [],
     ];
 
@@ -43,7 +44,6 @@ class HtmlSanitizer
 
         $this->sanitizeNode($doc->documentElement ?? $doc);
 
-        // Remove doctype and html/body wrappers
         $output = '';
         foreach ($doc->childNodes as $child) {
             $output .= $doc->saveHTML($child);
@@ -61,25 +61,36 @@ class HtmlSanitizer
                 return;
             }
 
-            // Remove event handler and style/class attributes
             $allowedAttrs = $this->allowedTags[$tag];
             for ($i = $node->attributes->length - 1; $i >= 0; $i--) {
                 $attr = $node->attributes->item($i);
                 $name = strtolower($attr->nodeName);
-                if (str_starts_with($name, 'on') || $name === 'style' || $name === 'class') {
+
+                // Drop event handlers and style attributes always
+                if (str_starts_with($name, 'on') || $name === 'style') {
                     $node->removeAttribute($attr->nodeName);
                     continue;
                 }
+
+                // Special-case: only allow class="mention" on span
+                if ($name === 'class') {
+                    if ($tag === 'span' && trim((string) $attr->nodeValue) === 'mention') {
+                        continue; // keep class=mention
+                    }
+                    $node->removeAttribute($attr->nodeName);
+                    continue;
+                }
+
                 if (! in_array($name, $allowedAttrs, true)) {
                     $node->removeAttribute($attr->nodeName);
                     continue;
                 }
+
                 if ($tag === 'a' && $name === 'href') {
                     $href = trim((string) $attr->nodeValue);
                     if (! $this->isSafeHref($href)) {
                         $node->removeAttribute('href');
                     } else {
-                        // enforce safe link attrs
                         $node->setAttribute('rel', 'nofollow noopener noreferrer');
                         $node->setAttribute('target', '_blank');
                     }
@@ -87,7 +98,6 @@ class HtmlSanitizer
             }
         }
 
-        // Recurse
         if ($node->hasChildNodes()) {
             for ($i = $node->childNodes->length - 1; $i >= 0; $i--) {
                 $this->sanitizeNode($node->childNodes->item($i));
@@ -97,7 +107,6 @@ class HtmlSanitizer
 
     private function isSafeHref(string $href): bool
     {
-        // allow http, https, mailto only
         $lower = strtolower($href);
         return str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://') || str_starts_with($lower, 'mailto:');
     }

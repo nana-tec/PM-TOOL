@@ -23,6 +23,8 @@ export default function NotesPanel({ projectId }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyNoteId, setHistoryNoteId] = useState(null);
+  const [restoringAuditId, setRestoringAuditId] = useState(null);
 
   const fetchNotes = async (page = 1) => {
     setLoading(true);
@@ -95,6 +97,7 @@ export default function NotesPanel({ projectId }) {
   };
 
   const openHistory = async (noteId) => {
+    setHistoryNoteId(noteId);
     setHistoryOpen(true);
     setHistoryLoading(true);
     try {
@@ -102,6 +105,18 @@ export default function NotesPanel({ projectId }) {
       setHistoryItems(data.history || []);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const restoreFromHistory = async (auditId) => {
+    if (!historyNoteId) return;
+    setRestoringAuditId(auditId);
+    try {
+      const { data } = await axios.post(route('projects.notes.history.restore', [projectId, historyNoteId, auditId]));
+      const updated = data.note;
+      setNotes(prev => prev.map(n => (n.id === updated.id ? updated : n)));
+    } finally {
+      setRestoringAuditId(null);
     }
   };
 
@@ -206,11 +221,18 @@ export default function NotesPanel({ projectId }) {
             <Stack>
               {historyItems.map((h) => (
                 <div key={h.id}>
-                  <Group gap="xs" mb={6}>
-                    <Badge size="xs" variant="light" color={h.event === 'created' ? 'green' : h.event === 'updated' ? 'blue' : 'gray'}>
-                      {h.event}
-                    </Badge>
-                    <Text size="xs" c="dimmed">{new Date(h.created_at).toLocaleString()}</Text>
+                  <Group gap="xs" mb={6} justify="space-between" wrap="nowrap">
+                    <Group gap="xs">
+                      <Badge size="xs" variant="light" color={h.event === 'created' ? 'green' : h.event === 'updated' ? 'blue' : 'gray'}>
+                        {h.event}
+                      </Badge>
+                      <Text size="xs" c="dimmed">{new Date(h.created_at).toLocaleString()}</Text>
+                    </Group>
+                    {can.edit && (
+                      <Button size="xs" variant="light" onClick={() => restoreFromHistory(h.id)} loading={restoringAuditId === h.id}>
+                        Restore this version
+                      </Button>
+                    )}
                   </Group>
                   {h.event === 'created' && h.new_values?.content && (
                     <div dangerouslySetInnerHTML={{ __html: h.new_values.content }} />
