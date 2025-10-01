@@ -38,6 +38,9 @@ const ActivityIndex = () => {
     if (title.includes("comment")) {
       return <IconMessage size={18} />;
     }
+    if (title.includes("note")) {
+      return <IconEdit size={18} />;
+    }
     if (title.includes("was changed")) {
       return <IconEdit size={18} />;
     }
