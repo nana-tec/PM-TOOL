@@ -18,6 +18,7 @@ class PermissionService
             'Client User' => ['view client users', 'create client user', 'edit client user', 'archive client user', 'restore client user'],
             'Client Company' => ['view client companies', 'create client company', 'edit client company', 'archive client company', 'restore client company'],
             'Project' => ['view projects', 'view project', 'create project', 'edit project', 'archive project', 'restore project', 'edit project user access'],
+            'Notes' => ['view notes', 'create note', 'edit note', 'delete note'],
             'TaskGroups' => ['create task group', 'edit task group', 'archive task group', 'restore task group', 'reorder task group'],
             'Tasks' => [
                 'view tasks', 'create task', 'edit task', 'archive task', 'restore task', 'reorder task', 'complete task', 'add time log', 'delete time log',
@@ -30,6 +31,7 @@ class PermissionService
         'manager' => [
             'User' => ['view users'],
             'Project' => ['view projects', 'view project', 'create project', 'edit project', 'archive project', 'restore project', 'edit project user access'],
+            'Notes' => ['view notes', 'create note', 'edit note', 'delete note'],
             'TaskGroups' => ['create task group', 'edit task group', 'archive task group', 'restore task group', 'reorder task group'],
             'Tasks' => [
                 'view tasks', 'create task', 'edit task', 'archive task', 'restore task', 'reorder task', 'complete task', 'add time log', 'delete time log',
@@ -39,6 +41,7 @@ class PermissionService
         ],
         'developer' => [
             'Project' => ['view projects', 'view project'],
+            'Notes' => ['view notes', 'create note', 'edit note', 'delete note'],
             'Tasks' => [
                 'view tasks', 'create task', 'edit task', 'restore task', 'reorder task', 'complete task', 'add time log', 'delete time log',
                 'view time logs', 'view comments',
@@ -46,12 +49,14 @@ class PermissionService
         ],
         'qa engineer' => [
             'Project' => ['view projects', 'view project'],
+            'Notes' => ['view notes', 'create note', 'edit note', 'delete note'],
             'Tasks' => [
                 'view tasks', 'create task', 'edit task', 'add time log', 'delete time log', 'view time logs', 'view comments',
             ],
         ],
         'designer' => [
             'Project' => ['view projects', 'view project'],
+            'Notes' => ['view notes', 'create note', 'edit note', 'delete note'],
             'Tasks' => [
                 'view tasks', 'create task', 'edit task', 'restore task', 'reorder task', 'complete task', 'add time log', 'delete time log',
                 'view time logs', 'view comments',
@@ -59,6 +64,7 @@ class PermissionService
         ],
         'client' => [
             'Project' => ['view projects', 'view project'],
+            'Notes' => ['view notes', 'create note'],
             'Tasks' => [
                 'view tasks', 'create task', 'view time logs', 'view comments',
             ],
