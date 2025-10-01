@@ -159,7 +159,7 @@ class ReportController extends Controller
         $weeks = $days / 7;
         $weeklyCapacity = (float) ($request->get('weekly_capacity', 40));
         $capacityHours = $weeklyCapacity * $weeks;
-        $rankBy = in_array($request->get('rank_by'), ['performance','planned','actual']) ? $request->get('rank_by') : 'performance';
+        $rankBy = in_array($request->get('rank_by'), ['performance', 'planned', 'actual']) ? $request->get('rank_by') : 'performance';
 
         // Users to include (exclude clients by default)
         $usersQuery = User::query()->withoutRole('client');
@@ -229,7 +229,7 @@ class ReportController extends Controller
             ->whereIn('assigned_to_user_id', $userIds)
             ->where(function ($q) use ($start, $end) {
                 $q->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
-                  ->orWhereBetween('tasks.completed_at', [$start, $end]);
+                    ->orWhereBetween('tasks.completed_at', [$start, $end]);
             })
             ->groupBy('assigned_to_user_id')
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(DISTINCT project_id) AS projects')
@@ -248,14 +248,14 @@ class ReportController extends Controller
         $items = $users->map(function ($user) use (
             $capacityHours, $weeks, $pendingCounts, $overdueCounts, $completedCounts, $assignedCounts, $openWorkload, $windowWorkload, $projectsCounts, $timeLogged
         ) {
-            $pending = (int)($pendingCounts[$user->id] ?? 0);
-            $overdue = (int)($overdueCounts[$user->id] ?? 0);
-            $completed = (int)($completedCounts[$user->id] ?? 0);
-            $assigned = (int)($assignedCounts[$user->id] ?? 0);
-            $projects = (int)($projectsCounts[$user->id] ?? 0);
-            $openHours = (float)($openWorkload[$user->id] ?? 0.0);
-            $windowHours = (float)($windowWorkload[$user->id] ?? 0.0);
-            $loggedHours = (float)($timeLogged[$user->id] ?? 0.0);
+            $pending = (int) ($pendingCounts[$user->id] ?? 0);
+            $overdue = (int) ($overdueCounts[$user->id] ?? 0);
+            $completed = (int) ($completedCounts[$user->id] ?? 0);
+            $assigned = (int) ($assignedCounts[$user->id] ?? 0);
+            $projects = (int) ($projectsCounts[$user->id] ?? 0);
+            $openHours = (float) ($openWorkload[$user->id] ?? 0.0);
+            $windowHours = (float) ($windowWorkload[$user->id] ?? 0.0);
+            $loggedHours = (float) ($timeLogged[$user->id] ?? 0.0);
 
             $completionRate = $assigned > 0 ? round(($completed / $assigned) * 100, 1) : null;
             $throughput = $weeks > 0 ? round($completed / $weeks, 2) : $completed; // tasks per week
@@ -285,7 +285,7 @@ class ReportController extends Controller
                 'availability_hours' => $availabilityHours,
                 'completion_rate' => $completionRate,
                 'throughput_per_week' => $throughput,
-                ];
+            ];
         })->values();
 
         // Ranking
@@ -305,6 +305,7 @@ class ReportController extends Controller
         // Attach rank
         $ranked = $ranked->map(function ($i, $idx) {
             $i['rank'] = $idx + 1;
+
             return $i;
         });
 
@@ -328,9 +329,9 @@ class ReportController extends Controller
         Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
 
         $request->validate([
-            'user_id' => ['required','integer','exists:users,id'],
-            'status' => ['required','in:pending,overdue,completed'],
-            'dateRange' => ['array','size:2'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'status' => ['required', 'in:pending,overdue,completed'],
+            'dateRange' => ['array', 'size:2'],
         ]);
 
         $userId = (int) $request->user_id;
@@ -352,11 +353,11 @@ class ReportController extends Controller
             $q->whereNull('tasks.completed_at');
         } elseif ($status === 'overdue') {
             $q->whereNull('tasks.completed_at')
-              ->whereNotNull('tasks.due_on')
-              ->whereDate('tasks.due_on', '<', now()->toDateString());
+                ->whereNotNull('tasks.due_on')
+                ->whereDate('tasks.due_on', '<', now()->toDateString());
         } else { // completed
             $q->whereNotNull('tasks.completed_at')
-              ->whereBetween('tasks.completed_at', [$start, $end]);
+                ->whereBetween('tasks.completed_at', [$start, $end]);
         }
 
         $tasks = $q->limit(100)->get();
