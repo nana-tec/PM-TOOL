@@ -6,10 +6,11 @@ import OverdueTasks from "./Cards/OverdueTasks";
 import { ProjectCard } from "./Cards/ProjectCard";
 import RecentComments from "./Cards/RecentComments";
 import RecentlyAssignedTasks from "./Cards/RecentlyAssignedTasks";
+import TeamCapacityCard from "./Cards/TeamCapacityCard";
 import classes from "./css/Index.module.css";
 
 const Dashboard = () => {
-  const { projects, overdueTasks, recentlyAssignedTasks, recentComments } = usePage().props;
+  const { projects, overdueTasks, recentlyAssignedTasks, recentComments, teamCapacity } = usePage().props;
 
   const breakpointColumns = {
     default: 3,
@@ -25,6 +26,7 @@ const Dashboard = () => {
         className={classes.myMasonryGrid}
         columnClassName={classes.myMasonryGridColumn}
       >
+        {teamCapacity && <TeamCapacityCard capacityData={teamCapacity} />}
         {projects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}
