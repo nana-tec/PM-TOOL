@@ -20,6 +20,7 @@ class ActivityGroupedByDateCollection extends ResourceCollection
                 return [
                     'id' => $activity->id,
                     'activity_capable' => $activity->activityCapable,
+                    'activity_capable_type' => class_basename($activity->activity_capable_type),
                     'project' => $activity->project,
                     'title' => $activity->title,
                     'subtitle' => $activity->subtitle,

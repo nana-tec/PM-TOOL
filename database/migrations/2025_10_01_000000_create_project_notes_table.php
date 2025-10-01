@@ -14,6 +14,7 @@ return new class extends Migration
             $table->foreignId('project_id');
             $table->text('content');
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
@@ -22,4 +23,3 @@ return new class extends Migration
         Schema::dropIfExists('project_notes');
     }
 };
-

@@ -5,9 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Auditable as AuditingTrait;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class ProjectNote extends Model
+class ProjectNote extends Model implements AuditableContract
 {
+    use SoftDeletes, AuditingTrait;
+
     protected $fillable = [
         'user_id',
         'project_id',
@@ -29,4 +34,3 @@ class ProjectNote extends Model
         return $this->morphMany(Activity::class, 'activity_capable');
     }
 }
-
