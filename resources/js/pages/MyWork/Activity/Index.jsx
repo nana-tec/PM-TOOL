@@ -100,12 +100,14 @@ const ActivityIndex = () => {
                       href="#"
                       fz="md"
                       fw={600}
-                      onClick={() =>
-                        redirectTo("projects.tasks.open", [
-                          activity.project.id,
-                          activity.activity_capable.id,
-                        ])
-                      }
+                      onClick={() => {
+                        if (activity.activity_capable_type === 'Task') {
+                          return redirectTo("projects.tasks.open", [activity.project.id, activity.activity_capable.id]);
+                        }
+                        if (activity.activity_capable_type === 'ProjectNote') {
+                          return redirectTo("projects.edit", [activity.project.id]);
+                        }
+                      }}
                     >
                       {activity.title}
                     </Anchor>
