@@ -121,6 +121,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::get('logged-time/sum', [ReportController::class, 'loggedTimeSum'])->name('logged-time.sum');
         Route::get('logged-time/daily', [ReportController::class, 'dailyLoggedTime'])->name('logged-time.daily');
         Route::get('fixed-price/sum', [ReportController::class, 'fixedPriceSum'])->name('fixed-price.sum');
+        Route::get('team-capacity', [ReportController::class, 'teamCapacity'])->name('team-capacity');
     });
 
     // Settings

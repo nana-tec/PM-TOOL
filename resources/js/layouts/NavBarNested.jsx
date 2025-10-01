@@ -98,7 +98,7 @@ export default function Sidebar() {
         icon: IconReportAnalytics,
         active: route().current("reports.*"),
         opened: route().current("reports.*"),
-        visible: can("view logged time sum report") || can("view daily logged time report") || can("view fixed price sum report"),
+        visible: can("view logged time sum report") || can("view daily logged time report") || can("view fixed price sum report") || can("view team capacity report"),
         links: [
           {
             label: "Logged time sum",
@@ -117,6 +117,12 @@ export default function Sidebar() {
             link: route("reports.fixed-price.sum"),
             active: route().current("reports.fixed-price.sum"),
             visible: can("view fixed price sum report"),
+          },
+          {
+            label: "Team capacity",
+            link: route("reports.team-capacity"),
+            active: route().current("reports.team-capacity"),
+            visible: can("view team capacity report"),
           },
         ],
       },
