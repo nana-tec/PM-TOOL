@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, Group, Loader, Paper, Stack, Text, Textarea, Title, ActionIcon, Pagination } from '@mantine/core';
+import { Box, Button, Group, Loader, Paper, Stack, Text, Title, ActionIcon, Pagination } from '@mantine/core';
 import { IconPencil, IconTrash, IconX, IconCheck } from '@tabler/icons-react';
 import axios from 'axios';
+import RichTextEditor from '@/components/RichTextEditor';
+
+function stripHtml(html = '') {
+  const tmp = typeof window !== 'undefined' ? document.createElement('div') : null;
+  if (!tmp) return html;
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim();
+}
 
 export default function NotesPanel({ projectId }) {
   const [notes, setNotes] = useState([]);
@@ -31,7 +39,8 @@ export default function NotesPanel({ projectId }) {
   }, [projectId]);
 
   const addNote = async () => {
-    if (!newContent || newContent.length < 8) return;
+    const plain = stripHtml(newContent);
+    if (!plain || plain.length < 8) return;
     setSaving(true);
     try {
       const { data } = await axios.post(route('projects.notes.store', projectId), { content: newContent });
@@ -49,7 +58,7 @@ export default function NotesPanel({ projectId }) {
 
   const startEdit = (note) => {
     setEditingId(note.id);
-    setEditContent(note.content);
+    setEditContent(note.content || '');
   };
 
   const cancelEdit = () => {
@@ -58,7 +67,8 @@ export default function NotesPanel({ projectId }) {
   };
 
   const saveEdit = async (noteId) => {
-    if (!editContent || editContent.length < 8) return;
+    const plain = stripHtml(editContent);
+    if (!plain || plain.length < 8) return;
     setSaving(true);
     try {
       const { data } = await axios.put(route('projects.notes.update', [projectId, noteId]), { content: editContent });
@@ -85,6 +95,9 @@ export default function NotesPanel({ projectId }) {
     await fetchNotes(page);
   };
 
+  const canSubmitNew = stripHtml(newContent).length >= 8;
+  const canSubmitEdit = stripHtml(editContent).length >= 8;
+
   return (
     <Paper withBorder p="md" radius="md">
       <Group justify="space-between" mb="sm">
@@ -93,15 +106,14 @@ export default function NotesPanel({ projectId }) {
 
       {can.create && (
         <Stack gap="sm">
-          <Textarea
+          <RichTextEditor
             placeholder="Write a note (min 8 characters)"
-            autosize
-            minRows={2}
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
+            content={newContent}
+            onChange={setNewContent}
+            height={150}
           />
           <Group justify="flex-end">
-            <Button loading={saving} onClick={addNote} disabled={!newContent || newContent.length < 8}>
+            <Button loading={saving} onClick={addNote} disabled={!canSubmitNew}>
               Add note
             </Button>
           </Group>
@@ -122,10 +134,16 @@ export default function NotesPanel({ projectId }) {
                 <Paper key={note.id} withBorder p="sm" radius="sm">
                   {editingId === note.id ? (
                     <Stack>
-                      <Textarea autosize minRows={2} value={editContent} onChange={(e) => setEditContent(e.target.value)} />
+                      <RichTextEditor
+                        key={editingId}
+                        placeholder="Edit note"
+                        content={editContent}
+                        onChange={setEditContent}
+                        height={150}
+                      />
                       <Group justify="flex-end">
                         <ActionIcon color="gray" variant="light" onClick={cancelEdit}><IconX size={16} /></ActionIcon>
-                        <ActionIcon color="green" variant="light" onClick={() => saveEdit(note.id)} disabled={!editContent || editContent.length < 8}>
+                        <ActionIcon color="green" variant="light" onClick={() => saveEdit(note.id)} disabled={!canSubmitEdit}>
                           <IconCheck size={16} />
                         </ActionIcon>
                       </Group>
@@ -139,7 +157,7 @@ export default function NotesPanel({ projectId }) {
                           )}
                           <Text size="xs" c="dimmed">{new Date(note.created_at).toLocaleString()}</Text>
                         </Group>
-                        <Text>{note.content}</Text>
+                        <div dangerouslySetInnerHTML={{ __html: note.content }} />
                       </Stack>
                       <Group gap={6}>
                         {can.edit && (
