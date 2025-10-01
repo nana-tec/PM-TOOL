@@ -25,8 +25,78 @@
     }
 }
 
+.enhancedTask {
+    position: relative;
+    transition: all 0.2s ease;
+    border: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-5));
+    background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+
+    @mixin hover {
+        border-color: light-dark(var(--mantine-color-blue-3), var(--mantine-color-blue-7));
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    &.completed {
+        opacity: 0.7;
+        background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7));
+    }
+}
+
+.priorityIndicator {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 0 var(--mantine-radius-md) var(--mantine-radius-md) 0;
+
+    &[data-priority="critical"] {
+        background: linear-gradient(180deg, var(--mantine-color-red-6), var(--mantine-color-red-4));
+    }
+
+    &[data-priority="high"] {
+        background: linear-gradient(180deg, var(--mantine-color-orange-6), var(--mantine-color-orange-4));
+    }
+
+    &[data-priority="medium"] {
+        background: linear-gradient(180deg, var(--mantine-color-yellow-6), var(--mantine-color-yellow-4));
+    }
+}
+
 .name {
     cursor: pointer;
+    transition: color 0.2s ease;
+
+    @mixin hover {
+        color: light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4));
+    }
+}
+
+.enhancedName {
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.metadata {
+    flex-shrink: 0;
+    align-items: center;
+}
+
+.dueBadge {
+    font-weight: 500;
+    font-size: rem(11px);
+}
+
+.projectBadge {
+    font-weight: 500;
+    font-size: rem(11px);
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    @mixin hover {
+        transform: scale(1.05);
+    }
 }
 
 .completed {

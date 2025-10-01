@@ -4,3 +4,25 @@
     border: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-6));
     transition: 0.3s ease border, 0.3s ease color;
 }
+
+.labelGroup {
+    border: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-5));
+    background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+    transition: all 0.2s ease;
+
+    @mixin hover {
+        border-color: light-dark(var(--mantine-color-blue-3), var(--mantine-color-blue-7));
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+}
+
+.dateGroup {
+    border: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-5));
+    background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+    transition: all 0.2s ease;
+
+    @mixin hover {
+        border-color: light-dark(var(--mantine-color-blue-3), var(--mantine-color-blue-7));
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+}
