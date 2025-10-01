@@ -19,6 +19,7 @@ import {
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { PricingType } from '@/utils/enums';
+import NotesPanel from '@/pages/Projects/Notes/Panel';
 
 const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
   const { item } = usePage().props;
@@ -155,6 +156,10 @@ const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
           </Group>
         </form>
       </ContainerBox>
+
+      <div style={{ marginTop: 24 }}>
+        <NotesPanel projectId={item.id} />
+      </div>
     </>
   );
 };
