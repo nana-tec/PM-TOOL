@@ -22,6 +22,7 @@ use App\Http\Controllers\Task\TimeLogController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Project\NoteController;
 
 Route::redirect('/', 'dashboard');
 
@@ -37,6 +38,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('{projectId}/restore', [ProjectController::class, 'restore'])->name('restore');
         Route::put('{project}/favorite/toggle', [ProjectController::class, 'favoriteToggle'])->name('favorite.toggle');
         Route::post('{project}/user-access', [ProjectController::class, 'userAccess'])->name('user_access');
+
+        // PROJECT NOTES
+        Route::get('{project}/notes', [NoteController::class, 'index'])->name('notes');
+        Route::post('{project}/notes', [NoteController::class, 'store'])->name('notes.store');
+        Route::put('{project}/notes/{note}', [NoteController::class, 'update'])->name('notes.update')->scopeBindings();
+        Route::delete('{project}/notes/{note}', [NoteController::class, 'destroy'])->name('notes.destroy')->scopeBindings();
+        Route::get('{project}/notes/{note}/history', [NoteController::class, 'history'])->name('notes.history')->scopeBindings();
 
         // TASK GROUPS
         Route::post('{project}/task-groups', [GroupController::class, 'store'])->name('task-groups.store');
