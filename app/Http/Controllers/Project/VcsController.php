@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 class VcsController extends Controller
 {
-    public function showIntegration(Project $project)
+    public function showIntegration(Project $project): \Illuminate\Http\JsonResponse
     {
         $this->authorize('view', $project);
         $integration = $project->vcsIntegration;
@@ -36,7 +36,7 @@ class VcsController extends Controller
         ]);
     }
 
-    public function upsertIntegration(Request $request, Project $project)
+    public function upsertIntegration(Request $request, Project $project): \Illuminate\Http\JsonResponse
     {
         $this->authorize('update', $project);
         $data = $request->validate([
@@ -61,12 +61,13 @@ class VcsController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
-    public function destroyIntegration(Project $project)
+    public function destroyIntegration(Project $project): \Illuminate\Http\JsonResponse
     {
         $this->authorize('update', $project);
         if ($project->vcsIntegration) {
             $project->vcsIntegration->delete();
         }
+
         return response()->json(['status' => 'ok']);
     }
 
@@ -87,6 +88,7 @@ class VcsController extends Controller
                 'token' => $data['token'],
             ]
         );
+
         return response()->json(['status' => 'ok']);
     }
 
@@ -98,6 +100,7 @@ class VcsController extends Controller
             ->where('user_id', auth()->id())
             ->where('provider', $integration->provider)
             ->delete();
+
         return response()->json(['status' => 'ok']);
     }
 
@@ -105,6 +108,7 @@ class VcsController extends Controller
     {
         $integration = $project->vcsIntegration;
         abort_unless($integration, 404, 'VCS integration not configured for this project');
+
         return $integration;
     }
 
@@ -122,6 +126,7 @@ class VcsController extends Controller
         if ($preferred === 'user') {
             return $userToken?->token;
         }
+
         // default: prefer user token if exists
         return $userToken?->token;
     }
@@ -132,6 +137,7 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+
             return response()->json(['branches' => $client->listBranches()]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -146,6 +152,7 @@ class VcsController extends Controller
             $branch = $request->query('branch') ?: ($integration->default_branch ?: 'main');
             $perPage = (int) ($request->query('per_page', 20));
             $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+
             return response()->json(['commits' => $client->listCommits($branch, $perPage)]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -157,6 +164,7 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+
             return response()->json(['issues' => $client->listIssues()]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -168,6 +176,7 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+
             return response()->json(['pulls' => $client->listPullRequests()]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -184,6 +193,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $issue = $client->createIssue($data['title'], $data['body'] ?? null);
+
             return response()->json(['issue' => $issue]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -207,17 +217,18 @@ class VcsController extends Controller
             $branches = collect($client->listBranches())->pluck('name')->all();
 
             $target = $data['target_branch'];
-            if (!in_array($target, $branches, true)) {
+            if (! in_array($target, $branches, true)) {
                 return response()->json(['error' => "Target branch '{$target}' does not exist in the repository."], 422);
             }
 
             $source = $data['source_branch'];
             // If source contains a colon (e.g., "owner:branch" for forks), skip local existence check
-            if (!str_contains($source, ':') && !in_array($source, $branches, true)) {
+            if (! str_contains($source, ':') && ! in_array($source, $branches, true)) {
                 return response()->json(['error' => "Source branch '{$source}' does not exist in the repository. If using a fork, use 'owner:branch'."], 422);
             }
 
             $pr = $client->openMergeRequest($source, $target, $data['title'], $data['body'] ?? null);
+
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -233,6 +244,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $res = $client->mergeRequest($data['number']);
+
             return response()->json($res);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
