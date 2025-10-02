@@ -36,9 +36,9 @@ class HtmlSanitizer
             return '';
         }
 
-        $doc = new DOMDocument();
+        $doc = new DOMDocument;
         $internalErrors = libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="utf-8" ?>' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $doc->loadHTML('<?xml encoding="utf-8" ?>'.$html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         libxml_use_internal_errors($internalErrors);
 
@@ -58,6 +58,7 @@ class HtmlSanitizer
             $tag = strtolower($node->tagName);
             if (! array_key_exists($tag, $this->allowedTags)) {
                 $node->parentNode?->removeChild($node);
+
                 return;
             }
 
@@ -69,6 +70,7 @@ class HtmlSanitizer
                 // Drop event handlers and style attributes always
                 if (str_starts_with($name, 'on') || $name === 'style') {
                     $node->removeAttribute($attr->nodeName);
+
                     continue;
                 }
 
@@ -78,11 +80,13 @@ class HtmlSanitizer
                         continue; // keep class=mention
                     }
                     $node->removeAttribute($attr->nodeName);
+
                     continue;
                 }
 
                 if (! in_array($name, $allowedAttrs, true)) {
                     $node->removeAttribute($attr->nodeName);
+
                     continue;
                 }
 
@@ -108,6 +112,7 @@ class HtmlSanitizer
     private function isSafeHref(string $href): bool
     {
         $lower = strtolower($href);
+
         return str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://') || str_starts_with($lower, 'mailto:');
     }
 }

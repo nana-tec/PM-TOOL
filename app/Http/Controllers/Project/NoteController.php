@@ -8,8 +8,6 @@ use App\Http\Requests\ProjectNote\UpdateProjectNoteRequest;
 use App\Models\Project;
 use App\Models\ProjectNote;
 use App\Services\HtmlSanitizer;
-use Illuminate\Http\Request;
-use OwenIt\Auditing\Models\Audit;
 
 class NoteController extends Controller
 {

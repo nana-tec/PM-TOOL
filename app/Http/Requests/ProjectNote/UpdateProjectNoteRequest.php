@@ -18,4 +18,3 @@ class UpdateProjectNoteRequest extends FormRequest
         ];
     }
 }
-
