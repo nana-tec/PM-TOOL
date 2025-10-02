@@ -70,6 +70,13 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::post('issues', [VcsController::class, 'createIssue'])->name('issues.create')->scopeBindings();
             Route::post('pulls', [VcsController::class, 'openPr'])->name('pulls.open')->scopeBindings();
             Route::post('merge', [VcsController::class, 'merge'])->name('merge')->scopeBindings();
+
+            Route::get('pulls/{number}/reviewers', [VcsController::class, 'listReviewers'])->name('pulls.reviewers')->scopeBindings();
+            Route::post('pulls/{number}/reviewers', [VcsController::class, 'addReviewers'])->name('pulls.reviewers.add')->scopeBindings();
+            Route::get('pulls/{number}/statuses', [VcsController::class, 'pullStatuses'])->name('pulls.statuses')->scopeBindings();
+
+            Route::get('issues/{issueId}/comments', [VcsController::class, 'issueComments'])->name('issues.comments')->scopeBindings();
+            Route::post('issues/{issueId}/comments', [VcsController::class, 'addIssueComment'])->name('issues.comments.add')->scopeBindings();
         });
 
         // TASK GROUPS

@@ -43,4 +43,19 @@ interface VcsClientInterface
     public function compare(string $base, string $head): array;
 
     public function getRepositoryUrl(): string;
+
+    /** @return array{items: array<int, array{username:string, name?:string}>, has_next: bool} */
+    public function listPotentialReviewers(int $page = 1, int $perPage = 50): array;
+
+    /** @return array{status:string, added?:array} */
+    public function requestReviewers(int|string $number, array $usernames): array;
+
+    /** @return array{sha?:string, statuses: array<int, array{context:string, state:string, description?:string, url?:string}>} */
+    public function getPullStatuses(int|string $number): array;
+
+    /** @return array{items: array<int, array{id:int|string, user?:string, body:string, created_at:string}>, has_next: bool} */
+    public function listIssueComments(int|string $issueId, int $page = 1, int $perPage = 20): array;
+
+    /** @return array{id:int|string, url?:string} */
+    public function createIssueComment(int|string $issueId, string $body): array;
 }

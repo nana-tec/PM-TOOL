@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch } from '@mantine/core';
-import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle, IconInfoCircle } from '@tabler/icons-react';
+import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, MultiSelect } from '@mantine/core';
+import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle, IconInfoCircle, IconDownload } from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
 
@@ -88,12 +88,64 @@ export default function VcsPanel({ projectId }) {
   const [compareCommits, setCompareCommits] = useState([]);
   const [compareFiles, setCompareFiles] = useState([]);
 
+  // PR statuses
+  const [prStatuses, setPrStatuses] = useState([]);
+  const [prStatusSha, setPrStatusSha] = useState('');
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+
+  // Reviewers picker
+  const [reviewers, setReviewers] = useState([]); // [{username, name}]
+  const [reviewersPage, setReviewersPage] = useState(1);
+  const [reviewersHasNext, setReviewersHasNext] = useState(false);
+  const [loadingReviewers, setLoadingReviewers] = useState(false);
+  const [selectedReviewerUsernames, setSelectedReviewerUsernames] = useState([]);
+  const [addingReviewers, setAddingReviewers] = useState(false);
+
+  // Issue details/comments
+  const [issueDetailsOpen, setIssueDetailsOpen] = useState(false);
+  const [issueDetails, setIssueDetails] = useState(null); // {id,title,state,url}
+  const [issueComments, setIssueComments] = useState([]);
+  const [issueCommentsPage, setIssueCommentsPage] = useState(1);
+  const [issueCommentsHasNext, setIssueCommentsHasNext] = useState(false);
+  const [loadingIssueComments, setLoadingIssueComments] = useState(false);
+  const [newIssueComment, setNewIssueComment] = useState('');
+  const [submittingIssueComment, setSubmittingIssueComment] = useState(false);
+
   const providerIcon = useMemo(() => PROVIDERS.find(p => p.value === (integration?.provider || provider))?.icon, [integration, provider]);
 
   const notifyError = (title, message) => showNotification({ color: 'red', title, message });
   const notifySuccess = (title, message) => showNotification({ color: 'green', title, message });
 
   const tokenParams = () => ({ use_token: useUserToken ? 'user' : 'project' });
+
+  // Friendly error parser for common VCS errors
+  const parseApiError = (e, fallback = 'Something went wrong') => {
+    try {
+      const status = e?.response?.status;
+      const headers = e?.response?.headers || {};
+      const data = e?.response?.data || {};
+      const msg = data?.error || data?.message || e?.message || fallback;
+      // Rate limit hint
+      if (status === 403 && (headers['x-ratelimit-remaining'] === '0' || /rate limit/i.test(msg))) {
+        return 'API rate limit exceeded. Try again later or switch token in the panel.';
+      }
+      // GitHub PR base invalid
+      const errors = data?.errors;
+      if (Array.isArray(errors)) {
+        const baseInvalid = errors.find(er => er?.resource === 'PullRequest' && er?.field === 'base' && er?.code === 'invalid');
+        if (baseInvalid) return 'Invalid target branch. Ensure the target/base branch exists and you have access.';
+      }
+      // GitHub merge weird schema error
+      if (status === 422 && /links\/1\/schema/.test(String(msg))) {
+        return 'Merge cannot be completed via API. Ensure the PR is mergeable, up to date, and you have permissions.';
+      }
+      if (status === 401) return 'Unauthorized. Check your token.';
+      if (status === 404) return 'Not found. Check repository and permissions.';
+      return msg;
+    } catch {
+      return fallback;
+    }
+  };
 
   const loadIntegration = async () => {
     setLoading(true);
@@ -335,7 +387,7 @@ export default function VcsPanel({ projectId }) {
       await fetchPulls(pullsState, 1);
       notifySuccess('Request opened', `${integration.provider === 'github' ? 'Pull request' : 'Merge request'} opened`);
     } catch (e) {
-      const msg = e?.response?.data?.error || e.message;
+      const msg = parseApiError(e, 'Failed to open request');
       setError(msg);
       notifyError('Failed to open request', msg);
     } finally {
@@ -351,7 +403,7 @@ export default function VcsPanel({ projectId }) {
       await fetchPulls(pullsState, 1);
       notifySuccess('Merged', 'Request merged successfully');
     } catch (e) {
-      const msg = e?.response?.data?.error || e.message;
+      const msg = parseApiError(e, 'Merge failed');
       setError(msg);
       notifyError('Merge failed', msg);
     }
@@ -365,22 +417,151 @@ export default function VcsPanel({ projectId }) {
     setPrComments([]);
     setPrCommentsPage(1);
     setPrCommentsHasNext(false);
+    setReviewers([]);
+    setSelectedReviewerUsernames([]);
     setError('');
     try {
       const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), { params: tokenParams() });
       setPrDetails(data.pull);
-      // Preload first page of comments
-      await fetchPrComments(number, 1);
+      await Promise.all([
+        fetchPrStatuses(number),
+        fetchPrComments(number, 1),
+        fetchReviewers(number, 1),
+      ]);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
-      notifyError('Failed to load PR details', msg);
+      showNotification({ color: 'red', title: 'Failed to load PR details', message: msg });
     } finally {
       setLoadingPrDetails(false);
     }
   };
 
+  // Status checks
+  const fetchPrStatuses = async (number) => {
+    if (!number) return;
+    setLoadingStatuses(true);
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.statuses', [projectId, number]), { params: tokenParams() });
+      setPrStatusSha(data.sha || '');
+      setPrStatuses(data.statuses || []);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      showNotification({ color: 'red', title: 'Failed to fetch statuses', message: msg });
+    } finally {
+      setLoadingStatuses(false);
+    }
+  };
+
+  // Reviewers
+  const fetchReviewers = async (number, page = 1) => {
+    setLoadingReviewers(true);
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.reviewers', [projectId, number]), { params: { ...tokenParams(), page, per_page: 50 } });
+      setReviewers(prev => (page === 1 ? data.reviewers : [...prev, ...data.reviewers]));
+      setReviewersHasNext(!!data.has_next);
+      setReviewersPage(page);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      showNotification({ color: 'red', title: 'Failed to load reviewers', message: msg });
+    } finally {
+      setLoadingReviewers(false);
+    }
+  };
+
+  const addSelectedReviewers = async () => {
+    if (!prDetails || selectedReviewerUsernames.length === 0) return;
+    setAddingReviewers(true);
+    try {
+      await axios.post(route('projects.vcs.pulls.reviewers.add', [projectId, prDetails.number]), { usernames: selectedReviewerUsernames }, { params: tokenParams() });
+      showNotification({ color: 'green', title: 'Reviewers added', message: 'Selected reviewers have been requested.' });
+      setSelectedReviewerUsernames([]);
+      // refresh PR details to reflect requested reviewers
+      await openPrDetails(prDetails.number);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      showNotification({ color: 'red', title: 'Failed to add reviewers', message: msg });
+    } finally {
+      setAddingReviewers(false);
+    }
+  };
+
+  // Issue comments
+  const openIssueDetails = async (issue) => {
+    setIssueDetails(issue);
+    setIssueDetailsOpen(true);
+    await fetchIssueComments(issue.id, 1);
+  };
+
+  const fetchIssueComments = async (issueId, page = 1) => {
+    setLoadingIssueComments(true);
+    try {
+      const { data } = await axios.get(route('projects.vcs.issues.comments', [projectId, issueId]), { params: { ...tokenParams(), page, per_page: 20 } });
+      setIssueComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
+      setIssueCommentsHasNext(!!data.has_next);
+      setIssueCommentsPage(page);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      showNotification({ color: 'red', title: 'Failed to load issue comments', message: msg });
+    } finally {
+      setLoadingIssueComments(false);
+    }
+  };
+
+  const addIssueComment = async () => {
+    if (!issueDetails || !newIssueComment.trim()) return;
+    setSubmittingIssueComment(true);
+    try {
+      await axios.post(route('projects.vcs.issues.comments.add', [projectId, issueDetails.id]), { body: newIssueComment }, { params: tokenParams() });
+      setNewIssueComment('');
+      await fetchIssueComments(issueDetails.id, 1);
+      showNotification({ color: 'green', title: 'Comment added', message: 'Your comment was posted' });
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      showNotification({ color: 'red', title: 'Failed to add comment', message: msg });
+    } finally {
+      setSubmittingIssueComment(false);
+    }
+  };
+
+  // Compare export
+  const downloadText = (filename, text, type = 'text/plain') => {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCompareJSON = () => {
+    const obj = { commits: compareCommits, files: compareFiles };
+    downloadText('compare.json', JSON.stringify(obj, null, 2), 'application/json');
+  };
+
+  const exportCompareCSV = () => {
+    const rows = [];
+    rows.push(['type', 'sha/filename', 'message', 'author', 'date', 'additions', 'deletions'].join(','));
+    (compareCommits || []).forEach(c => {
+      rows.push(['commit', c.sha, JSON.stringify(c.message || ''), JSON.stringify(c.author || ''), c.date || '', '', ''].join(','));
+    });
+    (compareFiles || []).forEach(f => {
+      rows.push(['file', f.filename, '', '', '', f.additions ?? 0, f.deletions ?? 0].join(','));
+    });
+    downloadText('compare.csv', rows.join('\n'), 'text/csv');
+  };
+
+  // --- Missing functions implementation ---
   const fetchPrComments = async (number, page = 1) => {
+    if (!number) return;
     setLoadingPrComments(true);
     setError('');
     try {
@@ -391,7 +572,7 @@ export default function VcsPanel({ projectId }) {
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
-      notifyError('Failed to load comments', msg);
+      showNotification({ color: 'red', title: 'Failed to load comments', message: msg });
     } finally {
       setLoadingPrComments(false);
     }
@@ -405,11 +586,11 @@ export default function VcsPanel({ projectId }) {
       await axios.post(route('projects.vcs.pulls.comments.add', [projectId, prDetails.number]), { body: newComment }, { params: tokenParams() });
       setNewComment('');
       await fetchPrComments(prDetails.number, 1);
-      notifySuccess('Comment added', 'Your comment was posted');
+      showNotification({ color: 'green', title: 'Comment added', message: 'Your comment was posted' });
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
-      notifyError('Failed to add comment', msg);
+      showNotification({ color: 'red', title: 'Failed to add comment', message: msg });
     } finally {
       setSubmittingComment(false);
     }
@@ -422,31 +603,54 @@ export default function VcsPanel({ projectId }) {
     try {
       await axios.post(route('projects.vcs.pulls.reviews.submit', [projectId, prDetails.number]), { event, body: newComment || null }, { params: tokenParams() });
       if (event !== 'COMMENT') setNewComment('');
-      notifySuccess('Review submitted', event === 'APPROVE' ? 'Approved' : event === 'REQUEST_CHANGES' ? 'Requested changes' : 'Commented');
+      showNotification({ color: 'green', title: 'Review submitted', message: event.replace('_', ' ').toLowerCase() });
+      // refresh statuses and details (mergeability/checks may change)
+      await Promise.all([
+        fetchPrStatuses(prDetails.number),
+        openPrDetails(prDetails.number),
+      ]);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
-      notifyError('Failed to submit review', msg);
+      showNotification({ color: 'red', title: 'Failed to submit review', message: msg });
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  // Compare
+  // Poll mergeability and statuses when PR details are open
+  useEffect(() => {
+    if (!prDetailsOpen || !prDetails?.number) return;
+    let stopped = false;
+    const number = prDetails.number;
+    const tick = async () => {
+      if (stopped) return;
+      await Promise.all([
+        fetchPrStatuses(number),
+        refreshPrDetailsOnly(number),
+      ]);
+    };
+    const id = setInterval(tick, 15000);
+    // initial tick
+    tick();
+    return () => { stopped = true; clearInterval(id); };
+  }, [prDetailsOpen, prDetails?.number]);
+
   const doCompare = async () => {
-    if (!compareBase?.trim() || !compareHead?.trim()) return;
+    if (!compareBase.trim() || !compareHead.trim()) return;
     setCompareLoading(true);
-    setCompareCommits([]);
-    setCompareFiles([]);
     setError('');
     try {
       const { data } = await axios.post(route('projects.vcs.compare', projectId), { base: compareBase, head: compareHead }, { params: tokenParams() });
       setCompareCommits(data.commits || []);
       setCompareFiles(data.files || []);
+      if ((data.commits || []).length === 0 && (!data.files || data.files.length === 0)) {
+        showNotification({ color: 'yellow', title: 'No differences', message: 'No commits or file changes found for this comparison.' });
+      }
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
-      notifyError('Compare failed', msg);
+      showNotification({ color: 'red', title: 'Compare failed', message: msg });
     } finally {
       setCompareLoading(false);
     }
@@ -566,6 +770,9 @@ export default function VcsPanel({ projectId }) {
                       style={{ minWidth: 220 }}
                     />
                     <ActionIcon variant="subtle" onClick={() => fetchBranches(1)} loading={branchesLoading}><IconRefresh size={16} /></ActionIcon>
+                    {!branchesLoading && branchesHasNext && (
+                      <Button size="xs" variant="light" onClick={() => fetchBranches(branchesPage + 1)}>Load more branches</Button>
+                    )}
                   </Group>
                   <Divider my="xs" />
                   <ScrollArea.Autosize mah={240} type="scroll">
@@ -605,7 +812,9 @@ export default function VcsPanel({ projectId }) {
                       {issues.map((i) => (
                         <Group key={i.id} gap="xs" wrap="nowrap" justify="space-between">
                           <Stack gap={2} style={{ flex: 1 }}>
-                            <Text size="sm" fw={600}>{i.title}</Text>
+                            <Anchor size="sm" fw={600} onClick={() => openIssueDetails(i)}>
+                              {i.title}
+                            </Anchor>
                             <Group gap={6}><Badge size="xs" variant="light" color={i.state === 'open' || i.state === 'opened' ? 'green' : 'gray'}>{i.state}</Badge>{i.url && (<Anchor href={i.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
                           </Stack>
                         </Group>
@@ -716,6 +925,63 @@ export default function VcsPanel({ projectId }) {
 
             <Divider />
 
+            {/* Status checks */}
+            <Stack>
+              <Group justify="space-between">
+                <Text fw={600}>Status checks</Text>
+                <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} loading={loadingStatuses} onClick={() => fetchPrStatuses(prDetails.number)}>Refresh statuses</Button>
+              </Group>
+              {prStatusSha && <Text size="xs" c="dimmed">Head SHA: {prStatusSha}</Text>}
+              <Stack>
+                {prStatuses.length === 0 ? (
+                  <Text c="dimmed">No statuses.</Text>
+                ) : prStatuses.map((s, idx) => (
+                  <Group key={idx} justify="space-between">
+                    <Text size="sm">{s.context}</Text>
+                    <Group gap={6}>
+                      <Badge size="xs" color={s.state === 'success' ? 'green' : s.state === 'failure' || s.state === 'error' ? 'red' : s.state === 'pending' ? 'yellow' : 'gray'}>{s.state}</Badge>
+                      {s.url && <Anchor href={s.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
+                    </Group>
+                  </Group>
+                ))}
+              </Stack>
+            </Stack>
+
+            <Divider />
+
+            {/* Reviewers picker */}
+            <Stack>
+              <Group justify="space-between">
+                <Text fw={600}>Request reviewers</Text>
+                <Group>
+                  {reviewersHasNext && (
+                    <Button size="xs" variant="subtle" onClick={() => fetchReviewers(prDetails.number, reviewersPage + 1)} loading={loadingReviewers}>Load more</Button>
+                  )}
+                </Group>
+              </Group>
+              <MultiSelect
+                data={reviewers.map(r => ({ value: r.username, label: r.name ? `${r.name} (${r.username})` : r.username }))}
+                value={selectedReviewerUsernames}
+                onChange={setSelectedReviewerUsernames}
+                searchable
+                placeholder="Select reviewers"
+              />
+              <Group justify="flex-end">
+                <Button size="xs" onClick={addSelectedReviewers} loading={addingReviewers} disabled={selectedReviewerUsernames.length === 0}>Request reviewers</Button>
+              </Group>
+              {prDetails.requested_reviewers?.length > 0 && (
+                <Group gap={6} wrap="wrap">
+                  <Text size="sm" fw={600}>Requested:</Text>
+                  {prDetails.requested_reviewers.map(u => (
+                    <Badge key={u} size="xs" variant="light">{u}</Badge>
+                  ))}
+                </Group>
+              )}
+            </Stack>
+
+            <Divider />
+
+            {/* Comments */}
             <Stack>
               <Text fw={600}>Comments</Text>
               <Stack>
@@ -736,6 +1002,48 @@ export default function VcsPanel({ projectId }) {
               <Group align="flex-end" wrap="nowrap">
                 <Textarea label="Add a comment / review note" value={newComment} onChange={(e) => setNewComment(e.target.value)} autosize minRows={2} style={{ flex: 1 }} />
                 <Button variant="light" onClick={addPrComment} loading={submittingComment} disabled={!newComment.trim()}>Comment</Button>
+              </Group>
+            </Stack>
+          </Stack>
+        )}
+      </Modal>
+
+      {/* Issue Details Modal */}
+      <Modal opened={issueDetailsOpen} onClose={() => setIssueDetailsOpen(false)} title="Issue details" size="lg">
+        {!issueDetails ? (
+          <Group justify="center" my="md"><Loader size="sm" /></Group>
+        ) : (
+          <Stack>
+            <Group justify="space-between">
+              <Stack gap={2}>
+                <Text fw={600}>{issueDetails.title}</Text>
+                <Group gap={6}>
+                  <Badge size="xs" variant="light" color={issueDetails.state === 'open' || issueDetails.state === 'opened' ? 'green' : 'gray'}>{issueDetails.state}</Badge>
+                  {issueDetails.url && <Anchor href={issueDetails.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
+                </Group>
+              </Stack>
+            </Group>
+            <Divider />
+            <Stack>
+              <Text fw={600}>Comments</Text>
+              <Stack>
+                {issueComments.map(c => (
+                  <Paper key={c.id} withBorder p="sm" radius="sm">
+                    <Group justify="space-between">
+                      <Text size="sm" fw={600}>{c.user || 'User'}</Text>
+                      <Text size="xs" c="dimmed">{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</Text>
+                    </Group>
+                    <Text size="sm" mt={4}>{c.body}</Text>
+                  </Paper>
+                ))}
+                {loadingIssueComments && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                {!loadingIssueComments && issueCommentsHasNext && (
+                  <Group justify="center"><Button size="xs" variant="light" onClick={() => fetchIssueComments(issueDetails.id, issueCommentsPage + 1)}>Load more comments</Button></Group>
+                )}
+              </Stack>
+              <Group align="flex-end" wrap="nowrap">
+                <Textarea label="Add a comment" value={newIssueComment} onChange={(e) => setNewIssueComment(e.target.value)} autosize minRows={2} style={{ flex: 1 }} />
+                <Button variant="light" onClick={addIssueComment} loading={submittingIssueComment} disabled={!newIssueComment.trim()}>Comment</Button>
               </Group>
             </Stack>
           </Stack>
@@ -786,6 +1094,12 @@ export default function VcsPanel({ projectId }) {
               </Paper>
             </Group>
           )}
+          <Group justify="space-between" mt="sm">
+            <Group>
+              <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={exportCompareCSV}>Export CSV</Button>
+              <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={exportCompareJSON}>Export JSON</Button>
+            </Group>
+          </Group>
         </Stack>
       </Modal>
     </Paper>

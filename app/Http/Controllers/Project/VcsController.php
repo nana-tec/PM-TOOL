@@ -271,4 +271,128 @@ class VcsController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
     }
+
+    public function listReviewers(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('view', $project);
+        try {
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 50);
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->listPotentialReviewers($page, $perPage);
+
+            return response()->json(['reviewers' => $res['items'], 'has_next' => $res['has_next']]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function addReviewers(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate([
+            'usernames' => 'required|array|min:1',
+            'usernames.*' => 'string',
+        ]);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->requestReviewers($number, $data['usernames']);
+
+            return response()->json($res);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function pullStatuses(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('view', $project);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->getPullStatuses($number);
+
+            return response()->json($res);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function issueComments(Project $project, Request $request, int|string $issueId)
+    {
+        $this->authorize('view', $project);
+        try {
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 20);
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->listIssueComments($issueId, $page, $perPage);
+
+            return response()->json(['comments' => $res['items'], 'has_next' => $res['has_next']]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function addIssueComment(Project $project, Request $request, int|string $issueId)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate(['body' => 'required|string|min:1']);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $c = $client->createIssueComment($issueId, $data['body']);
+
+            return response()->json(['comment' => $c]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    // --- Added missing endpoints ---
+    public function createIssue(Project $project, Request $request)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate([
+            'title' => 'required|string|min:1',
+            'body' => 'nullable|string',
+        ]);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $issue = $client->createIssue($data['title'], $data['body'] ?? null);
+            return response()->json(['issue' => $issue]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function openPr(Project $project, Request $request)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate([
+            'source_branch' => 'required|string',
+            'target_branch' => 'required|string',
+            'title' => 'required|string|min:1',
+            'body' => 'nullable|string',
+        ]);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $pr = $client->openMergeRequest($data['source_branch'], $data['target_branch'], $data['title'], $data['body'] ?? null);
+            return response()->json(['pull' => $pr]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function merge(Project $project, Request $request)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate([
+            'number' => 'required',
+        ]);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->mergeRequest($data['number']);
+            return response()->json($res);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
 }

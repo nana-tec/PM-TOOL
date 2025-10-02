@@ -187,4 +187,68 @@ class VcsGitlabClient implements VcsClientInterface
         $base = $this->integration->base_url ?: 'https://gitlab.com';
         return rtrim($base, '/') . '/' . $this->integration->repo;
     }
+
+    public function listPotentialReviewers(int $page = 1, int $perPage = 50): array
+    {
+        try {
+            [$data, $headers] = $this->request('GET', '/members/all?per_page=' . $perPage . '&page=' . $page);
+            $items = array_map(fn ($u) => ['username' => $u['username'], 'name' => $u['name'] ?? null], $data);
+            return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
+        } catch (GuzzleException $e) {
+            throw $e;
+        }
+    }
+
+    public function requestReviewers(int|string $number, array $usernames): array
+    {
+        // Map usernames to user IDs from members list (first page large perPage to minimize misses)
+        [$members] = $this->request('GET', '/members/all?per_page=100');
+        $ids = [];
+        $lower = array_map('strtolower', $usernames);
+        foreach ($members as $m) {
+            if (in_array(strtolower($m['username']), $lower, true)) {
+                $ids[] = $m['id'];
+            }
+        }
+        // Update MR reviewers (GitLab supports reviewers as array of user IDs)
+        $this->api('PUT', '/merge_requests/' . urlencode((string) $number), ['form_params' => ['reviewer_ids' => $ids]]);
+        return ['status' => 'ok', 'added' => $usernames];
+    }
+
+    public function getPullStatuses(int|string $number): array
+    {
+        $mr = $this->api('GET', '/merge_requests/' . urlencode((string) $number));
+        $sha = $mr['sha'] ?? ($mr['diff_refs']['head_sha'] ?? null);
+        $statuses = [];
+        if ($sha) {
+            [$data] = $this->request('GET', '/repository/commits/' . urlencode($sha) . '/statuses');
+            foreach ($data as $s) {
+                $statuses[] = [
+                    'context' => $s['name'] ?? 'status',
+                    'state' => $s['status'] ?? 'pending',
+                    'description' => $s['description'] ?? null,
+                    'url' => $s['target_url'] ?? null,
+                ];
+            }
+        }
+        return ['sha' => $sha, 'statuses' => $statuses];
+    }
+
+    public function listIssueComments(int|string $issueId, int $page = 1, int $perPage = 20): array
+    {
+        [$data, $headers] = $this->request('GET', '/issues/' . urlencode((string) $issueId) . '/notes?per_page=' . $perPage . '&page=' . $page);
+        $items = array_map(fn ($n) => [
+            'id' => $n['id'],
+            'user' => $n['author']['username'] ?? null,
+            'body' => $n['body'] ?? '',
+            'created_at' => $n['created_at'] ?? '',
+        ], $data);
+        return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
+    }
+
+    public function createIssueComment(int|string $issueId, string $body): array
+    {
+        $data = $this->api('POST', '/issues/' . urlencode((string) $issueId) . '/notes', ['form_params' => ['body' => $body]]);
+        return ['id' => $data['id'] ?? 0, 'url' => $data['web_url'] ?? null];
+    }
 }

@@ -187,4 +187,60 @@ class VcsGithubClient implements VcsClientInterface
     {
         return 'https://github.com/' . $this->integration->repo;
     }
+
+    public function listPotentialReviewers(int $page = 1, int $perPage = 50): array
+    {
+        try {
+            // Use collaborators as potential reviewers
+            [$data, $headers] = $this->request('GET', '/collaborators?per_page=' . $perPage . '&page=' . $page);
+            $items = array_map(fn ($u) => ['username' => $u['login'], 'name' => $u['name'] ?? null], $data);
+            return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
+        } catch (GuzzleException $e) {
+            throw $e;
+        }
+    }
+
+    public function requestReviewers(int|string $number, array $usernames): array
+    {
+        $payload = ['json' => ['reviewers' => array_values($usernames)]];
+        $this->api('POST', '/pulls/' . urlencode((string) $number) . '/requested_reviewers', $payload);
+        return ['status' => 'ok', 'added' => $usernames];
+    }
+
+    public function getPullStatuses(int|string $number): array
+    {
+        $pr = $this->api('GET', '/pulls/' . urlencode((string) $number));
+        $sha = $pr['head']['sha'] ?? null;
+        $statuses = [];
+        if ($sha) {
+            $res = $this->api('GET', '/commits/' . urlencode($sha) . '/status');
+            foreach ($res['statuses'] ?? [] as $s) {
+                $statuses[] = [
+                    'context' => $s['context'] ?? 'status',
+                    'state' => $s['state'] ?? 'pending',
+                    'description' => $s['description'] ?? null,
+                    'url' => $s['target_url'] ?? null,
+                ];
+            }
+        }
+        return ['sha' => $sha, 'statuses' => $statuses];
+    }
+
+    public function listIssueComments(int|string $issueId, int $page = 1, int $perPage = 20): array
+    {
+        [$data, $headers] = $this->request('GET', '/issues/' . urlencode((string) $issueId) . '/comments?per_page=' . $perPage . '&page=' . $page);
+        $items = array_map(fn ($c) => [
+            'id' => $c['id'],
+            'user' => $c['user']['login'] ?? null,
+            'body' => $c['body'] ?? '',
+            'created_at' => $c['created_at'] ?? '',
+        ], $data);
+        return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
+    }
+
+    public function createIssueComment(int|string $issueId, string $body): array
+    {
+        $data = $this->api('POST', '/issues/' . urlencode((string) $issueId) . '/comments', ['json' => ['body' => $body]]);
+        return ['id' => $data['id'] ?? 0, 'url' => $data['html_url'] ?? null];
+    }
 }
