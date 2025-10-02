@@ -18,7 +18,7 @@ class CurrencySeeder extends Seeder
 
         foreach ($names as $code => $name) {
             // Ensure ISO 4217 3-letter codes only
-            if (!is_string($code) || strlen($code) !== 3) {
+            if (! is_string($code) || strlen($code) !== 3) {
                 continue;
             }
 
