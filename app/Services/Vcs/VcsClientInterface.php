@@ -8,8 +8,6 @@ interface VcsClientInterface
     public function listBranches(): array;
 
     /**
-     * @param string $branch
-     * @param int $perPage
      * @return array<int, array{sha:string, message:string, author?:string, date?:string, url?:string}>
      */
     public function listCommits(string $branch, int $perPage = 20): array;
