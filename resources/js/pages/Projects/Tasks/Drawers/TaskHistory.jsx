@@ -4,6 +4,8 @@ import { IconHistory, IconRestore } from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
 import { usePage } from '@inertiajs/react';
+import htmldiff from 'htmldiff-js';
+import { diffWords } from 'diff';
 
 const allowedFieldLabels = {
   name: 'Name',
@@ -21,7 +23,7 @@ const allowedFieldLabels = {
 
 export default function TaskHistory({ task, onRestored }) {
   const projectId = task?.project_id;
-  const { usersWithAccessToProject = [], taskGroups = [], currency } = usePage().props || {};
+  const { usersWithAccessToProject = [], taskGroups = [], currency, labels: labelsList = [] } = usePage().props || {};
   const currencySymbol = currency?.symbol || '';
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
@@ -100,7 +102,7 @@ export default function TaskHistory({ task, onRestored }) {
     if (s === 'fixed') return 'Fixed';
     if (s === 'hourly') return 'Hourly';
     return s || '—';
-    };
+  };
   const formatMoney = (v) => {
     if (v === null || v === undefined) return '—';
     const cents = parseInt(v, 10);
@@ -114,6 +116,19 @@ export default function TaskHistory({ task, onRestored }) {
   const groupNameById = (id) => {
     const found = taskGroups.find((g) => g.id?.toString() === id?.toString());
     return found ? found.name : (id != null ? `#${id}` : '—');
+  };
+  const labelNamesByIds = (arr) => {
+    const ids = Array.isArray(arr) ? arr.map((x) => (x && typeof x === 'object' ? x.id ?? x : x)) : [];
+    const names = ids.map((id) => {
+      const found = labelsList.find((l) => l.id?.toString() === id?.toString());
+      return found ? found.name : (id != null ? `#${id}` : '—');
+    });
+    return names.join(', ');
+  };
+  const subscribersNamesByIds = (arr) => {
+    const ids = Array.isArray(arr) ? arr.map((x) => (x && typeof x === 'object' ? x.id ?? x : x)) : [];
+    const names = ids.map((id) => userNameById(id));
+    return names.join(', ');
   };
   const formatValue = (field, v) => {
     switch (field) {
@@ -135,8 +150,46 @@ export default function TaskHistory({ task, onRestored }) {
         return groupNameById(v);
       case 'estimation':
         return v != null ? `${v} hours` : '—';
+      case 'labels':
+        return labelNamesByIds(v);
+      case 'subscribed_users':
+        return subscribersNamesByIds(v);
       default:
         return v != null && v !== '' ? String(v) : '—';
+    }
+  };
+
+  const renderInlineTextDiff = (oldText = '', newText = '') => {
+    const parts = diffWords(oldText || '', newText || '');
+    return (
+      <Text>
+        {parts.map((p, idx) => {
+          if (p.added) return <span key={idx} style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>{p.value}</span>;
+          if (p.removed) return <span key={idx} style={{ backgroundColor: 'rgba(239,68,68,0.2)', textDecoration: 'line-through' }}>{p.value}</span>;
+          return <span key={idx}>{p.value}</span>;
+        })}
+      </Text>
+    );
+  };
+
+  const renderHtmlDiff = (oldHtml = '', newHtml = '') => {
+    try {
+      const diffed = htmldiff(oldHtml || '', newHtml || '');
+      return <div dangerouslySetInnerHTML={{ __html: diffed }} />;
+    } catch (e) {
+      // Fallback to side-by-side if diff fails
+      return (
+        <Group align="flex-start" grow wrap="nowrap">
+          <Stack gap={4} style={{ flex: 1 }}>
+            <Text size="xs" c="dimmed">Old</Text>
+            <div dangerouslySetInnerHTML={{ __html: oldHtml || '' }} />
+          </Stack>
+          <Stack gap={4} style={{ flex: 1 }}>
+            <Text size="xs" c="dimmed">New</Text>
+            <div dangerouslySetInnerHTML={{ __html: newHtml || '' }} />
+          </Stack>
+        </Group>
+      );
     }
   };
 
@@ -199,38 +252,47 @@ export default function TaskHistory({ task, onRestored }) {
                         const oldVal = h.old_values?.[field];
                         const newVal = h.new_values?.[field];
 
-                        const fmt = (f, v) => {
-                          const val = formatValue(f, v);
-                          if (typeof val === 'string') return val;
-                          try { return JSON.stringify(val); } catch { return String(val); }
-                        };
-
                         if (field === 'description') {
-                          const hasDescOld = !!oldVal;
-                          const hasDescNew = !!newVal;
+                          if (h.event === 'created') {
+                            return (
+                              <div key={field}>
+                                <Text size="sm" fw={600}>{label}</Text>
+                                <div dangerouslySetInnerHTML={{ __html: newVal || '' }} />
+                              </div>
+                            );
+                          }
                           return (
                             <div key={field}>
                               <Text size="sm" fw={600}>{label}</Text>
-                              {h.event === 'created' && hasDescNew && (
-                                <div dangerouslySetInnerHTML={{ __html: newVal }} />
-                              )}
-                              {h.event === 'updated' && (hasDescOld || hasDescNew) && (
-                                <Group align="flex-start" grow wrap="nowrap">
-                                  <Stack gap={4} style={{ flex: 1 }}>
-                                    <Text size="xs" c="dimmed">Old</Text>
-                                    <div dangerouslySetInnerHTML={{ __html: oldVal || '' }} />
-                                  </Stack>
-                                  <Stack gap={4} style={{ flex: 1 }}>
-                                    <Text size="xs" c="dimmed">New</Text>
-                                    <div dangerouslySetInnerHTML={{ __html: newVal || '' }} />
-                                  </Stack>
-                                </Group>
-                              )}
+                              {renderHtmlDiff(oldVal || '', newVal || '')}
+                            </div>
+                          );
+                        }
+
+                        // Inline text diff for textual fields like name
+                        if (field === 'name') {
+                          if (h.event === 'created') {
+                            return (
+                              <div key={field}>
+                                <Text size="sm" fw={600}>{label}</Text>
+                                <Text>{newVal || '—'}</Text>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={field}>
+                              <Text size="sm" fw={600}>{label}</Text>
+                              {renderInlineTextDiff(String(oldVal ?? ''), String(newVal ?? ''))}
                             </div>
                           );
                         }
 
                         // Generic fields
+                        const fmt = (f, v) => {
+                          const val = formatValue(f, v);
+                          if (typeof val === 'string') return val;
+                          try { return JSON.stringify(val); } catch { return String(val); }
+                        };
                         return (
                           <div key={field}>
                             <Text size="sm" fw={600}>{label}</Text>
