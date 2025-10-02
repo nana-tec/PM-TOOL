@@ -14,10 +14,11 @@ class VcsClientFactory
         $http = new Client([
             'timeout' => 15,
         ]);
+
         return match ($provider) {
             'github' => new VcsGithubClient($http, $integration),
             'gitlab' => new VcsGitlabClient($http, $integration),
-            default => throw new InvalidArgumentException('Unsupported VCS provider: ' . $integration->provider),
+            default => throw new InvalidArgumentException('Unsupported VCS provider: '.$integration->provider),
         };
     }
 }

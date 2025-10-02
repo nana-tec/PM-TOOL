@@ -60,6 +60,7 @@ class VcsController extends Controller
         if ($project->vcsIntegration) {
             $project->vcsIntegration->delete();
         }
+
         return response()->json(['status' => 'ok']);
     }
 
@@ -67,6 +68,7 @@ class VcsController extends Controller
     {
         $integration = $project->vcsIntegration;
         abort_unless($integration, 404, 'VCS integration not configured for this project');
+
         return $integration;
     }
 
@@ -76,6 +78,7 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $client = VcsClientFactory::make($integration);
+
             return response()->json(['branches' => $client->listBranches()]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -90,6 +93,7 @@ class VcsController extends Controller
             $branch = $request->query('branch') ?: ($integration->default_branch ?: 'main');
             $perPage = (int) ($request->query('per_page', 20));
             $client = VcsClientFactory::make($integration);
+
             return response()->json(['commits' => $client->listCommits($branch, $perPage)]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -101,6 +105,7 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project));
+
             return response()->json(['issues' => $client->listIssues()]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -112,6 +117,7 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project));
+
             return response()->json(['pulls' => $client->listPullRequests()]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -128,6 +134,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project));
             $issue = $client->createIssue($data['title'], $data['body'] ?? null);
+
             return response()->json(['issue' => $issue]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -146,6 +153,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project));
             $pr = $client->openMergeRequest($data['source_branch'], $data['target_branch'], $data['title'], $data['body'] ?? null);
+
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -161,6 +169,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project));
             $res = $client->mergeRequest($data['number']);
+
             return response()->json($res);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
