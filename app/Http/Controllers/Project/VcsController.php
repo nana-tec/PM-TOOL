@@ -200,8 +200,24 @@ class VcsController extends Controller
             'body' => 'nullable|string',
         ]);
         try {
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $pr = $client->openMergeRequest($data['source_branch'], $data['target_branch'], $data['title'], $data['body'] ?? null);
+            $integration = $this->requireIntegration($project);
+            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+
+            // Pre-validate that target exists (and source if it doesn't look like a fork ref "owner:branch")
+            $branches = collect($client->listBranches())->pluck('name')->all();
+
+            $target = $data['target_branch'];
+            if (!in_array($target, $branches, true)) {
+                return response()->json(['error' => "Target branch '{$target}' does not exist in the repository."], 422);
+            }
+
+            $source = $data['source_branch'];
+            // If source contains a colon (e.g., "owner:branch" for forks), skip local existence check
+            if (!str_contains($source, ':') && !in_array($source, $branches, true)) {
+                return response()->json(['error' => "Source branch '{$source}' does not exist in the repository. If using a fork, use 'owner:branch'."], 422);
+            }
+
+            $pr = $client->openMergeRequest($source, $target, $data['title'], $data['body'] ?? null);
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
