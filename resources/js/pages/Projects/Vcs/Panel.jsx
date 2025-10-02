@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Anchor, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip } from '@mantine/core';
-import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { ActionIcon, Anchor, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, Alert } from '@mantine/core';
+import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle } from '@tabler/icons-react';
 import axios from 'axios';
+import { showNotification } from '@mantine/notifications';
 
 const PROVIDERS = [
   { value: 'github', label: 'GitHub', icon: IconBrandGithub },
@@ -13,12 +14,21 @@ export default function VcsPanel({ projectId }) {
   const [saving, setSaving] = useState(false);
   const [integration, setIntegration] = useState(null);
 
+  // error banner
+  const [error, setError] = useState('');
+
   // Form state
   const [provider, setProvider] = useState('github');
   const [repo, setRepo] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [defaultBranch, setDefaultBranch] = useState('');
   const [token, setToken] = useState('');
+
+  // Token preference and per-user token management
+  const [useUserToken, setUseUserToken] = useState(true);
+  const [hasUserToken, setHasUserToken] = useState(false);
+  const [userToken, setUserToken] = useState('');
+  const [savingUserToken, setSavingUserToken] = useState(false);
 
   // Data
   const [branches, setBranches] = useState([]);
@@ -37,10 +47,24 @@ export default function VcsPanel({ projectId }) {
   const [issueBody, setIssueBody] = useState('');
   const [creatingIssue, setCreatingIssue] = useState(false);
 
+  // Open PR/MR modal
+  const [prOpen, setPrOpen] = useState(false);
+  const [prSource, setPrSource] = useState('');
+  const [prTarget, setPrTarget] = useState('');
+  const [prTitle, setPrTitle] = useState('');
+  const [prBody, setPrBody] = useState('');
+  const [creatingPr, setCreatingPr] = useState(false);
+
   const providerIcon = useMemo(() => PROVIDERS.find(p => p.value === (integration?.provider || provider))?.icon, [integration, provider]);
+
+  const notifyError = (title, message) => showNotification({ color: 'red', title, message });
+  const notifySuccess = (title, message) => showNotification({ color: 'green', title, message });
+
+  const tokenQuery = () => ({ params: { use_token: useUserToken ? 'user' : 'project' } });
 
   const loadIntegration = async () => {
     setLoading(true);
+    setError('');
     try {
       const { data } = await axios.get(route('projects.vcs.show', projectId));
       const integ = data.integration;
@@ -51,7 +75,11 @@ export default function VcsPanel({ projectId }) {
         setBaseUrl(integ.base_url || '');
         setDefaultBranch(integ.default_branch || '');
         setSelectedBranch(integ.default_branch || '');
+        setHasUserToken(integ.has_user_token || false);
       }
+    } catch (e) {
+      setError(e?.response?.data?.error || e.message);
+      notifyError('Failed to load integration', e?.response?.data?.error || e.message);
     } finally {
       setLoading(false);
     }
@@ -64,6 +92,7 @@ export default function VcsPanel({ projectId }) {
 
   const saveIntegration = async () => {
     setSaving(true);
+    setError('');
     try {
       await axios.post(route('projects.vcs.upsert', projectId), {
         provider,
@@ -73,8 +102,12 @@ export default function VcsPanel({ projectId }) {
         token: token || undefined,
       });
       await loadIntegration();
-      // clear token input after save
       setToken('');
+      notifySuccess('Integration saved', 'VCS integration updated');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Save failed', msg);
     } finally {
       setSaving(false);
     }
@@ -83,6 +116,7 @@ export default function VcsPanel({ projectId }) {
   const removeIntegration = async () => {
     if (!integration) return;
     setSaving(true);
+    setError('');
     try {
       await axios.delete(route('projects.vcs.destroy', projectId));
       setIntegration(null);
@@ -90,21 +124,66 @@ export default function VcsPanel({ projectId }) {
       setCommits([]);
       setIssues([]);
       setPulls([]);
+      setHasUserToken(false);
+      notifySuccess('Integration removed', 'VCS integration deleted');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Remove failed', msg);
     } finally {
       setSaving(false);
     }
   };
 
+  const saveUserToken = async () => {
+    if (!userToken?.trim()) return;
+    setSavingUserToken(true);
+    setError('');
+    try {
+      await axios.post(route('projects.vcs.user-token.set', projectId), { token: userToken });
+      setHasUserToken(true);
+      setUserToken('');
+      notifySuccess('Token saved', 'Your personal token was saved');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to save token', msg);
+    } finally {
+      setSavingUserToken(false);
+    }
+  };
+
+  const deleteUserToken = async () => {
+    setSavingUserToken(true);
+    setError('');
+    try {
+      await axios.delete(route('projects.vcs.user-token.delete', projectId));
+      setHasUserToken(false);
+      notifySuccess('Token removed', 'Your personal token was removed');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to remove token', msg);
+    } finally {
+      setSavingUserToken(false);
+    }
+  };
+
   const loadBranches = async () => {
     setBranchesLoading(true);
+    setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.branches', projectId));
+      const { data } = await axios.get(route('projects.vcs.branches', projectId), tokenQuery());
       const list = data.branches || [];
       setBranches(list);
       if (!selectedBranch && list.length > 0) {
         const pick = defaultBranch || list[0].name;
         setSelectedBranch(pick);
       }
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to load branches', msg);
     } finally {
       setBranchesLoading(false);
     }
@@ -113,9 +192,14 @@ export default function VcsPanel({ projectId }) {
   const loadCommits = async (branch) => {
     if (!branch) return;
     setCommitsLoading(true);
+    setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.commits', projectId), { params: { branch, per_page: 20 } });
+      const { data } = await axios.get(route('projects.vcs.commits', projectId), { params: { ...tokenQuery().params, branch, per_page: 20 } });
       setCommits(data.commits || []);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to load commits', msg);
     } finally {
       setCommitsLoading(false);
     }
@@ -123,9 +207,14 @@ export default function VcsPanel({ projectId }) {
 
   const loadIssues = async () => {
     setIssuesLoading(true);
+    setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.issues', projectId));
+      const { data } = await axios.get(route('projects.vcs.issues', projectId), tokenQuery());
       setIssues(data.issues || []);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to load issues', msg);
     } finally {
       setIssuesLoading(false);
     }
@@ -133,9 +222,14 @@ export default function VcsPanel({ projectId }) {
 
   const loadPulls = async () => {
     setPullsLoading(true);
+    setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls', projectId));
+      const { data } = await axios.get(route('projects.vcs.pulls', projectId), tokenQuery());
       setPulls(data.pulls || []);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to load PRs/MRs', msg);
     } finally {
       setPullsLoading(false);
     }
@@ -148,32 +242,67 @@ export default function VcsPanel({ projectId }) {
       loadPulls();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [integration]);
+  }, [integration, useUserToken]);
 
   useEffect(() => {
     if (selectedBranch) loadCommits(selectedBranch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBranch]);
+  }, [selectedBranch, useUserToken]);
 
   const createIssue = async () => {
     if (!issueTitle?.trim()) return;
     setCreatingIssue(true);
+    setError('');
     try {
-      const { data } = await axios.post(route('projects.vcs.issues.create', projectId), { title: issueTitle, body: issueBody || null });
+      await axios.post(route('projects.vcs.issues.create', projectId), { title: issueTitle, body: issueBody || null }, tokenQuery());
       setIssueTitle('');
       setIssueBody('');
       setIssueOpen(false);
       await loadIssues();
-      return data.issue;
+      notifySuccess('Issue created', 'Your issue has been created');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to create issue', msg);
     } finally {
       setCreatingIssue(false);
     }
   };
 
+  const openPr = async () => {
+    if (!prSource?.trim() || !prTarget?.trim() || !prTitle?.trim()) return;
+    setCreatingPr(true);
+    setError('');
+    try {
+      await axios.post(route('projects.vcs.pulls.open', projectId), { source_branch: prSource, target_branch: prTarget, title: prTitle, body: prBody || null }, tokenQuery());
+      setPrOpen(false);
+      setPrSource('');
+      setPrTarget('');
+      setPrTitle('');
+      setPrBody('');
+      await loadPulls();
+      notifySuccess('Request opened', `${integration.provider === 'github' ? 'Pull request' : 'Merge request'} opened`);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to open request', msg);
+    } finally {
+      setCreatingPr(false);
+    }
+  };
+
   const mergePull = async (number) => {
     if (!number) return;
-    await axios.post(route('projects.vcs.merge', projectId), { number });
-    await loadPulls();
+    setError('');
+    try {
+      await axios.post(route('projects.vcs.merge', projectId), { number }, tokenQuery());
+      await loadPulls();
+      notifySuccess('Merged', 'Request merged successfully');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Merge failed', msg);
+    }
   };
 
   return (
@@ -191,6 +320,10 @@ export default function VcsPanel({ projectId }) {
           </Group>
         )}
       </Group>
+
+      {error && (
+        <Alert color="red" icon={<IconAlertCircle size={16} />} mb="sm" variant="light">{error}</Alert>
+      )}
 
       {loading ? (
         <Group justify="center" my="md"><Loader size="sm" /></Group>
@@ -219,10 +352,27 @@ export default function VcsPanel({ projectId }) {
                 />
               )}
               <TextInput label="Default branch" placeholder="main" value={defaultBranch} onChange={(e) => setDefaultBranch(e.target.value)} style={{ minWidth: 160 }} />
-              <TextInput label="Access token" placeholder={integration?.has_token ? '•••••••• (leave blank to keep)' : 'Personal access token'} value={token} onChange={(e) => setToken(e.target.value)} style={{ minWidth: 240 }} />
+              <TextInput label="Project access token" placeholder={integration?.has_token ? '•••••••• (leave blank to keep)' : 'Personal access token'} value={token} onChange={(e) => setToken(e.target.value)} style={{ minWidth: 240 }} />
               <Button onClick={saveIntegration} loading={saving}>Save</Button>
             </Group>
           </Paper>
+
+          {/* Personal token */}
+          {integration && (
+            <Paper withBorder p="sm" radius="sm">
+              <Group justify="space-between" align="flex-end" wrap="wrap">
+                <Group>
+                  <Switch checked={useUserToken} onChange={(e) => setUseUserToken(e.currentTarget.checked)} label="Use my personal token for API calls" />
+                  <Badge color={hasUserToken ? 'green' : 'gray'} variant="light">{hasUserToken ? 'Token on file' : 'No token saved'}</Badge>
+                </Group>
+                <Group wrap="wrap" align="flex-end">
+                  <TextInput label="My personal token" placeholder="Paste token (not shown after save)" value={userToken} onChange={(e) => setUserToken(e.target.value)} style={{ minWidth: 260 }} />
+                  <Button variant="light" onClick={saveUserToken} loading={savingUserToken} disabled={!userToken?.trim()}>Save token</Button>
+                  <Button variant="subtle" color="red" onClick={deleteUserToken} loading={savingUserToken} disabled={!hasUserToken}>Remove token</Button>
+                </Group>
+              </Group>
+            </Paper>
+          )}
 
           {!integration ? (
             <Text c="dimmed">Connect this project to GitHub or GitLab to view branches/commits, create issues and open merge requests.</Text>
@@ -242,6 +392,9 @@ export default function VcsPanel({ projectId }) {
                       <IconRefresh size={16} />
                     </ActionIcon>
                   </Tooltip>
+                  <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => { setPrSource(selectedBranch || ''); setPrTarget(defaultBranch || 'main'); setPrTitle(''); setPrBody(''); setPrOpen(true); }}>
+                    Open {integration.provider === 'github' ? 'PR' : 'MR'}
+                  </Button>
                 </Group>
               </Group>
 
@@ -360,6 +513,18 @@ export default function VcsPanel({ projectId }) {
           <Textarea label="Description" value={issueBody} onChange={(e) => setIssueBody(e.target.value)} minRows={4} autosize />
           <Group justify="flex-end">
             <Button onClick={createIssue} loading={creatingIssue} disabled={!issueTitle?.trim()}>Create</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal opened={prOpen} onClose={() => setPrOpen(false)} title={integration?.provider === 'github' ? 'Open pull request' : 'Open merge request'} size="md">
+        <Stack>
+          <Select label="Source branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prSource} onChange={setPrSource} placeholder="Select source branch" />
+          <TextInput label="Target branch" placeholder={defaultBranch || 'main'} value={prTarget} onChange={(e) => setPrTarget(e.target.value)} />
+          <TextInput label="Title" value={prTitle} onChange={(e) => setPrTitle(e.target.value)} required />
+          <Textarea label="Description" value={prBody} onChange={(e) => setPrBody(e.target.value)} minRows={4} autosize />
+          <Group justify="flex-end">
+            <Button onClick={openPr} loading={creatingPr} disabled={!prSource?.trim() || !prTarget?.trim() || !prTitle?.trim()}>Open {integration?.provider === 'github' ? 'PR' : 'MR'}</Button>
           </Group>
         </Stack>
       </Modal>

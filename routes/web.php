@@ -54,6 +54,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::post('/', [VcsController::class, 'upsertIntegration'])->name('upsert')->scopeBindings();
             Route::delete('/', [VcsController::class, 'destroyIntegration'])->name('destroy')->scopeBindings();
 
+            Route::post('user-token', [VcsController::class, 'setUserToken'])->name('user-token.set')->scopeBindings();
+            Route::delete('user-token', [VcsController::class, 'deleteUserToken'])->name('user-token.delete')->scopeBindings();
+
             Route::get('branches', [VcsController::class, 'branches'])->name('branches')->scopeBindings();
             Route::get('commits', [VcsController::class, 'commits'])->name('commits')->scopeBindings();
             Route::get('issues', [VcsController::class, 'listIssues'])->name('issues')->scopeBindings();
