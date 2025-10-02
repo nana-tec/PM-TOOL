@@ -34,6 +34,7 @@ class SyncPermissionsCommand extends Command
 
         if (! $role) {
             $this->error("Role '{$roleName}' not found.");
+
             return self::FAILURE;
         }
 
@@ -62,11 +63,10 @@ class SyncPermissionsCommand extends Command
         $allPermissionNames = SpatiePermission::pluck('name')->toArray();
         $role->syncPermissions($allPermissionNames);
 
-        $this->info("Synced " . count($allPermissionNames) . " permission(s) to role '{$roleName}'.");
+        $this->info('Synced '.count($allPermissionNames)." permission(s) to role '{$roleName}'.");
 
         app()['\\Spatie\\Permission\\PermissionRegistrar']->forgetCachedPermissions();
 
         return self::SUCCESS;
     }
 }
-

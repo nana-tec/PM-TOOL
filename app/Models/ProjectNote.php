@@ -11,7 +11,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 class ProjectNote extends Model implements AuditableContract
 {
-    use SoftDeletes, AuditingTrait;
+    use AuditingTrait, SoftDeletes;
 
     protected $fillable = [
         'user_id',

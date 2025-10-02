@@ -7,7 +7,6 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\PermissionService;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -112,9 +111,9 @@ class DashboardController extends Controller
             ->pluck('assigned', 'user_id');
 
         $members = $users->map(function ($user) use ($capacityHours, $windowWorkload, $completedCounts, $assignedCounts) {
-            $windowHours = (float)($windowWorkload[$user->id] ?? 0.0);
-            $completed = (int)($completedCounts[$user->id] ?? 0);
-            $assigned = (int)($assignedCounts[$user->id] ?? 0);
+            $windowHours = (float) ($windowWorkload[$user->id] ?? 0.0);
+            $completed = (int) ($completedCounts[$user->id] ?? 0);
+            $assigned = (int) ($assignedCounts[$user->id] ?? 0);
 
             $plannedUtil = $capacityHours > 0 ? round(min(100, ($windowHours / $capacityHours) * 100), 1) : 0;
             $completionRate = $assigned > 0 ? round(($completed / $assigned) * 100, 1) : null;
@@ -134,9 +133,9 @@ class DashboardController extends Controller
         $totalAvailable = $members->sum('availability_hours') ?? 0;
         $avgCompletion = $members->whereNotNull('completion_rate')->avg('completion_rate') ?? 0;
 
-        $available = $members->filter(fn($m) => $m['planned_utilization'] < 90 && $m['availability_hours'] > 8)->count();
-        $atCapacity = $members->filter(fn($m) => $m['planned_utilization'] >= 90 && $m['planned_utilization'] < 100 || $m['availability_hours'] <= 8)->count();
-        $overCapacity = $members->filter(fn($m) => $m['planned_utilization'] >= 100)->count();
+        $available = $members->filter(fn ($m) => $m['planned_utilization'] < 90 && $m['availability_hours'] > 8)->count();
+        $atCapacity = $members->filter(fn ($m) => $m['planned_utilization'] >= 90 && $m['planned_utilization'] < 100 || $m['availability_hours'] <= 8)->count();
+        $overCapacity = $members->filter(fn ($m) => $m['planned_utilization'] >= 100)->count();
 
         return [
             'summary' => [
@@ -147,8 +146,8 @@ class DashboardController extends Controller
                 'at_capacity' => $atCapacity,
                 'over_capacity' => $overCapacity,
             ],
-            'overCapacityMembers' => $members->filter(fn($m) => $m['planned_utilization'] >= 100)->take(5)->values()->all(),
-            'availableMembers' => $members->filter(fn($m) => $m['planned_utilization'] < 70 && $m['availability_hours'] > 16)->take(5)->values()->all(),
+            'overCapacityMembers' => $members->filter(fn ($m) => $m['planned_utilization'] >= 100)->take(5)->values()->all(),
+            'availableMembers' => $members->filter(fn ($m) => $m['planned_utilization'] < 70 && $m['availability_hours'] > 16)->take(5)->values()->all(),
         ];
     }
 }

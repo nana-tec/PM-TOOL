@@ -12,8 +12,7 @@ class ProjectNoteObserver
             'project_id' => $note->project_id,
             'user_id' => auth()->id(),
             'title' => 'New note',
-            'subtitle' => auth()->user()->name . " added a note to \"{$note->project->name}\"",
+            'subtitle' => auth()->user()->name." added a note to \"{$note->project->name}\"",
         ]);
     }
 }
-
