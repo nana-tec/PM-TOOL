@@ -26,3 +26,318 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 }
+
+/* Professional Kanban View with Animations */
+:global(.kanban-view) {
+    .kanbanViewport {
+        display: flex;
+        gap: rem(24px);
+        padding: rem(24px);
+        height: calc(100dvh - 200px);
+        overflow-x: auto;
+        margin: 0 rem(-24px) rem(-24px) rem(-24px);
+        animation: fadeInUp 0.6s ease-out;
+
+        /* Custom scrollbar for kanban */
+        scrollbar-width: thin;
+        scrollbar-color: light-dark(var(--mantine-color-blue-4), var(--mantine-color-blue-6)) transparent;
+
+        &::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-7));
+            border-radius: 4px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: linear-gradient(90deg,
+                light-dark(var(--mantine-color-blue-4), var(--mantine-color-blue-6)),
+                light-dark(var(--mantine-color-blue-5), var(--mantine-color-blue-5))
+            );
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+
+        &::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(90deg,
+                light-dark(var(--mantine-color-blue-5), var(--mantine-color-blue-5)),
+                light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4))
+            );
+        }
+    }
+
+    .kanbanColumn {
+        min-width: 340px;
+        max-width: 380px;
+        flex-shrink: 0;
+        background: linear-gradient(145deg,
+            light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7)),
+            light-dark(var(--mantine-color-white), var(--mantine-color-dark-6))
+        );
+        border: rem(1px) solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+        border-radius: var(--mantine-radius-lg);
+        padding: rem(20px);
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+
+        /* Animated border gradient */
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--column-color, linear-gradient(90deg, var(--mantine-color-blue-5), var(--mantine-color-blue-6)));
+            border-radius: var(--mantine-radius-lg) var(--mantine-radius-lg) 0 0;
+            transition: all 0.3s ease;
+        }
+
+        @mixin hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border-color: light-dark(var(--mantine-color-blue-3), var(--mantine-color-blue-7));
+
+            &::before {
+                height: 4px;
+                background: linear-gradient(90deg,
+                    var(--column-color-start, var(--mantine-color-blue-4)),
+                    var(--column-color-end, var(--mantine-color-blue-6))
+                );
+            }
+        }
+
+        /* Staggered animation for columns */
+        &:nth-child(1) {
+            animation: slideInLeft 0.6s ease-out 0.1s both;
+            --column-color: linear-gradient(90deg, #228be6, #339af0);
+            --column-color-start: #228be6;
+            --column-color-end: #339af0;
+        }
+
+        &:nth-child(2) {
+            animation: slideInLeft 0.6s ease-out 0.2s both;
+            --column-color: linear-gradient(90deg, #fd7e14, #ff922b);
+            --column-color-start: #fd7e14;
+            --column-color-end: #ff922b;
+        }
+
+        &:nth-child(3) {
+            animation: slideInLeft 0.6s ease-out 0.3s both;
+            --column-color: linear-gradient(90deg, #51cf66, #69db7c);
+            --column-color-start: #51cf66;
+            --column-color-end: #69db7c;
+        }
+    }
+
+    .columnHeader {
+        flex-shrink: 0;
+        margin-bottom: rem(16px);
+        padding-bottom: rem(12px);
+        border-bottom: rem(1px) solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+        animation: fadeInDown 0.5s ease-out 0.4s both;
+    }
+
+    .columnTasks {
+        flex: 1;
+        overflow-y: auto;
+        padding-right: rem(4px);
+        margin-right: rem(-4px);
+        scrollbar-width: thin;
+        scrollbar-color: light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4)) transparent;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: transparent;
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+            border-radius: 3px;
+            transition: background 0.3s ease;
+        }
+
+        &::-webkit-scrollbar-thumb:hover {
+            background: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-3));
+        }
+    }
+
+    .kanbanTask {
+        cursor: pointer;
+        border: rem(1px) solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+        background: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        margin-bottom: rem(12px);
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--mantine-radius-md);
+
+        /* Subtle gradient background */
+        background: linear-gradient(135deg,
+            light-dark(var(--mantine-color-white), var(--mantine-color-dark-6)),
+            light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))
+        );
+
+        /* Task entry animation */
+        animation: taskSlideIn 0.4s ease-out both;
+
+        /* Staggered animation for tasks */
+        &:nth-child(1) { animation-delay: 0.5s; }
+        &:nth-child(2) { animation-delay: 0.6s; }
+        &:nth-child(3) { animation-delay: 0.7s; }
+        &:nth-child(4) { animation-delay: 0.8s; }
+        &:nth-child(5) { animation-delay: 0.9s; }
+        &:nth-child(n+6) { animation-delay: 1s; }
+
+        @mixin hover {
+            transform: translateY(-2px) scale(1.02);
+            border-color: light-dark(var(--mantine-color-blue-4), var(--mantine-color-blue-6));
+            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1),
+                        0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+            /* Hover glow effect */
+            &::before {
+                opacity: 1;
+            }
+        }
+
+        &:active {
+            transform: translateY(-1px) scale(1.01);
+            transition: all 0.1s ease;
+        }
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Subtle glow effect on hover */
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg,
+                rgba(34, 139, 230, 0.1),
+                rgba(51, 154, 240, 0.05)
+            );
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            border-radius: var(--mantine-radius-md);
+        }
+    }
+
+    /* Priority indicators for kanban tasks */
+    .kanbanTask[data-priority="critical"] {
+        border-left: rem(4px) solid var(--mantine-color-red-6);
+
+        &::before {
+            background: linear-gradient(135deg,
+                rgba(250, 82, 82, 0.15),
+                rgba(255, 107, 107, 0.08)
+            );
+        }
+    }
+
+    .kanbanTask[data-priority="high"] {
+        border-left: rem(4px) solid var(--mantine-color-orange-6);
+
+        &::before {
+            background: linear-gradient(135deg,
+                rgba(253, 126, 20, 0.15),
+                rgba(255, 146, 43, 0.08)
+            );
+        }
+    }
+
+    .kanbanTask[data-priority="medium"] {
+        border-left: rem(4px) solid var(--mantine-color-yellow-6);
+
+        &::before {
+            background: linear-gradient(135deg,
+                rgba(250, 176, 5, 0.15),
+                rgba(255, 192, 41, 0.08)
+            );
+        }
+    }
+
+    .emptyColumn {
+        animation: emptyColumnPulse 2s ease-in-out infinite;
+        opacity: 0.6;
+    }
+}
+
+/* Keyframe Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes taskSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes emptyColumnPulse {
+    0%, 100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* List View - Ensuring proper spacing */
+:global(.list-view) {
+    .kanbanViewport {
+        display: none;
+    }
+}

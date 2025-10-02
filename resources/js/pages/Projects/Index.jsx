@@ -5,13 +5,17 @@ import useAuthorization from "@/hooks/useAuthorization";
 import Layout from "@/layouts/MainLayout";
 import { redirectTo, reloadWithQuery } from "@/utils/route";
 import { usePage } from "@inertiajs/react";
-import { Button, Center, Flex, Grid, Group } from "@mantine/core";
+import { Button, Center, Flex, Grid, Group, SegmentedControl } from "@mantine/core";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
+import { useState } from "react";
 import ProjectCard from "./Index/ProjectCard";
+import ProjectsSummary from "./Summary";
 
 const ProjectsIndex = () => {
   const { items } = usePage().props;
   const { isAdmin } = useAuthorization();
+
+  const [view, setView] = useState('grid'); // 'grid' | 'summary'
 
   const search = (search) => reloadWithQuery({ search });
 
@@ -22,6 +26,15 @@ const ProjectsIndex = () => {
           <Group>
             <SearchInput placeholder="Search projects" search={search} />
             {isAdmin() && <ArchivedFilterButton />}
+            <SegmentedControl
+              size="sm"
+              value={view}
+              onChange={setView}
+              data={[
+                { label: 'Grid', value: 'grid' },
+                { label: 'Summary', value: 'summary' },
+              ]}
+            />
           </Group>
         </Grid.Col>
         <Grid.Col span="content">
@@ -38,11 +51,15 @@ const ProjectsIndex = () => {
       </Grid>
 
       {items.length ? (
-        <Flex mt="xl" gap="lg" justify="flex-start" align="flex-start" direction="row" wrap="wrap">
-          {items.map((item) => (
-            <ProjectCard item={item} key={item.id} />
-          ))}
-        </Flex>
+        view === 'summary' ? (
+          <ProjectsSummary items={items} />
+        ) : (
+          <Flex mt="xl" gap="lg" justify="flex-start" align="flex-start" direction="row" wrap="wrap">
+            {items.map((item) => (
+              <ProjectCard item={item} key={item.id} />
+            ))}
+          </Flex>
+        )
       ) : (
         <Center mih={400}>
           <EmptyWithIcon

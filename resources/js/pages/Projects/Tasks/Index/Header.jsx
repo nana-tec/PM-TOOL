@@ -13,6 +13,7 @@ import {
   IconLayoutKanban,
   IconLayoutList,
   IconPlus,
+  IconTable,
 } from "@tabler/icons-react";
 
 export default function Header() {
@@ -76,6 +77,15 @@ export default function Header() {
               >
                 <Tooltip label="Kanban view" openDelay={250} withArrow>
                   <IconLayoutKanban style={{ width: "45%", height: "45%" }} />
+                </Tooltip>
+              </ActionIcon>
+              <ActionIcon
+                size="lg"
+                variant={tasksView === "gantt" ? "filled" : "default"}
+                onClick={() => setTasksView("gantt")}
+              >
+                <Tooltip label="Gantt view" openDelay={250} withArrow>
+                  <IconTable style={{ width: "45%", height: "45%" }} />
                 </Tooltip>
               </ActionIcon>
             </ActionIcon.Group>

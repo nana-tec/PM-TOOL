@@ -1,6 +1,7 @@
 import EmptyWithIcon from "@/components/EmptyWithIcon";
 import Layout from "@/layouts/MainLayout";
 import { usePage } from "@inertiajs/react";
+import { redirectTo } from "@/utils/route";
 import {
   Accordion,
   Box,
@@ -10,14 +11,16 @@ import {
   Text,
   Title,
   rem,
-  Tabs,
   Group,
   Badge,
   Select,
-  Divider,
   Card,
   ActionIcon,
-  Tooltip
+  Tooltip,
+  Avatar,
+  Grid,
+  SegmentedControl,
+  Switch
 } from "@mantine/core";
 import {
   IconRocket,
@@ -25,19 +28,26 @@ import {
   IconStarFilled,
   IconTags,
   IconCalendar,
-  IconFolder,
-  IconListCheck,
-  IconGridDots
+  IconGridDots,
+  IconTable,
+  IconLayoutKanban,
+  IconLayoutList,
+  IconClock,
+  IconCalendarDue
 } from "@tabler/icons-react";
 import { useState, useMemo } from "react";
 import Task from "./Task";
 import classes from "./css/Index.module.css";
+import GanttChart from "@/components/GanttChart";
 
 const TasksIndex = () => {
   let { projects } = usePage().props;
 
-  const [viewMode, setViewMode] = useState('grouped'); // 'grouped', 'labels', 'dates'
-  const [sortBy, setSortBy] = useState('priority'); // 'priority', 'date', 'project', 'alphabetical'
+  const [viewMode, setViewMode] = useState('list'); // 'list', 'kanban', 'gantt'
+  const [groupBy, setGroupBy] = useState('project'); // 'project', 'labels', 'dates'
+  const [sortBy, setSortBy] = useState('priority'); // 'priority', 'date', 'alphabetical'
+  const [ganttZoom, setGanttZoom] = useState('month'); // 'week' | 'month' | 'quarter'
+  const [ganttGroupByProject, setGanttGroupByProject] = useState(true);
 
   projects = projects.filter((i) => i.tasks.length);
 
@@ -58,15 +68,16 @@ const TasksIndex = () => {
 
   // Group tasks by different criteria
   const groupedTasks = useMemo(() => {
-    switch (viewMode) {
+    switch (groupBy) {
       case 'labels':
         return groupTasksByLabels(allTasks);
       case 'dates':
         return groupTasksByDates(allTasks);
+      case 'project':
       default:
         return groupTasksByProject(projects, sortBy);
     }
-  }, [allTasks, projects, viewMode, sortBy]);
+  }, [allTasks, projects, groupBy, sortBy]);
 
   function calculatePriorityScore(task) {
     let score = 0;
@@ -217,38 +228,110 @@ const TasksIndex = () => {
   }
 
   const ViewControls = () => (
-    <Group justify="space-between" mb="md">
-      <Tabs value={viewMode} onChange={setViewMode}>
-        <Tabs.List>
-          <Tabs.Tab value="grouped" leftSection={<IconFolder size={16} />}>
-            By Project
-          </Tabs.Tab>
-          <Tabs.Tab value="labels" leftSection={<IconTags size={16} />}>
-            By Labels
-          </Tabs.Tab>
-          <Tabs.Tab value="dates" leftSection={<IconCalendar size={16} />}>
-            By Due Date
-          </Tabs.Tab>
-        </Tabs.List>
-      </Tabs>
+    <Grid justify="space-between" align="end" mb="lg">
+      <Grid.Col span="content">
+        <Group>
+          {viewMode !== 'gantt' && (
+            <>
+              <Select
+                value={groupBy}
+                onChange={setGroupBy}
+                data={[
+                  { value: 'project', label: 'Group by Project' },
+                  { value: 'labels', label: 'Group by Labels' },
+                  { value: 'dates', label: 'Group by Due Date' }
+                ]}
+                size="sm"
+                w={180}
+              />
 
-      {viewMode === 'grouped' && (
-        <Select
-          value={sortBy}
-          onChange={setSortBy}
-          data={[
-            { value: 'priority', label: 'Priority' },
-            { value: 'alphabetical', label: 'Alphabetical' },
-            { value: 'date', label: 'Due Date' }
-          ]}
-          size="sm"
-          w={140}
-        />
-      )}
-    </Group>
+              {groupBy === 'project' && (
+                <Select
+                  value={sortBy}
+                  onChange={setSortBy}
+                  data={[
+                    { value: 'priority', label: 'Sort by Priority' },
+                    { value: 'alphabetical', label: 'Sort Alphabetically' },
+                    { value: 'date', label: 'Sort by Due Date' }
+                  ]}
+                  size="sm"
+                  w={160}
+                />
+              )}
+            </>
+          )}
+
+          {viewMode === 'gantt' && (
+            <>
+              <SegmentedControl
+                size="sm"
+                value={ganttZoom}
+                onChange={setGanttZoom}
+                data={[
+                  { label: 'Week', value: 'week' },
+                  { label: 'Month', value: 'month' },
+                  { label: 'Quarter', value: 'quarter' },
+                ]}
+              />
+              <Switch
+                size="sm"
+                checked={ganttGroupByProject}
+                onChange={(e) => setGanttGroupByProject(e.currentTarget.checked)}
+                label="Group by project"
+              />
+            </>
+          )}
+        </Group>
+      </Grid.Col>
+
+      <Grid.Col span="content">
+        <Group>
+          <ActionIcon.Group>
+            <ActionIcon
+              size="lg"
+              variant={viewMode === "list" ? "filled" : "default"}
+              onClick={() => setViewMode("list")}
+            >
+              <Tooltip label="List view" openDelay={250} withArrow>
+                <IconLayoutList style={{ width: "40%", height: "40%" }} />
+              </Tooltip>
+            </ActionIcon>
+            <ActionIcon
+              size="lg"
+              variant={viewMode === "kanban" ? "filled" : "default"}
+              onClick={() => setViewMode("kanban")}
+            >
+              <Tooltip label="Kanban view" openDelay={250} withArrow>
+                <IconLayoutKanban style={{ width: "45%", height: "45%" }} />
+              </Tooltip>
+            </ActionIcon>
+            <ActionIcon
+              size="lg"
+              variant={viewMode === "gantt" ? "filled" : "default"}
+              onClick={() => setViewMode("gantt")}
+            >
+              <Tooltip label="Gantt view" openDelay={250} withArrow>
+                <IconTable style={{ width: "45%", height: "45%" }} />
+              </Tooltip>
+            </ActionIcon>
+          </ActionIcon.Group>
+        </Group>
+      </Grid.Col>
+    </Grid>
   );
 
-  const renderGroupedView = () => (
+  const renderListView = () => {
+    switch (groupBy) {
+      case 'labels':
+        return renderLabelGroups();
+      case 'dates':
+        return renderDateGroups();
+      default:
+        return renderProjectGroups();
+    }
+  };
+
+  const renderProjectGroups = () => (
     <Accordion variant="separated" radius="md" multiple defaultValue={opened}>
       {groupedTasks.map((project) => (
         <Accordion.Item
@@ -304,7 +387,7 @@ const TasksIndex = () => {
     </Accordion>
   );
 
-  const renderLabelView = () => (
+  const renderLabelGroups = () => (
     <Stack gap="md">
       {groupedTasks.map((group) => (
         <Card key={group.id} shadow="sm" padding="md" radius="md" className={classes.labelGroup}>
@@ -333,7 +416,7 @@ const TasksIndex = () => {
     </Stack>
   );
 
-  const renderDateView = () => (
+  const renderDateGroups = () => (
     <Stack gap="md">
       {groupedTasks.map((group) => (
         <Card key={group.id} shadow="sm" padding="md" radius="md" className={classes.dateGroup}>
@@ -362,6 +445,255 @@ const TasksIndex = () => {
     </Stack>
   );
 
+  const renderKanbanView = () => {
+    const statusColumns = {
+      todo: {
+        name: 'To Do',
+        tasks: allTasks.filter(task => !task.completed_at && (!task.due_on || new Date(task.due_on) >= new Date())),
+        color: '#228be6'
+      },
+      inProgress: {
+        name: 'In Progress',
+        tasks: allTasks.filter(task => !task.completed_at && task.due_on && new Date(task.due_on) < new Date()),
+        color: '#fd7e14'
+      },
+      completed: {
+        name: 'Completed',
+        tasks: allTasks.filter(task => task.completed_at),
+        color: '#51cf66'
+      }
+    };
+
+    const getPriorityLevel = (task) => {
+      const isOverdue = task.due_on && new Date(task.due_on) < new Date() && !task.completed_at;
+      const daysUntilDue = task.due_on ?
+        Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+
+      if (isOverdue) return 'critical';
+      if (daysUntilDue !== null && daysUntilDue <= 1 && daysUntilDue >= 0) return 'high';
+      if (daysUntilDue !== null && daysUntilDue <= 3 && daysUntilDue >= 0) return 'medium';
+      return 'normal';
+    };
+
+    return (
+      <div className={classes.kanbanViewport}>
+        {Object.entries(statusColumns).map(([key, column]) => (
+          <div key={key} className={classes.kanbanColumn}>
+            <div className={classes.columnHeader}>
+              <Group justify="space-between" mb="md">
+                <Group gap="sm">
+                  <Text fz={18} fw={700} c={column.color}>
+                    {column.name}
+                  </Text>
+                  <div style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: column.color,
+                    boxShadow: `0 0 8px ${column.color}40`
+                  }} />
+                </Group>
+                <Badge
+                  variant="light"
+                  color={column.color}
+                  size="lg"
+                  style={{
+                    background: `${column.color}15`,
+                    color: column.color,
+                    fontWeight: 600
+                  }}
+                >
+                  {column.tasks.length}
+                </Badge>
+              </Group>
+            </div>
+
+            <div className={classes.columnTasks}>
+              {column.tasks.map((task, index) => {
+                const isOverdue = task.due_on && new Date(task.due_on) < new Date() && !task.completed_at;
+                const priority = getPriorityLevel(task);
+
+                return (
+                  <Card
+                    key={task.id}
+                    shadow="sm"
+                    padding="md"
+                    radius="md"
+                    className={classes.kanbanTask}
+                    data-priority={priority}
+                    onClick={() => redirectTo("projects.tasks.open", [task.project_id, task.id])}
+                    style={{
+                      animationDelay: `${0.5 + (index * 0.1)}s`
+                    }}
+                  >
+                    <Stack gap="sm">
+                      {/* Task header with priority and favorite */}
+                      <Group justify="space-between" align="flex-start">
+                        <Group gap="xs" style={{ flex: 1 }}>
+                          {priority !== 'normal' && (
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: priority === 'critical' ? '#fa5252' :
+                                             priority === 'high' ? '#fd7e14' : '#fab005',
+                              flexShrink: 0,
+                              marginTop: '2px',
+                              boxShadow: `0 0 4px ${priority === 'critical' ? '#fa5252' :
+                                                   priority === 'high' ? '#fd7e14' : '#fab005'}60`
+                            }} />
+                          )}
+                          <Text size="sm" fw={600} lineClamp={2} style={{ flex: 1 }}>
+                            #{task.number}: {task.name}
+                          </Text>
+                        </Group>
+                        {task.project_favorite && (
+                          <IconStar
+                            size={16}
+                            color="var(--mantine-color-yellow-6)"
+                            style={{
+                              flexShrink: 0,
+                              filter: 'drop-shadow(0 0 2px rgba(255, 193, 7, 0.5))'
+                            }}
+                          />
+                        )}
+                      </Group>
+
+                      {/* Project and task group info */}
+                      <Group gap="xs">
+                        <Badge variant="dot" size="xs" color="gray">
+                          {task.project_name}
+                        </Badge>
+                        <Text size="xs" c="dimmed">
+                          {task.task_group.name}
+                        </Text>
+                      </Group>
+
+                      {/* Assignee with enhanced styling */}
+                      {task.assigned_to_user && (
+                        <Group gap="xs" style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-8))',
+                          borderRadius: 'var(--mantine-radius-sm)',
+                          border: '1px solid light-dark(var(--mantine-color-blue-2), var(--mantine-color-dark-6))'
+                        }}>
+                          <Avatar size={20} color="blue" radius="xl">
+                            {task.assigned_to_user.name.charAt(0)}
+                          </Avatar>
+                          <Text size="xs" fw={500} c="blue">
+                            {task.assigned_to_user.name}
+                          </Text>
+                        </Group>
+                      )}
+
+                      {/* Due date with enhanced styling */}
+                      {task.due_on && (
+                        <Group gap="xs" style={{
+                          padding: '4px 8px',
+                          backgroundColor: isOverdue ?
+                            'light-dark(var(--mantine-color-red-0), var(--mantine-color-red-9))' :
+                            'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))',
+                          borderRadius: 'var(--mantine-radius-sm)',
+                          border: `1px solid ${isOverdue ?
+                            'light-dark(var(--mantine-color-red-3), var(--mantine-color-red-7))' :
+                            'light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))'}`
+                        }}>
+                          <IconCalendarDue size={12} color={isOverdue ? 'var(--mantine-color-red-6)' : undefined} />
+                          <Text
+                            size="xs"
+                            fw={isOverdue ? 600 : 400}
+                            c={isOverdue ? "red" : "dimmed"}
+                          >
+                            {new Date(task.due_on).toLocaleDateString()}
+                          </Text>
+                        </Group>
+                      )}
+
+                      {/* Time estimation */}
+                      {task.estimation && (
+                        <Group gap="xs" style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'light-dark(var(--mantine-color-teal-0), var(--mantine-color-dark-8))',
+                          borderRadius: 'var(--mantine-radius-sm)',
+                          border: '1px solid light-dark(var(--mantine-color-teal-2), var(--mantine-color-dark-6))'
+                        }}>
+                          <IconClock size={12} color="var(--mantine-color-teal-6)" />
+                          <Text size="xs" fw={500} c="teal">
+                            {task.estimation}h estimated
+                          </Text>
+                        </Group>
+                      )}
+
+                      {/* Labels with improved styling */}
+                      {task.labels.length > 0 && (
+                        <Group gap={6} style={{ marginTop: '4px' }}>
+                          {task.labels.slice(0, 3).map((label) => (
+                            <Badge
+                              key={label.id}
+                              size="xs"
+                              variant="light"
+                              color={label.color}
+                              style={{
+                                textTransform: 'none',
+                                fontWeight: 500,
+                                border: `1px solid ${label.color}40`
+                              }}
+                            >
+                              {label.name}
+                            </Badge>
+                          ))}
+                          {task.labels.length > 3 && (
+                            <Badge size="xs" variant="outline" color="gray">
+                              +{task.labels.length - 3}
+                            </Badge>
+                          )}
+                        </Group>
+                      )}
+                    </Stack>
+                  </Card>
+                );
+              })}
+
+              {column.tasks.length === 0 && (
+                <Center p="xl" className={classes.emptyColumn}>
+                  <Stack align="center" gap="sm">
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: `${column.color}20`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: `2px dashed ${column.color}60`
+                    }}>
+                      <IconGridDots size={24} color={`${column.color}80`} />
+                    </div>
+                    <Text size="sm" c="dimmed" ta="center" fw={500}>
+                      No tasks yet
+                    </Text>
+                    <Text size="xs" c="dimmed" ta="center">
+                      Tasks will appear here
+                    </Text>
+                  </Stack>
+                </Center>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderGanttView = () => (
+    <GanttChart
+      tasks={allTasks}
+      zoom={ganttZoom}
+      groupByProject={ganttGroupByProject}
+      onBarClick={(task) => redirectTo("projects.tasks.open", [task.project_id, task.id])}
+    />
+  );
+
   return (
     <>
       <Breadcrumbs fz={14} mb={30}>
@@ -373,14 +705,12 @@ const TasksIndex = () => {
         Tasks assigned to you
       </Title>
 
-      <Box maw={1200}>
+      <Box className={`${viewMode}-view`}>
         {projects.length ? (
           <>
             <ViewControls />
 
-            {viewMode === 'grouped' && renderGroupedView()}
-            {viewMode === 'labels' && renderLabelView()}
-            {viewMode === 'dates' && renderDateView()}
+            {viewMode === 'list' ? renderListView() : viewMode === 'kanban' ? renderKanbanView() : renderGanttView()}
           </>
         ) : (
           <Center mih={300}>

@@ -13,19 +13,14 @@ import {
   Tooltip,
   rem,
   Badge,
-  ActionIcon,
-  Box,
-  Paper,
-  Stack,
-  Progress
+  Paper
 } from "@mantine/core";
 import {
   IconClock,
   IconCalendarDue,
-  IconAlertTriangle,
   IconCheckbox,
   IconFolderOpen,
-  IconEstimate
+  IconHourglass
 } from "@tabler/icons-react";
 import classes from "./css/Task.module.css";
 

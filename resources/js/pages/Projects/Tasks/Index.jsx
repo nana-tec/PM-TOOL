@@ -7,9 +7,9 @@ import useWebSockets from "@/hooks/useWebSockets";
 import Layout from "@/layouts/MainLayout";
 import { DragDropContext, Droppable } from "@hello-pangea/dnd";
 import { usePage } from "@inertiajs/react";
-import { Button, Grid, Stack, Box } from "@mantine/core";
+import { Button, Grid, Stack, Box, Group, SegmentedControl, Switch } from "@mantine/core";
 import { IconPlus } from "@tabler/icons-react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreateTaskDrawer } from "./Drawers/CreateTaskDrawer";
 import { EditTaskDrawer } from "./Drawers/EditTaskDrawer";
 import ArchivedItems from "./Index/Archive/ArchivedItems";
@@ -20,6 +20,8 @@ import CreateTasksGroupModal from "./Index/Modals/CreateTasksGroupModal";
 import TaskGroup from "./Index/TaskGroup";
 import classes from "./css/Index.module.css";
 import NotesPanel from "@/pages/Projects/Notes/Panel";
+import GanttChart from "@/components/GanttChart";
+import { redirectTo } from "@/utils/route";
 
 let currentProject = null;
 
@@ -31,7 +33,10 @@ const TasksIndex = () => {
   const { tasks, setTasks, addTask, reorderTask, moveTask } = useTasksStore();
   const { hasUrlParams } = useTaskFiltersStore();
   const { initProjectWebSocket } = useWebSockets();
-  const { tasksView } = usePreferences();
+  const { tasksView, setTasksView } = usePreferences();
+
+  const [ganttZoom, setGanttZoom] = useState('month');
+  const [ganttGroupByProject, setGanttGroupByProject] = useState(false);
 
   const usingFilters = hasUrlParams();
 
@@ -43,6 +48,13 @@ const TasksIndex = () => {
 
   useEffect(() => {
     return initProjectWebSocket(project);
+  }, []);
+
+  // Initialize view from query param (e.g., ?view=gantt)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view === 'gantt') setTasksView('gantt');
   }, []);
 
   const onDragEnd = ({ source, destination }) => {
@@ -60,6 +72,22 @@ const TasksIndex = () => {
     }
   };
 
+  // Flatten all tasks across groups to feed into Gantt
+  const allTasks = useMemo(() => {
+    const items = [];
+    groups.forEach((group) => {
+      const list = tasks[group.id] || [];
+      list.forEach((t) => {
+        items.push({
+          ...t,
+          project_id: project.id,
+          project_name: project.name,
+        });
+      });
+    });
+    return items;
+  }, [groups, tasks, project]);
+
   return (
     <>
       <Header />
@@ -67,10 +95,38 @@ const TasksIndex = () => {
       {can("create task") && <CreateTaskDrawer />}
       <EditTaskDrawer />
 
+      {tasksView === 'gantt' && (
+        <Group mt="md" mb="sm" gap="md">
+          <SegmentedControl
+            size="sm"
+            value={ganttZoom}
+            onChange={setGanttZoom}
+            data={[
+              { label: 'Week', value: 'week' },
+              { label: 'Month', value: 'month' },
+              { label: 'Quarter', value: 'quarter' },
+            ]}
+          />
+          <Switch
+            size="sm"
+            checked={ganttGroupByProject}
+            onChange={(e) => setGanttGroupByProject(e.currentTarget.checked)}
+            label="Group by project"
+          />
+        </Group>
+      )}
+
       <Grid columns={12} gutter={50} mt="xl" className={`${tasksView}-view`}>
         {!route().params.archived ? (
           <Grid.Col span={tasksView === "list" ? 9 : 12}>
-            {groups.length ? (
+            {tasksView === 'gantt' ? (
+              <GanttChart
+                tasks={allTasks}
+                zoom={ganttZoom}
+                groupByProject={ganttGroupByProject}
+                onBarClick={(task) => redirectTo("projects.tasks.open", [project.id, task.id])}
+              />
+            ) : groups.length ? (
               <>
                 <DragDropContext onDragEnd={onDragEnd}>
                   <Droppable
