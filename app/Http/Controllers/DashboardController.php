@@ -56,8 +56,10 @@ class DashboardController extends Controller
                 ->get(['id', 'name', 'assigned_at', 'group_id', 'project_id']),
             'recentComments' => Comment::query()
                 ->whereHas('task', function ($query) use ($projectIds) {
-                    $query->whereIn('project_id', $projectIds)
-                        ->where('assigned_to_user_id', auth()->id());
+                    if (! auth()->user()?->can('view all comments')) {
+                        $query->whereIn('project_id', $projectIds)
+                            ->where('assigned_to_user_id', auth()->id());
+                    }
                 })
                 ->with([
                     'task:id,name,project_id',
