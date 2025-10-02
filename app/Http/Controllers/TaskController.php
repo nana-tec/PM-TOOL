@@ -207,7 +207,7 @@ class TaskController extends Controller
         }
 
         if (! empty($data)) {
-            $updater = new UpdateTask();
+            $updater = new UpdateTask;
             foreach ($data as $field => $value) {
                 $updater->update($task, [$field => $value]);
             }

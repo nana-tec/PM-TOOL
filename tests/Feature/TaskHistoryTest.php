@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\PricingType;
 use App\Models\ClientCompany;
 use App\Models\Project;
 use App\Models\Task;
@@ -13,12 +12,13 @@ use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
-function actingAsAdminWithTaskPermissions(): User {
+function actingAsAdminWithTaskPermissions(): User
+{
     $user = User::factory()->create();
     $role = Role::firstOrCreate(['name' => 'admin']);
 
     $perms = [
-        'view tasks', 'create task', 'edit task', 'archive task', 'restore task', 'reorder task', 'complete task'
+        'view tasks', 'create task', 'edit task', 'archive task', 'restore task', 'reorder task', 'complete task',
     ];
     foreach ($perms as $permName) {
         $perm = Permission::firstOrCreate(['name' => $permName]);
@@ -61,15 +61,15 @@ it('returns task audit history for authorized users', function () {
 
     // Trigger an update to create an audit
     $this->put("/projects/{$project->id}/tasks/{$task->id}", [
-        'name' => 'Renamed Task'
+        'name' => 'Renamed Task',
     ])->assertOk();
 
     $this->get("/projects/{$project->id}/tasks/{$task->id}/history")
         ->assertOk()
         ->assertJsonStructure([
             'history' => [
-                ['id', 'event', 'old_values', 'new_values', 'created_at']
-            ]
+                ['id', 'event', 'old_values', 'new_values', 'created_at'],
+            ],
         ]);
 });
 
@@ -101,7 +101,7 @@ it('restores a task from a selected audit snapshot', function () {
 
     // Change the name so we have something to restore
     $this->put("/projects/{$project->id}/tasks/{$task->id}", [
-        'name' => 'Second Name'
+        'name' => 'Second Name',
     ])->assertOk();
 
     // Fetch history and pick the first (latest) audit that has old_values with 'name'
@@ -120,4 +120,3 @@ it('restores a task from a selected audit snapshot', function () {
         ->assertOk()
         ->assertJsonStructure(['task' => ['id', 'name']]);
 });
-

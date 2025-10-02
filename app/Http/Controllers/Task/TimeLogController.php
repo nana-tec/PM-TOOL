@@ -51,7 +51,7 @@ class TimeLogController extends Controller
         abort_unless($timeLog->user_id === auth()->id(), 403);
 
         // Only stop a running timer
-        abort_if(!is_null($timeLog->minutes), 422, 'Timer already stopped');
+        abort_if(! is_null($timeLog->minutes), 422, 'Timer already stopped');
 
         $timeLog->update([
             'timer_stop' => now()->timestamp,
