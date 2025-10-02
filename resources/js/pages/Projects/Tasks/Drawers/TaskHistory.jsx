@@ -1,11 +1,9 @@
-import { useState } from 'react';
-import { ActionIcon, Badge, Button, Divider, Group, Loader, Modal, MultiSelect, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
-import { IconHistory, IconRestore } from '@tabler/icons-react';
+import { useState, useEffect } from 'react';
+import { ActionIcon, Accordion, Badge, Button, Divider, Group, Loader, Modal, MultiSelect, ScrollArea, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core';
+import { IconHistory, IconRestore, IconCopy } from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
 import { usePage } from '@inertiajs/react';
-import htmldiff from 'htmldiff-js';
-import { diffWords } from 'diff';
 
 const allowedFieldLabels = {
   name: 'Name',
@@ -30,6 +28,42 @@ export default function TaskHistory({ task, onRestored }) {
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(null);
   const [selectedFields, setSelectedFields] = useState({}); // { [auditId]: [fields] }
+  const [diffLibs, setDiffLibs] = useState({ diffWords: null, htmldiff: null });
+  const [expanded, setExpanded] = useState([]); // array of opened audit IDs as strings
+  const [viewMode, setViewMode] = useState({}); // { [`${auditId}:${field}`]: 'inline' | 'side' }
+  const [persistedMode, setPersistedMode] = useState({}); // { [field]: 'inline'|'side' }
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('taskHistory.viewModes') || '{}');
+      if (saved && typeof saved === 'object') setPersistedMode(saved);
+    } catch {}
+  }, []);
+
+  const savePersistedMode = (field, mode) => {
+    const next = { ...persistedMode, [field]: mode };
+    setPersistedMode(next);
+    try { localStorage.setItem('taskHistory.viewModes', JSON.stringify(next)); } catch {}
+  };
+
+  const ensureDiffLibs = async () => {
+    if (diffLibs.diffWords && diffLibs.htmldiff) return diffLibs;
+    try {
+      const [diffMod, htmlMod] = await Promise.all([
+        import('diff'),
+        import('htmldiff-js'),
+      ]);
+      const libs = {
+        diffWords: diffMod?.diffWords || diffMod?.default?.diffWords || null,
+        htmldiff: htmlMod?.default || htmlMod?.htmldiff || null,
+      };
+      setDiffLibs(libs);
+      return libs;
+    } catch (e) {
+      console.warn('Diff libs failed to load, falling back to basic view.');
+      return { diffWords: null, htmldiff: null };
+    }
+  };
 
   const openHistory = async () => {
     if (!projectId || !task?.id) return;
@@ -92,6 +126,36 @@ export default function TaskHistory({ task, onRestored }) {
     } finally {
       setRestoring(null);
     }
+  };
+
+  const onExpandChange = async (values) => {
+    setExpanded(values);
+    if (values.length && (!diffLibs.diffWords || !diffLibs.htmldiff)) {
+      await ensureDiffLibs();
+    }
+  };
+
+  const setFieldViewMode = (auditId, field, mode) => {
+    setViewMode(prev => ({ ...prev, [`${auditId}:${field}`]: mode }));
+    savePersistedMode(field, mode);
+  };
+
+  const getFieldViewMode = (auditId, field, defaultMode = 'inline') => viewMode[`${auditId}:${field}`] || persistedMode[field] || defaultMode;
+
+  const copyToClipboard = async (label, text) => {
+    try {
+      await navigator.clipboard.writeText(text || '');
+      showNotification({ color: 'green', title: 'Copied', message: `${label} copied to clipboard` });
+    } catch (e) {
+      showNotification({ color: 'red', title: 'Copy failed', message: 'Could not copy to clipboard' });
+    }
+  };
+
+  const htmlToText = (html = '') => {
+    if (typeof window === 'undefined' || !window?.document) return html;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || tmp.innerText || '').trim();
   };
 
   // Helpers to map/format field values for display in diffs
@@ -160,7 +224,23 @@ export default function TaskHistory({ task, onRestored }) {
   };
 
   const renderInlineTextDiff = (oldText = '', newText = '') => {
-    const parts = diffWords(oldText || '', newText || '');
+    if (!diffLibs.diffWords) {
+      // Fallback to basic side-by-side if diff lib not loaded
+      return (
+        <Group align="flex-start" gap="xl" wrap="nowrap">
+          <Stack gap={2} style={{ minWidth: 180 }}>
+            <Text size="xs" c="dimmed">Old</Text>
+            <Text>{oldText || '—'}</Text>
+          </Stack>
+          <Stack gap={2} style={{ minWidth: 180 }}>
+            <Text size="xs" c="dimmed">New</Text>
+            <Text>{newText || '—'}</Text>
+          </Stack>
+        </Group>
+      );
+    }
+
+    const parts = diffLibs.diffWords(oldText || '', newText || '');
     return (
       <Text>
         {parts.map((p, idx) => {
@@ -173,28 +253,51 @@ export default function TaskHistory({ task, onRestored }) {
   };
 
   const renderHtmlDiff = (oldHtml = '', newHtml = '') => {
-    try {
-      const diffed = htmldiff(oldHtml || '', newHtml || '');
-      return <div dangerouslySetInnerHTML={{ __html: diffed }} />;
-    } catch (e) {
-      // Fallback to side-by-side if diff fails
-      return (
-        <Group align="flex-start" grow wrap="nowrap">
-          <Stack gap={4} style={{ flex: 1 }}>
-            <Text size="xs" c="dimmed">Old</Text>
-            <div dangerouslySetInnerHTML={{ __html: oldHtml || '' }} />
-          </Stack>
-          <Stack gap={4} style={{ flex: 1 }}>
-            <Text size="xs" c="dimmed">New</Text>
-            <div dangerouslySetInnerHTML={{ __html: newHtml || '' }} />
-          </Stack>
-        </Group>
-      );
+    if (diffLibs.htmldiff) {
+      try {
+        const diffed = diffLibs.htmldiff(oldHtml || '', newHtml || '');
+        return <div dangerouslySetInnerHTML={{ __html: diffed }} />;
+      } catch (e) {
+        // ignore and fallback below
+      }
     }
+    // Fallback to side-by-side if diff lib not loaded or failed
+    return (
+      <Group align="flex-start" grow wrap="nowrap">
+        <Stack gap={4} style={{ flex: 1 }}>
+          <Text size="xs" c="dimmed">Old</Text>
+          <div dangerouslySetInnerHTML={{ __html: oldHtml || '' }} />
+        </Stack>
+        <Stack gap={4} style={{ flex: 1 }}>
+          <Text size="xs" c="dimmed">New</Text>
+          <div dangerouslySetInnerHTML={{ __html: newHtml || '' }} />
+        </Stack>
+      </Group>
+    );
+  };
+
+  const isStringField = (field, oldVal, newVal) => {
+    // Consider as string diff if both values are strings and field is not explicitly formatted above
+    const excluded = new Set([
+      'description',
+      'billable',
+      'hidden_from_clients',
+      'due_on',
+      'completed_at',
+      'pricing_type',
+      'fixed_price',
+      'assigned_to_user_id',
+      'group_id',
+      'estimation',
+      'labels',
+      'subscribed_users',
+    ]);
+    return !excluded.has(field) && typeof oldVal === 'string' && typeof newVal === 'string';
   };
 
   return (
     <>
+      {/* Legend for diff colors */}
       <Tooltip label="View history" withArrow>
         <ActionIcon variant="light" color="gray" onClick={openHistory} aria-label="View history">
           <IconHistory size={16} />
@@ -202,13 +305,33 @@ export default function TaskHistory({ task, onRestored }) {
       </Tooltip>
 
       <Modal opened={open} onClose={() => setOpen(false)} title={`Task #${task?.number} history`} size="lg">
+        {/* Legend */}
+        <Group gap="xs" mb="xs">
+          <Text size="xs" c="dimmed">Legend:</Text>
+          <Text size="xs"><span style={{ backgroundColor: 'rgba(34,197,94,0.2)', padding: '0 4px' }}>added</span></Text>
+          <Text size="xs"><span style={{ backgroundColor: 'rgba(239,68,68,0.2)', textDecoration: 'line-through', padding: '0 4px' }}>removed</span></Text>
+          <Text size="xs" c="dimmed">Use the view toggle on long text to switch Inline/Side-by-side.</Text>
+        </Group>
+        {/* Expand/Collapse all controls */}
+        {items.length > 0 && (
+          <Group justify="space-between" mb="xs">
+            <div />
+            <Group gap="xs">
+              <Button size="xs" variant="light" onClick={async () => { await ensureDiffLibs(); setExpanded(items.map(i => String(i.id))); }}>Expand all</Button>
+              <Button size="xs" variant="light" color="gray" onClick={() => setExpanded([])}>Collapse all</Button>
+            </Group>
+          </Group>
+        )}
+        {/* Optional inline styles for HTML diff tags if present */}
+        <style>{`.htmldiff ins{background:#dcfce7;text-decoration:none;} .htmldiff del{background:#fee2e2;}`}</style>
+
         {loading ? (
           <Group justify="center" my="md"><Loader size="sm" /></Group>
         ) : items.length === 0 ? (
           <Text c="dimmed">No history available.</Text>
         ) : (
           <ScrollArea.Autosize mah={500} type="scroll">
-            <Stack>
+            <Accordion multiple value={expanded} onChange={onExpandChange} variant="separated" chevronPosition="left">
               {items.map((h) => {
                 const changedKeysAll = [
                   ...Object.keys(h.old_values || {}),
@@ -216,114 +339,194 @@ export default function TaskHistory({ task, onRestored }) {
                 ].filter((v, i, arr) => arr.indexOf(v) === i);
                 const restoreSelectable = changedKeysAll.filter((k) => Object.keys(allowedFieldLabels).includes(k));
                 const restoreOptions = restoreSelectable.map((k) => ({ value: k, label: allowedFieldLabels[k] }));
+                const itemValue = String(h.id);
+                const isOpen = expanded.includes(itemValue);
 
                 return (
-                  <div key={h.id}>
-                    <Group gap="xs" mb={6} justify="space-between" wrap="nowrap">
-                      <Group gap="xs">
-                        <Badge size="xs" variant="light" color={h.event === 'created' ? 'green' : h.event === 'updated' ? 'blue' : 'gray'}>
-                          {h.event}
-                        </Badge>
-                        <Text size="xs" c="dimmed">{new Date(h.created_at).toLocaleString()}</Text>
+                  <Accordion.Item key={h.id} value={itemValue}>
+                    <Accordion.Control>
+                      <Group gap="xs" justify="space-between" wrap="nowrap">
+                        <Group gap="xs">
+                          <Badge size="xs" variant="light" color={h.event === 'created' ? 'green' : h.event === 'updated' ? 'blue' : 'gray'}>
+                            {h.event}
+                          </Badge>
+                          <Text size="xs" c="dimmed">{new Date(h.created_at).toLocaleString()}</Text>
+                        </Group>
+                        {can('edit task') && (
+                          <Button size="xs" variant="light" leftSection={<IconRestore size={14} />} onClick={(e) => { e.stopPropagation(); restore(h.id); }} loading={restoring === h.id}>
+                            Restore
+                          </Button>
+                        )}
                       </Group>
-                      {can('edit task') && (
-                        <Button size="xs" variant="light" leftSection={<IconRestore size={14} />} onClick={() => restore(h.id)} loading={restoring === h.id}>
-                          Restore
-                        </Button>
+                    </Accordion.Control>
+                    <Accordion.Panel>
+                      {restoreSelectable.length > 0 && (
+                        <MultiSelect
+                          size="xs"
+                          data={restoreOptions}
+                          value={selectedFields[h.id] || []}
+                          onChange={(vals) => onSelectFields(h.id, vals)}
+                          placeholder="Restore specific fields (optional)"
+                          searchable
+                          clearable
+                        />
                       )}
-                    </Group>
 
-                    {restoreSelectable.length > 0 && (
-                      <MultiSelect
-                        size="xs"
-                        data={restoreOptions}
-                        value={selectedFields[h.id] || []}
-                        onChange={(vals) => onSelectFields(h.id, vals)}
-                        placeholder="Restore specific fields (optional)"
-                        searchable
-                        clearable
-                      />
-                    )}
+                      {/* Only render heavy diffs when expanded */}
+                      {isOpen && (
+                        <Stack gap={10} mt="xs">
+                          {changedKeysAll.map((field) => {
+                            const label = allowedFieldLabels[field] || field;
+                            const oldVal = h.old_values?.[field];
+                            const newVal = h.new_values?.[field];
 
-                    {/* Per-field diffs for anything that changed */}
-                    <Stack gap={10} mt="xs">
-                      {changedKeysAll.map((field) => {
-                        const label = allowedFieldLabels[field] || field;
-                        const oldVal = h.old_values?.[field];
-                        const newVal = h.new_values?.[field];
+                            if (field === 'description') {
+                              const mode = getFieldViewMode(h.id, field, 'inline');
+                              const actions = (
+                                <Group justify="space-between" mb={4} wrap="nowrap">
+                                  <SegmentedControl size="xs" value={mode} onChange={(m) => setFieldViewMode(h.id, field, m)} data={[{ label: 'Inline', value: 'inline' }, { label: 'Side-by-side', value: 'side' }]} />
+                                  <Group gap="xs">
+                                    <Tooltip label="Copy Old"><ActionIcon variant="light" onClick={() => copyToClipboard('Old description', htmlToText(oldVal || ''))}><IconCopy size={14} /></ActionIcon></Tooltip>
+                                    <Tooltip label="Copy New"><ActionIcon variant="light" onClick={() => copyToClipboard('New description', htmlToText(newVal || ''))}><IconCopy size={14} /></ActionIcon></Tooltip>
+                                  </Group>
+                                </Group>
+                              );
+                              if (h.event === 'created') {
+                                return (
+                                  <div key={field}>
+                                    <Text size="sm" fw={600}>{label}</Text>
+                                    {actions}
+                                    {mode === 'inline' ? (
+                                      <div className="htmldiff" dangerouslySetInnerHTML={{ __html: newVal || '' }} />
+                                    ) : (
+                                      <Group align="flex-start" grow wrap="nowrap">
+                                        <Stack gap={4} style={{ flex: 1 }}>
+                                          <Text size="xs" c="dimmed">Old</Text>
+                                          <div dangerouslySetInnerHTML={{ __html: '' }} />
+                                        </Stack>
+                                        <Stack gap={4} style={{ flex: 1 }}>
+                                          <Text size="xs" c="dimmed">New</Text>
+                                          <div className="htmldiff" dangerouslySetInnerHTML={{ __html: newVal || '' }} />
+                                        </Stack>
+                                      </Group>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div key={field}>
+                                  <Text size="sm" fw={600}>{label}</Text>
+                                  {actions}
+                                  {mode === 'inline' ? (
+                                    <div className="htmldiff">{renderHtmlDiff(oldVal || '', newVal || '')}</div>
+                                  ) : (
+                                    <Group align="flex-start" grow wrap="nowrap">
+                                      <Stack gap={4} style={{ flex: 1 }}>
+                                        <Text size="xs" c="dimmed">Old</Text>
+                                        <div dangerouslySetInnerHTML={{ __html: oldVal || '' }} />
+                                      </Stack>
+                                      <Stack gap={4} style={{ flex: 1 }}>
+                                        <Text size="xs" c="dimmed">New</Text>
+                                        <div dangerouslySetInnerHTML={{ __html: newVal || '' }} />
+                                      </Stack>
+                                    </Group>
+                                  )}
+                                </div>
+                              );
+                            }
 
-                        if (field === 'description') {
-                          if (h.event === 'created') {
+                            // Inline text diff for textual fields and any other audited strings
+                            const isText = isStringField(field, oldVal, newVal);
+                            const isLongText = isText && ((oldVal?.length || 0) > 80 || (newVal?.length || 0) > 80);
+                            if (isText) {
+                              const mode = getFieldViewMode(h.id, field, isLongText ? 'inline' : 'inline');
+                              const actions = (
+                                <Group justify="space-between" mb={4} wrap="nowrap">
+                                  {isLongText && (
+                                    <SegmentedControl size="xs" value={mode} onChange={(m) => setFieldViewMode(h.id, field, m)} data={[{ label: 'Inline', value: 'inline' }, { label: 'Side-by-side', value: 'side' }]} />
+                                  )}
+                                  <Group gap="xs">
+                                    <Tooltip label="Copy Old"><ActionIcon variant="light" onClick={() => copyToClipboard(`Old ${label}`, String(oldVal ?? ''))}><IconCopy size={14} /></ActionIcon></Tooltip>
+                                    <Tooltip label="Copy New"><ActionIcon variant="light" onClick={() => copyToClipboard(`New ${label}`, String(newVal ?? ''))}><IconCopy size={14} /></ActionIcon></Tooltip>
+                                  </Group>
+                                </Group>
+                              );
+                              return (
+                                <div key={field}>
+                                  <Text size="sm" fw={600}>{label}</Text>
+                                  {actions}
+                                  {h.event === 'created' ? (
+                                    mode === 'side' ? (
+                                      <Group align="flex-start" gap="xl" wrap="nowrap">
+                                        <Stack gap={2} style={{ minWidth: 180 }}>
+                                          <Text size="xs" c="dimmed">Old</Text>
+                                          <Text>—</Text>
+                                        </Stack>
+                                        <Stack gap={2} style={{ minWidth: 180 }}>
+                                          <Text size="xs" c="dimmed">New</Text>
+                                          <Text>{newVal || '—'}</Text>
+                                        </Stack>
+                                      </Group>
+                                    ) : (
+                                      <Text>{newVal || '—'}</Text>
+                                    )
+                                  ) : (
+                                    mode === 'side' ? (
+                                      <Group align="flex-start" gap="xl" wrap="nowrap">
+                                        <Stack gap={2} style={{ minWidth: 180 }}>
+                                          <Text size="xs" c="dimmed">Old</Text>
+                                          <Text>{String(oldVal ?? '—')}</Text>
+                                        </Stack>
+                                        <Stack gap={2} style={{ minWidth: 180 }}>
+                                          <Text size="xs" c="dimmed">New</Text>
+                                          <Text>{String(newVal ?? '—')}</Text>
+                                        </Stack>
+                                      </Group>
+                                    ) : (
+                                      renderInlineTextDiff(String(oldVal ?? ''), String(newVal ?? ''))
+                                    )
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            // Generic fields
+                            const fmt = (f, v) => {
+                              const val = formatValue(f, v);
+                              if (typeof val === 'string') return val;
+                              try { return JSON.stringify(val); } catch { return String(val); }
+                            };
                             return (
                               <div key={field}>
                                 <Text size="sm" fw={600}>{label}</Text>
-                                <div dangerouslySetInnerHTML={{ __html: newVal || '' }} />
-                              </div>
-                            );
-                          }
-                          return (
-                            <div key={field}>
-                              <Text size="sm" fw={600}>{label}</Text>
-                              {renderHtmlDiff(oldVal || '', newVal || '')}
-                            </div>
-                          );
-                        }
-
-                        // Inline text diff for textual fields like name
-                        if (field === 'name') {
-                          if (h.event === 'created') {
-                            return (
-                              <div key={field}>
-                                <Text size="sm" fw={600}>{label}</Text>
-                                <Text>{newVal || '—'}</Text>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div key={field}>
-                              <Text size="sm" fw={600}>{label}</Text>
-                              {renderInlineTextDiff(String(oldVal ?? ''), String(newVal ?? ''))}
-                            </div>
-                          );
-                        }
-
-                        // Generic fields
-                        const fmt = (f, v) => {
-                          const val = formatValue(f, v);
-                          if (typeof val === 'string') return val;
-                          try { return JSON.stringify(val); } catch { return String(val); }
-                        };
-                        return (
-                          <div key={field}>
-                            <Text size="sm" fw={600}>{label}</Text>
-                            {h.event === 'created' ? (
-                              <Text>{fmt(field, newVal)}</Text>
-                            ) : (
-                              <Group align="flex-start" gap="xl" wrap="nowrap">
-                                <Stack gap={2} style={{ minWidth: 180 }}>
-                                  <Text size="xs" c="dimmed">Old</Text>
-                                  <Text>{fmt(field, oldVal)}</Text>
-                                </Stack>
-                                <Stack gap={2} style={{ minWidth: 180 }}>
-                                  <Text size="xs" c="dimmed">New</Text>
+                                {h.event === 'created' ? (
                                   <Text>{fmt(field, newVal)}</Text>
-                                </Stack>
-                              </Group>
-                            )}
-                          </div>
-                        );
-                      })}
+                                ) : (
+                                  <Group align="flex-start" gap="xl" wrap="nowrap">
+                                    <Stack gap={2} style={{ minWidth: 180 }}>
+                                      <Text size="xs" c="dimmed">Old</Text>
+                                      <Text>{fmt(field, oldVal)}</Text>
+                                    </Stack>
+                                    <Stack gap={2} style={{ minWidth: 180 }}>
+                                      <Text size="xs" c="dimmed">New</Text>
+                                      <Text>{fmt(field, newVal)}</Text>
+                                    </Stack>
+                                  </Group>
+                                )}
+                              </div>
+                            );
+                          })}
 
-                      {h.event === 'updated' && changedKeysAll.length > 0 && (
-                        <Text size="xs" c="dimmed">Changed fields: {changedKeysAll.map(k => allowedFieldLabels[k] || k).join(', ')}</Text>
+                          {h.event === 'updated' && changedKeysAll.length > 0 && (
+                            <Text size="xs" c="dimmed">Changed fields: {changedKeysAll.map(k => allowedFieldLabels[k] || k).join(', ')}</Text>
+                          )}
+                        </Stack>
                       )}
-                    </Stack>
-
-                    <Divider my="sm" />
-                  </div>
+                    </Accordion.Panel>
+                  </Accordion.Item>
                 );
               })}
-            </Stack>
+            </Accordion>
           </ScrollArea.Autosize>
         )}
       </Modal>
