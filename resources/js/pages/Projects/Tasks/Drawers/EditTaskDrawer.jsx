@@ -26,6 +26,7 @@ import LabelsDropdown from './LabelsDropdown';
 import Timer from './Timer';
 import classes from './css/TaskDrawer.module.css';
 import { PricingType } from '@/utils/enums';
+import TaskHistory from './TaskHistory';
 
 export function EditTaskDrawer() {
   const editorRef = useRef(null);
@@ -129,6 +130,34 @@ export function EditTaskDrawer() {
   const isFixedPrice = data.pricing_type === PricingType.FIXED;
   const currencySymbol = currency?.symbol || '';
 
+  // Resync local drawer state after history restore
+  const onHistoryRestored = updated => {
+    setData(prev => ({
+      ...prev,
+      group_id: updated?.group_id || '',
+      assigned_to_user_id: updated?.assigned_to_user_id || '',
+      name: updated?.name || '',
+      description: updated?.description || '',
+      pricing_type: updated?.pricing_type || PricingType.HOURLY,
+      estimation: updated?.estimation || 0,
+      fixed_price: updated?.fixed_price ? updated.fixed_price / 100 : 0,
+      due_on: updated?.due_on ? dayjs(updated?.due_on).toDate() : '',
+      hidden_from_clients:
+        updated?.hidden_from_clients !== undefined ? updated.hidden_from_clients : false,
+      billable: updated?.billable !== undefined ? updated.billable : true,
+      // Keep selected subscribers/labels from updated payload if present
+      subscribed_users: (updated?.subscribed_users || data.subscribed_users || []).map(
+        i => i.id?.toString?.() ?? i?.toString?.() ?? ''
+      ),
+      labels: (updated?.labels || data.labels || []).map(i => i.id ?? i),
+    }));
+
+    // Sync rich text editor content if available
+    setTimeout(() => {
+      editorRef.current?.setContent(updated?.description || '');
+    }, 0);
+  };
+
   return (
     <Drawer
       opened={edit.opened}
@@ -155,6 +184,8 @@ export function EditTaskDrawer() {
           >
             #{task?.number}: {data.name}
           </Text>
+          {/* Quick access to history from title bar */}
+          {task && <TaskHistory task={task} onRestored={onHistoryRestored} />}
         </Group>
       }
       position='right'
@@ -217,6 +248,11 @@ export function EditTaskDrawer() {
               {can('view comments') && <Comments task={task} />}
             </div>
             <div className={classes.sidebar}>
+              {/* Also expose history from sidebar top */}
+              <Group justify='flex-end' mb='sm'>
+                <TaskHistory task={task} onRestored={onHistoryRestored} />
+              </Group>
+
               <Select
                 label='Task group'
                 placeholder='Select task group'

@@ -66,6 +66,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('{project}/tasks/reorder', [TaskController::class, 'reorder'])->name('tasks.reorder');
         Route::post('{project}/tasks/move', [TaskController::class, 'move'])->name('tasks.move');
 
+        // Task history
+        Route::get('{project}/tasks/{task}/history', [TaskController::class, 'history'])->name('tasks.history')->scopeBindings();
+        Route::post('{project}/tasks/{task}/history/{auditId}/restore', [TaskController::class, 'restoreHistory'])->name('tasks.history.restore')->scopeBindings();
+
         // ATTACHMENTS
         Route::group(['prefix' => '{project}/tasks/{task}', 'as' => 'tasks.'], function () {
             Route::post('attachments/upload', [AttachmentController::class, 'store'])->name('attachments.upload');

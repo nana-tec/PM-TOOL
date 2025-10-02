@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Task\CreateTask;
 use App\Actions\Task\UpdateTask;
+use App\Enums\PricingType;
 use App\Events\Task\TaskDeleted;
 use App\Events\Task\TaskGroupChanged;
 use App\Events\Task\TaskOrderChanged;
@@ -149,5 +150,69 @@ class TaskController extends Controller
         TaskRestored::dispatch($task);
 
         return redirect()->back()->success('Task restored', 'The restoring of the Task was completed successfully.');
+    }
+
+    public function history(Project $project, Task $task): JsonResponse
+    {
+        $this->authorize('viewAny', [Task::class, $project]);
+
+        $audits = $task->audits()
+            ->latest()
+            ->get(['id', 'event', 'old_values', 'new_values', 'created_at']);
+
+        return response()->json(['history' => $audits]);
+    }
+
+    public function restoreHistory(Request $request, Project $project, Task $task, int $auditId): JsonResponse
+    {
+        $this->authorize('update', [$task, $project]);
+
+        $audit = $task->audits()->where('id', $auditId)->firstOrFail();
+
+        $payload = $audit->new_values ?: $audit->old_values ?: [];
+
+        // Only allow restoring safe, fillable attributes
+        $allowed = [
+            'name',
+            'description',
+            'due_on',
+            'estimation',
+            'assigned_to_user_id',
+            'pricing_type',
+            'fixed_price',
+            'hidden_from_clients',
+            'billable',
+            'group_id',
+            'completed_at',
+        ];
+
+        $data = collect($payload)
+            ->only($allowed)
+            ->toArray();
+
+        // If a subset of fields is requested, filter the data
+        $requestedFields = $request->input('fields');
+        if (is_array($requestedFields) && ! empty($requestedFields)) {
+            $requestedFields = array_values(array_intersect($requestedFields, $allowed));
+            $data = array_intersect_key($data, array_flip($requestedFields));
+        }
+
+        // Normalize pricing_type case: if hourly then fixed_price must be null
+        if (array_key_exists('pricing_type', $data)) {
+            $pricing = $data['pricing_type'];
+            $pricingValue = $pricing instanceof PricingType ? $pricing->value : (string) $pricing;
+            if ($pricingValue === PricingType::HOURLY->value) {
+                $data['fixed_price'] = null;
+            }
+        }
+
+        if (! empty($data)) {
+            $updater = new UpdateTask();
+            foreach ($data as $field => $value) {
+                $updater->update($task, [$field => $value]);
+            }
+        }
+
+        return response()->json(['task' => $task->refresh()->loadDefault()]);
     }
 }
