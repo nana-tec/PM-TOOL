@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Lacodix\LaravelModelFilter\Traits\IsSearchable;
 use Lacodix\LaravelModelFilter\Traits\IsSortable;
 use LaravelArchivable\Archivable;
@@ -80,6 +81,11 @@ class Project extends Model implements AuditableContract
     public function activities(): MorphMany
     {
         return $this->morphMany(Activity::class, 'activity_capable');
+    }
+
+    public function vcsIntegration(): HasOne
+    {
+        return $this->hasOne(ProjectVcsIntegration::class);
     }
 
     public static function dropdownValues(): array

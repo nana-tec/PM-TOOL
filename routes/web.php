@@ -11,6 +11,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\MyWork\ActivityController;
 use App\Http\Controllers\MyWork\MyWorkTaskController;
 use App\Http\Controllers\Project\NoteController;
+use App\Http\Controllers\Project\VcsController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Settings\LabelController;
@@ -46,6 +47,21 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::delete('{project}/notes/{note}', [NoteController::class, 'destroy'])->name('notes.destroy')->scopeBindings();
         Route::get('{project}/notes/{note}/history', [NoteController::class, 'history'])->name('notes.history')->scopeBindings();
         Route::post('{project}/notes/{note}/history/{auditId}/restore', [NoteController::class, 'restore'])->name('notes.history.restore')->scopeBindings();
+
+        // VCS Integration
+        Route::group(['prefix' => '{project}/vcs', 'as' => 'vcs.'], function () {
+            Route::get('/', [VcsController::class, 'showIntegration'])->name('show')->scopeBindings();
+            Route::post('/', [VcsController::class, 'upsertIntegration'])->name('upsert')->scopeBindings();
+            Route::delete('/', [VcsController::class, 'destroyIntegration'])->name('destroy')->scopeBindings();
+
+            Route::get('branches', [VcsController::class, 'branches'])->name('branches')->scopeBindings();
+            Route::get('commits', [VcsController::class, 'commits'])->name('commits')->scopeBindings();
+            Route::get('issues', [VcsController::class, 'listIssues'])->name('issues')->scopeBindings();
+            Route::get('pulls', [VcsController::class, 'listPulls'])->name('pulls')->scopeBindings();
+            Route::post('issues', [VcsController::class, 'createIssue'])->name('issues.create')->scopeBindings();
+            Route::post('pulls', [VcsController::class, 'openPr'])->name('pulls.open')->scopeBindings();
+            Route::post('merge', [VcsController::class, 'merge'])->name('merge')->scopeBindings();
+        });
 
         // TASK GROUPS
         Route::post('{project}/task-groups', [GroupController::class, 'store'])->name('task-groups.store');

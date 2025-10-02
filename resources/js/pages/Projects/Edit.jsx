@@ -20,6 +20,7 @@ import {
 import { useEffect, useState } from 'react';
 import { PricingType } from '@/utils/enums';
 import NotesPanel from '@/pages/Projects/Notes/Panel';
+import VcsPanel from '@/pages/Projects/Vcs/Panel';
 
 const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
   const { item } = usePage().props;
@@ -159,6 +160,10 @@ const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
 
       <div style={{ marginTop: 24 }}>
         <NotesPanel projectId={item.id} />
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <VcsPanel projectId={item.id} />
       </div>
     </>
   );
