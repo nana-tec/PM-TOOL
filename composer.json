@@ -25,6 +25,7 @@
         "pusher/pusher-php-server": "^7.2",
         "spatie/eloquent-sortable": "^4.4",
         "spatie/laravel-permission": "^6.9",
+        "symfony/intl": "^7.0",
         "tightenco/ziggy": "^2.3"
     },
     "require-dev": {
