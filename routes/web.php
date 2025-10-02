@@ -61,6 +61,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::get('commits', [VcsController::class, 'commits'])->name('commits')->scopeBindings();
             Route::get('issues', [VcsController::class, 'listIssues'])->name('issues')->scopeBindings();
             Route::get('pulls', [VcsController::class, 'listPulls'])->name('pulls')->scopeBindings();
+            Route::get('pulls/{number}', [VcsController::class, 'pullDetails'])->name('pulls.details')->scopeBindings();
+            Route::get('pulls/{number}/comments', [VcsController::class, 'pullComments'])->name('pulls.comments')->scopeBindings();
+            Route::post('pulls/{number}/comments', [VcsController::class, 'addPullComment'])->name('pulls.comments.add')->scopeBindings();
+            Route::post('pulls/{number}/reviews', [VcsController::class, 'submitReview'])->name('pulls.reviews.submit')->scopeBindings();
+            Route::post('compare', [VcsController::class, 'compare'])->name('compare')->scopeBindings();
+
             Route::post('issues', [VcsController::class, 'createIssue'])->name('issues.create')->scopeBindings();
             Route::post('pulls', [VcsController::class, 'openPr'])->name('pulls.open')->scopeBindings();
             Route::post('merge', [VcsController::class, 'merge'])->name('merge')->scopeBindings();

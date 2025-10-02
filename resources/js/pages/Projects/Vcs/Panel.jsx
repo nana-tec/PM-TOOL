@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Anchor, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, Alert } from '@mantine/core';
-import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle } from '@tabler/icons-react';
+import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch } from '@mantine/core';
+import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle, IconInfoCircle } from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
 
@@ -30,16 +30,29 @@ export default function VcsPanel({ projectId }) {
   const [userToken, setUserToken] = useState('');
   const [savingUserToken, setSavingUserToken] = useState(false);
 
-  // Data
+  // Data + pagination
   const [branches, setBranches] = useState([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
+  const [branchesPage, setBranchesPage] = useState(1);
+  const [branchesHasNext, setBranchesHasNext] = useState(false);
+
   const [selectedBranch, setSelectedBranch] = useState('');
   const [commits, setCommits] = useState([]);
   const [commitsLoading, setCommitsLoading] = useState(false);
+  const [commitsPage, setCommitsPage] = useState(1);
+  const [commitsHasNext, setCommitsHasNext] = useState(false);
+
+  const [issuesState, setIssuesState] = useState('open');
   const [issues, setIssues] = useState([]);
   const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issuesPage, setIssuesPage] = useState(1);
+  const [issuesHasNext, setIssuesHasNext] = useState(false);
+
+  const [pullsState, setPullsState] = useState('open'); // open|closed|merged
   const [pulls, setPulls] = useState([]);
   const [pullsLoading, setPullsLoading] = useState(false);
+  const [pullsPage, setPullsPage] = useState(1);
+  const [pullsHasNext, setPullsHasNext] = useState(false);
 
   // Create issue modal
   const [issueOpen, setIssueOpen] = useState(false);
@@ -55,12 +68,32 @@ export default function VcsPanel({ projectId }) {
   const [prBody, setPrBody] = useState('');
   const [creatingPr, setCreatingPr] = useState(false);
 
+  // PR details modal
+  const [prDetailsOpen, setPrDetailsOpen] = useState(false);
+  const [prDetails, setPrDetails] = useState(null);
+  const [prComments, setPrComments] = useState([]);
+  const [prCommentsPage, setPrCommentsPage] = useState(1);
+  const [prCommentsHasNext, setPrCommentsHasNext] = useState(false);
+  const [loadingPrDetails, setLoadingPrDetails] = useState(false);
+  const [loadingPrComments, setLoadingPrComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Compare modal
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareBase, setCompareBase] = useState('');
+  const [compareHead, setCompareHead] = useState('');
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareCommits, setCompareCommits] = useState([]);
+  const [compareFiles, setCompareFiles] = useState([]);
+
   const providerIcon = useMemo(() => PROVIDERS.find(p => p.value === (integration?.provider || provider))?.icon, [integration, provider]);
 
   const notifyError = (title, message) => showNotification({ color: 'red', title, message });
   const notifySuccess = (title, message) => showNotification({ color: 'green', title, message });
 
-  const tokenQuery = () => ({ params: { use_token: useUserToken ? 'user' : 'project' } });
+  const tokenParams = () => ({ use_token: useUserToken ? 'user' : 'project' });
 
   const loadIntegration = async () => {
     setLoading(true);
@@ -169,15 +202,17 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const loadBranches = async () => {
+  // Branches
+  const fetchBranches = async (page = 1) => {
     setBranchesLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.branches', projectId), tokenQuery());
-      const list = data.branches || [];
-      setBranches(list);
-      if (!selectedBranch && list.length > 0) {
-        const pick = defaultBranch || list[0].name;
+      const { data } = await axios.get(route('projects.vcs.branches', projectId), { params: { ...tokenParams(), page, per_page: 30 } });
+      setBranches(prev => (page === 1 ? data.branches : [...prev, ...data.branches]));
+      setBranchesHasNext(!!data.has_next);
+      setBranchesPage(page);
+      if (!selectedBranch && (data.branches?.length ?? 0) > 0) {
+        const pick = defaultBranch || data.branches[0].name;
         setSelectedBranch(pick);
       }
     } catch (e) {
@@ -189,13 +224,16 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const loadCommits = async (branch) => {
+  // Commits
+  const fetchCommits = async (branch, page = 1) => {
     if (!branch) return;
     setCommitsLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.commits', projectId), { params: { ...tokenQuery().params, branch, per_page: 20 } });
-      setCommits(data.commits || []);
+      const { data } = await axios.get(route('projects.vcs.commits', projectId), { params: { ...tokenParams(), branch, page, per_page: 20 } });
+      setCommits(prev => (page === 1 ? data.commits : [...prev, ...data.commits]));
+      setCommitsHasNext(!!data.has_next);
+      setCommitsPage(page);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
@@ -205,12 +243,15 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const loadIssues = async () => {
+  // Issues
+  const fetchIssues = async (state = issuesState, page = 1) => {
     setIssuesLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.issues', projectId), tokenQuery());
-      setIssues(data.issues || []);
+      const { data } = await axios.get(route('projects.vcs.issues', projectId), { params: { ...tokenParams(), state, page, per_page: 20 } });
+      setIssues(prev => (page === 1 ? data.issues : [...prev, ...data.issues]));
+      setIssuesHasNext(!!data.has_next);
+      setIssuesPage(page);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
@@ -220,12 +261,15 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const loadPulls = async () => {
+  // Pulls
+  const fetchPulls = async (state = pullsState, page = 1) => {
     setPullsLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls', projectId), tokenQuery());
-      setPulls(data.pulls || []);
+      const { data } = await axios.get(route('projects.vcs.pulls', projectId), { params: { ...tokenParams(), state, page, per_page: 20 } });
+      setPulls(prev => (page === 1 ? data.pulls : [...prev, ...data.pulls]));
+      setPullsHasNext(!!data.has_next);
+      setPullsPage(page);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
@@ -235,17 +279,25 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
+  // Load after integration or token switch
   useEffect(() => {
     if (integration) {
-      loadBranches();
-      loadIssues();
-      loadPulls();
+      fetchBranches(1);
+      fetchIssues('open', 1);
+      fetchPulls('open', 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [integration, useUserToken]);
 
+  // Reload commits when branch changes
   useEffect(() => {
-    if (selectedBranch) loadCommits(selectedBranch);
+    if (selectedBranch) {
+      fetchCommits(selectedBranch, 1);
+    } else {
+      setCommits([]);
+      setCommitsHasNext(false);
+      setCommitsPage(1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBranch, useUserToken]);
 
@@ -254,11 +306,11 @@ export default function VcsPanel({ projectId }) {
     setCreatingIssue(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.issues.create', projectId), { title: issueTitle, body: issueBody || null }, tokenQuery());
+      await axios.post(route('projects.vcs.issues.create', projectId), { title: issueTitle, body: issueBody || null }, { params: tokenParams() });
       setIssueTitle('');
       setIssueBody('');
       setIssueOpen(false);
-      await loadIssues();
+      await fetchIssues(issuesState, 1);
       notifySuccess('Issue created', 'Your issue has been created');
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
@@ -274,13 +326,13 @@ export default function VcsPanel({ projectId }) {
     setCreatingPr(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.pulls.open', projectId), { source_branch: prSource, target_branch: prTarget, title: prTitle, body: prBody || null }, tokenQuery());
+      await axios.post(route('projects.vcs.pulls.open', projectId), { source_branch: prSource, target_branch: prTarget, title: prTitle, body: prBody || null }, { params: tokenParams() });
       setPrOpen(false);
       setPrSource('');
       setPrTarget('');
       setPrTitle('');
       setPrBody('');
-      await loadPulls();
+      await fetchPulls(pullsState, 1);
       notifySuccess('Request opened', `${integration.provider === 'github' ? 'Pull request' : 'Merge request'} opened`);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
@@ -295,13 +347,108 @@ export default function VcsPanel({ projectId }) {
     if (!number) return;
     setError('');
     try {
-      await axios.post(route('projects.vcs.merge', projectId), { number }, tokenQuery());
-      await loadPulls();
+      await axios.post(route('projects.vcs.merge', projectId), { number }, { params: tokenParams() });
+      await fetchPulls(pullsState, 1);
       notifySuccess('Merged', 'Request merged successfully');
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
       notifyError('Merge failed', msg);
+    }
+  };
+
+  // PR details
+  const openPrDetails = async (number) => {
+    setPrDetailsOpen(true);
+    setLoadingPrDetails(true);
+    setPrDetails(null);
+    setPrComments([]);
+    setPrCommentsPage(1);
+    setPrCommentsHasNext(false);
+    setError('');
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), { params: tokenParams() });
+      setPrDetails(data.pull);
+      // Preload first page of comments
+      await fetchPrComments(number, 1);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to load PR details', msg);
+    } finally {
+      setLoadingPrDetails(false);
+    }
+  };
+
+  const fetchPrComments = async (number, page = 1) => {
+    setLoadingPrComments(true);
+    setError('');
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.comments', [projectId, number]), { params: { ...tokenParams(), page, per_page: 20 } });
+      setPrComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
+      setPrCommentsHasNext(!!data.has_next);
+      setPrCommentsPage(page);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to load comments', msg);
+    } finally {
+      setLoadingPrComments(false);
+    }
+  };
+
+  const addPrComment = async () => {
+    if (!prDetails || !newComment.trim()) return;
+    setSubmittingComment(true);
+    setError('');
+    try {
+      await axios.post(route('projects.vcs.pulls.comments.add', [projectId, prDetails.number]), { body: newComment }, { params: tokenParams() });
+      setNewComment('');
+      await fetchPrComments(prDetails.number, 1);
+      notifySuccess('Comment added', 'Your comment was posted');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to add comment', msg);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const submitReview = async (event) => {
+    if (!prDetails) return;
+    setSubmittingReview(true);
+    setError('');
+    try {
+      await axios.post(route('projects.vcs.pulls.reviews.submit', [projectId, prDetails.number]), { event, body: newComment || null }, { params: tokenParams() });
+      if (event !== 'COMMENT') setNewComment('');
+      notifySuccess('Review submitted', event === 'APPROVE' ? 'Approved' : event === 'REQUEST_CHANGES' ? 'Requested changes' : 'Commented');
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Failed to submit review', msg);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Compare
+  const doCompare = async () => {
+    if (!compareBase?.trim() || !compareHead?.trim()) return;
+    setCompareLoading(true);
+    setCompareCommits([]);
+    setCompareFiles([]);
+    setError('');
+    try {
+      const { data } = await axios.post(route('projects.vcs.compare', projectId), { base: compareBase, head: compareHead }, { params: tokenParams() });
+      setCompareCommits(data.commits || []);
+      setCompareFiles(data.files || []);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      notifyError('Compare failed', msg);
+    } finally {
+      setCompareLoading(false);
     }
   };
 
@@ -388,7 +535,7 @@ export default function VcsPanel({ projectId }) {
                 </Group>
                 <Group gap="xs">
                   <Tooltip label="Reload data">
-                    <ActionIcon variant="subtle" onClick={() => { loadBranches(); loadIssues(); loadPulls(); if (selectedBranch) loadCommits(selectedBranch); }}>
+                    <ActionIcon variant="subtle" onClick={() => { fetchBranches(1); fetchIssues(issuesState, 1); fetchPulls(pullsState, 1); if (selectedBranch) fetchCommits(selectedBranch, 1); }}>
                       <IconRefresh size={16} />
                     </ActionIcon>
                   </Tooltip>
@@ -401,9 +548,12 @@ export default function VcsPanel({ projectId }) {
               <Group align="flex-start" grow>
                 {/* Branches & commits */}
                 <Paper withBorder p="sm" radius="sm">
-                  <Group gap="sm">
-                    <IconGitBranch size={16} />
-                    <Text fw={600}>Branches</Text>
+                  <Group gap="sm" justify="space-between" align="center">
+                    <Group gap="sm">
+                      <IconGitBranch size={16} />
+                      <Text fw={600}>Branches</Text>
+                    </Group>
+                    <Tooltip label="The first branch with results is selected automatically"><IconInfoCircle size={14} /></Tooltip>
                   </Group>
                   <Group mt="sm" gap="sm" align="flex-end">
                     <Select
@@ -415,90 +565,95 @@ export default function VcsPanel({ projectId }) {
                       nothingFound={branchesLoading ? 'Loading...' : 'No branches'}
                       style={{ minWidth: 220 }}
                     />
-                    <ActionIcon variant="subtle" onClick={loadBranches} loading={branchesLoading}><IconRefresh size={16} /></ActionIcon>
+                    <ActionIcon variant="subtle" onClick={() => fetchBranches(1)} loading={branchesLoading}><IconRefresh size={16} /></ActionIcon>
                   </Group>
                   <Divider my="xs" />
                   <ScrollArea.Autosize mah={240} type="scroll">
-                    {commitsLoading ? (
-                      <Group justify="center" my="sm"><Loader size="xs" /></Group>
-                    ) : commits.length === 0 ? (
-                      <Text c="dimmed">No commits.</Text>
-                    ) : (
-                      <Stack gap={8}>
-                        {commits.map((c) => (
-                          <Group key={c.sha} gap="xs" align="flex-start" wrap="nowrap">
-                            <IconGitCommit size={14} />
-                            <Stack gap={2} style={{ flex: 1 }}>
-                              <Text size="sm" fw={600} lineClamp={2}>{c.message}</Text>
-                              <Text size="xs" c="dimmed">{c.sha.substring(0, 7)} · {c.author || 'Unknown'} · {c.date ? new Date(c.date).toLocaleString() : ''}</Text>
-                            </Stack>
-                            {c.url && (
-                              <Anchor href={c.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>
-                            )}
-                          </Group>
-                        ))}
-                      </Stack>
-                    )}
+                    <Stack gap="xs">
+                      {commits.map((c) => (
+                        <Group key={c.sha} gap="xs" align="flex-start" wrap="nowrap">
+                          <IconGitCommit size={14} />
+                          <Stack gap={2} style={{ flex: 1 }}>
+                            <Text size="sm" fw={600} lineClamp={2}>{c.message}</Text>
+                            <Text size="xs" c="dimmed">{c.sha.substring(0, 7)} · {c.author || 'Unknown'} · {c.date ? new Date(c.date).toLocaleString() : ''}</Text>
+                          </Stack>
+                          {c.url && (
+                            <Anchor href={c.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>
+                          )}
+                        </Group>
+                      ))}
+                      {commitsLoading && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                      {!commitsLoading && commitsHasNext && (
+                        <Group justify="center" mt="xs"><Button variant="light" size="xs" onClick={() => fetchCommits(selectedBranch, commitsPage + 1)}>Load more commits</Button></Group>
+                      )}
+                    </Stack>
                   </ScrollArea.Autosize>
                 </Paper>
 
                 {/* Issues */}
                 <Paper withBorder p="sm" radius="sm">
-                  <Group gap="sm" justify="space-between">
+                  <Group gap="sm" justify="space-between" align="center">
                     <Group gap="sm">
                       <IconPlus size={16} />
                       <Text fw={600}>Issues</Text>
                     </Group>
-                    <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setIssueOpen(true)}>New issue</Button>
+                    <Select value={issuesState} onChange={(v) => { setIssuesState(v); fetchIssues(v, 1); }} data={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }]} style={{ width: 120 }} />
                   </Group>
                   <Divider my="xs" />
                   <ScrollArea.Autosize mah={240} type="scroll">
-                    {issuesLoading ? (
-                      <Group justify="center" my="sm"><Loader size="xs" /></Group>
-                    ) : issues.length === 0 ? (
-                      <Text c="dimmed">No open issues.</Text>
-                    ) : (
-                      <Stack gap={8}>
-                        {issues.map((i) => (
-                          <Group key={i.id} gap="xs" wrap="nowrap" justify="space-between">
-                            <Stack gap={2} style={{ flex: 1 }}>
-                              <Text size="sm" fw={600}>{i.title}</Text>
-                              <Group gap={6}><Badge size="xs" variant="light" color={i.state === 'open' || i.state === 'opened' ? 'green' : 'gray'}>{i.state}</Badge>{i.url && (<Anchor href={i.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
-                            </Stack>
-                          </Group>
-                        ))}
-                      </Stack>
-                    )}
+                    <Stack gap={8}>
+                      {issues.map((i) => (
+                        <Group key={i.id} gap="xs" wrap="nowrap" justify="space-between">
+                          <Stack gap={2} style={{ flex: 1 }}>
+                            <Text size="sm" fw={600}>{i.title}</Text>
+                            <Group gap={6}><Badge size="xs" variant="light" color={i.state === 'open' || i.state === 'opened' ? 'green' : 'gray'}>{i.state}</Badge>{i.url && (<Anchor href={i.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
+                          </Stack>
+                        </Group>
+                      ))}
+                      {issuesLoading && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                      {!issuesLoading && issuesHasNext && (
+                        <Group justify="center" mt="xs"><Button variant="light" size="xs" onClick={() => fetchIssues(issuesState, issuesPage + 1)}>Load more issues</Button></Group>
+                      )}
+                    </Stack>
                   </ScrollArea.Autosize>
+                  <Group justify="flex-end" mt="sm">
+                    <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setIssueOpen(true)}>New issue</Button>
+                  </Group>
                 </Paper>
 
                 {/* Pull Requests / Merge Requests */}
                 <Paper withBorder p="sm" radius="sm">
-                  <Group gap="sm">
-                    <IconGitMerge size={16} />
-                    <Text fw={600}>{integration.provider === 'github' ? 'Pull requests' : 'Merge requests'}</Text>
+                  <Group gap="sm" justify="space-between" align="center">
+                    <Group gap="sm">
+                      <IconGitMerge size={16} />
+                      <Text fw={600}>{integration.provider === 'github' ? 'Pull requests' : 'Merge requests'}</Text>
+                    </Group>
+                    <Select value={pullsState} onChange={(v) => { setPullsState(v); fetchPulls(v, 1); }} data={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'merged', label: 'Merged' }]} style={{ width: 140 }} />
                   </Group>
                   <Divider my="xs" />
                   <ScrollArea.Autosize mah={240} type="scroll">
-                    {pullsLoading ? (
-                      <Group justify="center" my="sm"><Loader size="xs" /></Group>
-                    ) : pulls.length === 0 ? (
-                      <Text c="dimmed">No open {integration.provider === 'github' ? 'PRs' : 'MRs'}.</Text>
-                    ) : (
-                      <Stack gap={8}>
-                        {pulls.map((p) => (
-                          <Group key={p.number} gap="xs" wrap="nowrap" justify="space-between" align="center">
-                            <Stack gap={2} style={{ flex: 1 }}>
-                              <Text size="sm" fw={600}>{p.title}</Text>
-                              <Group gap={6}><Badge size="xs" variant="light" color={p.state === 'open' || p.state === 'opened' ? 'green' : 'gray'}>{p.state}</Badge>{p.url && (<Anchor href={p.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
-                            </Stack>
-                            <Tooltip label="Merge">
-                              <ActionIcon variant="light" color="green" onClick={() => mergePull(p.number)}><IconGitMerge size={16} /></ActionIcon>
-                            </Tooltip>
+                    <Stack gap={8}>
+                      {pulls.map((p) => (
+                        <Group key={p.number} gap="xs" wrap="nowrap" justify="space-between" align="center">
+                          <Stack gap={2} style={{ flex: 1 }}>
+                            <Text size="sm" fw={600}>{p.title}</Text>
+                            <Group gap={6}><Badge size="xs" variant="light" color={p.state === 'open' || p.state === 'opened' ? 'green' : p.state === 'merged' ? 'blue' : 'gray'}>{p.state}</Badge>{p.url && (<Anchor href={p.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
+                          </Stack>
+                          <Group gap="xs">
+                            <Button size="xs" variant="light" onClick={() => openPrDetails(p.number)}>Details</Button>
+                            {(pullsState === 'open' || p.state === 'open' || p.state === 'opened') && (
+                              <Tooltip label="Merge now">
+                                <ActionIcon variant="light" color="green" onClick={() => mergePull(p.number)}><IconGitMerge size={16} /></ActionIcon>
+                              </Tooltip>
+                            )}
                           </Group>
-                        ))}
-                      </Stack>
-                    )}
+                        </Group>
+                      ))}
+                      {pullsLoading && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                      {!pullsLoading && pullsHasNext && (
+                        <Group justify="center" mt="xs"><Button variant="light" size="xs" onClick={() => fetchPulls(pullsState, pullsPage + 1)}>Load more {integration.provider === 'github' ? 'PRs' : 'MRs'}</Button></Group>
+                      )}
+                    </Stack>
                   </ScrollArea.Autosize>
                 </Paper>
               </Group>
@@ -507,6 +662,7 @@ export default function VcsPanel({ projectId }) {
         </Stack>
       )}
 
+      {/* Create Issue Modal */}
       <Modal opened={issueOpen} onClose={() => setIssueOpen(false)} title="Create issue" size="md">
         <Stack>
           <TextInput label="Title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} required />
@@ -517,15 +673,119 @@ export default function VcsPanel({ projectId }) {
         </Stack>
       </Modal>
 
+      {/* Open PR/MR Modal */}
       <Modal opened={prOpen} onClose={() => setPrOpen(false)} title={integration?.provider === 'github' ? 'Open pull request' : 'Open merge request'} size="md">
         <Stack>
-          <Select label="Source branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prSource} onChange={setPrSource} placeholder="Select source branch" />
-          <TextInput label="Target branch" placeholder={defaultBranch || 'main'} value={prTarget} onChange={(e) => setPrTarget(e.target.value)} />
+          <Select label="Source branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prSource} onChange={setPrSource} placeholder="Select source branch (or owner:branch for forks)" />
+          <Select label="Target branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prTarget} onChange={setPrTarget} placeholder={defaultBranch || 'main'} />
           <TextInput label="Title" value={prTitle} onChange={(e) => setPrTitle(e.target.value)} required />
           <Textarea label="Description" value={prBody} onChange={(e) => setPrBody(e.target.value)} minRows={4} autosize />
           <Group justify="flex-end">
             <Button onClick={openPr} loading={creatingPr} disabled={!prSource?.trim() || !prTarget?.trim() || !prTitle?.trim()}>Open {integration?.provider === 'github' ? 'PR' : 'MR'}</Button>
           </Group>
+        </Stack>
+      </Modal>
+
+      {/* PR Details Modal */}
+      <Modal opened={prDetailsOpen} onClose={() => setPrDetailsOpen(false)} title="Request details" size="lg">
+        {!prDetails || loadingPrDetails ? (
+          <Group justify="center" my="md"><Loader size="sm" /></Group>
+        ) : (
+          <Stack>
+            <Group justify="space-between">
+              <Stack gap={2}>
+                <Text fw={600}>{prDetails.title}</Text>
+                <Group gap={6}>
+                  <Badge size="xs" variant="light" color={prDetails.state === 'open' || prDetails.state === 'opened' ? 'green' : prDetails.state === 'merged' ? 'blue' : 'gray'}>{prDetails.state}</Badge>
+                  {prDetails.mergeable !== null && (
+                    <Badge size="xs" variant="light" color={prDetails.mergeable ? 'green' : 'red'}>{prDetails.mergeable ? 'Mergeable' : 'Not mergeable'}</Badge>
+                  )}
+                  {prDetails.url && <Anchor href={prDetails.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
+                </Group>
+              </Stack>
+              <Group gap="xs">
+                <Button size="xs" variant="light" onClick={() => { setCompareBase(prDetails.base || ''); setCompareHead(prDetails.head || ''); setCompareOpen(true); }}>Compare</Button>
+                <Tooltip label="Approve">
+                  <Button size="xs" color="green" variant="light" loading={submittingReview} onClick={() => submitReview('APPROVE')}>Approve</Button>
+                </Tooltip>
+                <Tooltip label="Request changes">
+                  <Button size="xs" color="red" variant="light" loading={submittingReview} onClick={() => submitReview('REQUEST_CHANGES')}>Request changes</Button>
+                </Tooltip>
+              </Group>
+            </Group>
+
+            <Divider />
+
+            <Stack>
+              <Text fw={600}>Comments</Text>
+              <Stack>
+                {prComments.map(c => (
+                  <Paper key={c.id} withBorder p="sm" radius="sm">
+                    <Group justify="space-between">
+                      <Text size="sm" fw={600}>{c.user || 'User'}</Text>
+                      <Text size="xs" c="dimmed">{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</Text>
+                    </Group>
+                    <Text size="sm" mt={4}>{c.body}</Text>
+                  </Paper>
+                ))}
+                {loadingPrComments && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                {!loadingPrComments && prCommentsHasNext && (
+                  <Group justify="center"><Button size="xs" variant="light" onClick={() => fetchPrComments(prDetails.number, prCommentsPage + 1)}>Load more comments</Button></Group>
+                )}
+              </Stack>
+              <Group align="flex-end" wrap="nowrap">
+                <Textarea label="Add a comment / review note" value={newComment} onChange={(e) => setNewComment(e.target.value)} autosize minRows={2} style={{ flex: 1 }} />
+                <Button variant="light" onClick={addPrComment} loading={submittingComment} disabled={!newComment.trim()}>Comment</Button>
+              </Group>
+            </Stack>
+          </Stack>
+        )}
+      </Modal>
+
+      {/* Compare Modal */}
+      <Modal opened={compareOpen} onClose={() => setCompareOpen(false)} title="Compare" size="lg">
+        <Stack>
+          <Group grow>
+            <TextInput label="Base" placeholder="target branch or owner:branch" value={compareBase} onChange={(e) => setCompareBase(e.target.value)} />
+            <TextInput label="Head" placeholder="source branch or owner:branch" value={compareHead} onChange={(e) => setCompareHead(e.target.value)} />
+          </Group>
+          <Group justify="flex-end">
+            <Button onClick={doCompare} loading={compareLoading} disabled={!compareBase.trim() || !compareHead.trim()}>Compare</Button>
+          </Group>
+          {compareLoading ? (
+            <Group justify="center" my="md"><Loader size="sm" /></Group>
+          ) : (
+            <Group align="flex-start" grow>
+              <Paper withBorder p="sm" radius="sm">
+                <Text fw={600} mb={6}>Commits</Text>
+                <ScrollArea.Autosize mah={260} type="scroll">
+                  <Stack gap={6}>
+                    {compareCommits.length === 0 && <Text c="dimmed">No commits.</Text>}
+                    {compareCommits.map(c => (
+                      <div key={c.sha}>
+                        <Text size="sm" fw={600}>{c.message}</Text>
+                        <Text size="xs" c="dimmed">{c.sha.substring(0,7)} · {c.author || 'Unknown'} · {c.date ? new Date(c.date).toLocaleString() : ''}</Text>
+                      </div>
+                    ))}
+                  </Stack>
+                </ScrollArea.Autosize>
+              </Paper>
+              <Paper withBorder p="sm" radius="sm">
+                <Text fw={600} mb={6}>Files</Text>
+                <ScrollArea.Autosize mah={260} type="scroll">
+                  <Stack gap={6}>
+                    {(!compareFiles || compareFiles.length === 0) && <Text c="dimmed">No file list available.</Text>}
+                    {compareFiles.map(f => (
+                      <Group key={f.filename} justify="space-between">
+                        <Text size="sm">{f.filename}</Text>
+                        <Badge size="xs" variant="light">+{f.additions} / -{f.deletions}</Badge>
+                      </Group>
+                    ))}
+                  </Stack>
+                </ScrollArea.Autosize>
+              </Paper>
+            </Group>
+          )}
         </Stack>
       </Modal>
     </Paper>

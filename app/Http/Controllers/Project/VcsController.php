@@ -137,8 +137,11 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 30);
+            $res = $client->listBranches($page, $perPage);
 
-            return response()->json(['branches' => $client->listBranches()]);
+            return response()->json(['branches' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
@@ -150,10 +153,12 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $branch = $request->query('branch') ?: ($integration->default_branch ?: 'main');
-            $perPage = (int) ($request->query('per_page', 20));
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 20);
             $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            $res = $client->listCommits($branch, $page, $perPage);
 
-            return response()->json(['commits' => $client->listCommits($branch, $perPage)]);
+            return response()->json(['commits' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
@@ -163,9 +168,13 @@ class VcsController extends Controller
     {
         $this->authorize('view', $project);
         try {
+            $state = (string) $request->query('state', 'open');
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 20);
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->listIssues($state, $page, $perPage);
 
-            return response()->json(['issues' => $client->listIssues()]);
+            return response()->json(['issues' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
@@ -175,59 +184,24 @@ class VcsController extends Controller
     {
         $this->authorize('view', $project);
         try {
+            $state = (string) $request->query('state', 'open');
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 20);
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->listPullRequests($state, $page, $perPage);
 
-            return response()->json(['pulls' => $client->listPullRequests()]);
+            return response()->json(['pulls' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
     }
 
-    public function createIssue(Request $request, Project $project)
+    public function pullDetails(Project $project, Request $request, int|string $number)
     {
-        $this->authorize('update', $project);
-        $data = $request->validate([
-            'title' => 'required|string',
-            'body' => 'nullable|string',
-        ]);
+        $this->authorize('view', $project);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $issue = $client->createIssue($data['title'], $data['body'] ?? null);
-
-            return response()->json(['issue' => $issue]);
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        }
-    }
-
-    public function openPr(Request $request, Project $project)
-    {
-        $this->authorize('update', $project);
-        $data = $request->validate([
-            'source_branch' => 'required|string',
-            'target_branch' => 'required|string',
-            'title' => 'required|string',
-            'body' => 'nullable|string',
-        ]);
-        try {
-            $integration = $this->requireIntegration($project);
-            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
-
-            // Pre-validate that target exists (and source if it doesn't look like a fork ref "owner:branch")
-            $branches = collect($client->listBranches())->pluck('name')->all();
-
-            $target = $data['target_branch'];
-            if (! in_array($target, $branches, true)) {
-                return response()->json(['error' => "Target branch '{$target}' does not exist in the repository."], 422);
-            }
-
-            $source = $data['source_branch'];
-            // If source contains a colon (e.g., "owner:branch" for forks), skip local existence check
-            if (! str_contains($source, ':') && ! in_array($source, $branches, true)) {
-                return response()->json(['error' => "Source branch '{$source}' does not exist in the repository. If using a fork, use 'owner:branch'."], 422);
-            }
-
-            $pr = $client->openMergeRequest($source, $target, $data['title'], $data['body'] ?? null);
+            $pr = $client->getPullRequest($number);
 
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
@@ -235,15 +209,62 @@ class VcsController extends Controller
         }
     }
 
-    public function merge(Request $request, Project $project)
+    public function pullComments(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('view', $project);
+        try {
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 20);
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->listPullComments($number, $page, $perPage);
+
+            return response()->json(['comments' => $res['items'], 'has_next' => $res['has_next']]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function addPullComment(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate(['body' => 'required|string|min:1']);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $c = $client->createPullComment($number, $data['body']);
+
+            return response()->json(['comment' => $c]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function submitReview(Project $project, Request $request, int|string $number)
     {
         $this->authorize('update', $project);
         $data = $request->validate([
-            'number' => 'required',
+            'event' => 'required|string|in:APPROVE,REQUEST_CHANGES,COMMENT',
+            'body' => 'nullable|string',
         ]);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->mergeRequest($data['number']);
+            $res = $client->submitReview($number, $data['event'], $data['body'] ?? null);
+
+            return response()->json($res);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function compare(Project $project, Request $request)
+    {
+        $this->authorize('view', $project);
+        $data = $request->validate([
+            'base' => 'required|string',
+            'head' => 'required|string',
+        ]);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->compare($data['base'], $data['head']);
 
             return response()->json($res);
         } catch (\Throwable $e) {
