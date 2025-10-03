@@ -20,6 +20,7 @@ LaraCollab, developed with Laravel and React, serves as a project management too
 - Dashboard offering project progress, overdue tasks, recently assigned tasks, and recent comments.
 - Additional reports for daily logged time per user and total logged time.
 - Dark mode support for user preference.
+- Version control integration (GitHub/GitLab): view branches/commits, issues, pull/merge requests, reviews, status checks, and compare changes with inline diffs.
 
 ## Screenshots
 
@@ -55,6 +56,70 @@ LaraCollab, developed with Laravel and React, serves as a project management too
 ## Tech stack
 
 [Laravel](https://laravel.com) for backend, [React](https://react.dev) for frontend and [Inertia](https://inertiajs.com) for "glueing" them together. For the frontend React UI components, the awesome [Mantine](https://mantine.dev) library was used.
+
+## Version control (GitHub/GitLab)
+
+LaraCollab includes a Version Control panel inside each project that connects to GitHub or GitLab so you can open PRs/MRs, review changes, and merge without leaving the app.
+
+What you can do
+
+- Browse branches, commits, issues, and pull/merge requests with pagination.
+- Open PRs/MRs via a dialog (source/target branch, title, description; draft supported on GitHub).
+- See PR/MR details: mergeability, draft status, head SHA, status checks (classic + GitHub Actions check-runs), required checks (GitHub), and current reviewers.
+- Request reviewers with a list picker.
+- Add comments on PRs/MRs and on issues (with pagination of comments).
+- Compare branches/PRs and preview inline diffs per file:
+  - Unified and side-by-side modes
+  - Expand/Collapse all files
+  - Copy-to-clipboard for individual patches or all patches
+  - Export compare results to CSV/JSON
+- Merge using supported strategies (merge/squash/rebase depending on provider).
+- "Merge when ready" (GitHub): enabled only when required checks pass and PR is not a draft.
+- Convert draft PRs to ready-for-review (GitHub).
+
+Setup
+
+1. Open a project and locate the Version control panel.
+2. Pick a provider (GitHub/GitLab).
+3. Enter the repository identifier:
+   - GitHub: owner/repo (e.g. `acme/my-repo`)
+   - GitLab: group/subgroup/project (e.g. `group/my-app`); add Base URL for self-hosted GitLab (e.g. `https://gitlab.example.com`).
+4. Optionally set the default branch (e.g. `main`).
+5. Add a Project access token (PAT) if you want a project-level token available to everyone.
+6. Optionally, save your Personal token in the panel and enable "Use my personal token for API calls" if you prefer user-level auth. Your token is only used for your requests.
+
+Token scopes
+
+- GitHub: repo-level scopes sufficient to read/write PRs, statuses, and requested reviewers. For public repos, `public_repo` may be sufficient; for private repos, use `repo`.
+- GitLab: `api` or a combination of `read_api`, `read_repository`, and `write_repository` for creating MRs and posting comments.
+
+Using the panel
+
+- Branches/Commits/Issues/PRs are paginated; use "Load more" to fetch additional pages.
+- Open PR/MR: choose source/target branches, provide title/body; on GitHub you can create as Draft.
+- PR Details: view mergeability and draft; see statuses and required checks; refresh statuses; request reviewers; add comments; and select a merge strategy.
+- "Merge when ready" (GitHub): the button is disabled until required checks pass and the PR is not a draft. It’s enabled automatically once everything is green.
+
+Compare and diffs
+
+- Open Compare from a PR or manually set Base and Head.
+- "PR number" helper auto-fills base/head and loads the compare.
+- Per-file inline diffs support:
+  - Unified/Side-by-side rendering
+  - Expand/Collapse all files
+  - Copy patch per-file or all patches at once
+  - Export compare results to CSV or JSON
+
+Troubleshooting
+
+- GitHub: 422 "Validation Failed" for PR create (base invalid)
+  - Ensure the target/base branch exists and your token has access. For forks, specify the head as `owner:branch`.
+- GitHub: 422 on merge with message mentioning `links/1/schema`
+  - Ensure the PR is mergeable (no conflicts), up to date with base, required checks have passed, and your token has permission to merge.
+- Rate limit exceeded (403)
+  - Wait for limits to reset or switch to a different token (toggle personal vs project token in the panel).
+- Scrollbars in lists/diffs
+  - Scrollbars are always visible in the VCS lists and diff panes for easier mouse interaction. If your OS hides scrollbars, hovering or scrolling should reveal them.
 
 ## Setup
 
