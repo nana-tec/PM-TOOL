@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionIcon, Badge, Group, Stack, Text, Tooltip } from '@mantine/core';
 import { IconClipboard } from '@tabler/icons-react';
 import { parseUnifiedPatch, buildSideBySide, copyToClipboard } from '@/utils/patch';
@@ -6,7 +6,7 @@ import { parseUnifiedPatch, buildSideBySide, copyToClipboard } from '@/utils/pat
 const LINE_HEIGHT = 20; // px per row approx
 const BUFFER_ROWS = 50; // render buffer around viewport
 
-export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, additions = 0, deletions = 0, colorful = false }) {
+export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, additions = 0, deletions = 0, colorful = false, height = 360 }) {
   const containerRef = useRef(null);
   const [viewportH, setViewportH] = useState(320);
   const [scrollTop, setScrollTop] = useState(0);
@@ -21,9 +21,8 @@ export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, 
     for (const h of hunks) {
       rows.push({ kind: 'header', text: h.header });
       for (const ln of h.lines) {
-        const bgKind = ln.type;
-        const prefix = ln.type === 'add' ? '+' : ln.type === 'del' ? '-' : ' ';
-        rows.push({ kind: 'line', type: ln.type, text: prefix + ln.text });
+         const prefix = ln.type === 'add' ? '+' : ln.type === 'del' ? '-' : ' ';
+         rows.push({ kind: 'line', type: ln.type, text: prefix + ln.text });
       }
     }
     return rows;
@@ -86,7 +85,7 @@ export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, 
       {(!patch || hunks.length === 0) ? (
         <Text size="sm" c="dimmed">No patch available.</Text>
       ) : (
-        <div ref={containerRef} style={{ height: 360, overflow: 'auto', border: '1px solid var(--mantine-color-dark-5)', borderRadius: 6 }}>
+        <div ref={containerRef} style={{ height, overflow: 'auto', border: '1px solid var(--mantine-color-dark-5)', borderRadius: 6, background: 'var(--mantine-color-dark-7)' }}>
           <div style={{ height: totalHeight, position: 'relative' }}>
             <div style={{ position: 'absolute', top: startIndex * LINE_HEIGHT, left: 0, right: 0 }}>
               {mode === 'unified' ? (

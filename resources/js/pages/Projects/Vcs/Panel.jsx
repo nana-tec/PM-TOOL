@@ -177,6 +177,13 @@ export default function VcsPanel({ projectId }) {
       setReviewComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
       setReviewCommentsHasNext(!!data.has_next);
       setReviewCommentsPage(page);
+      const loadedNow = (data?.comments?.length ?? 0);
+      const totalLoaded = page === 1 ? loadedNow : (reviewComments.length + loadedNow);
+      if (loadedNow > 0) {
+        showNotification({ color: 'blue', title: 'Review comments', message: `Loaded ${loadedNow} ${loadedNow === 1 ? 'comment' : 'comments'} (total ${totalLoaded})` });
+      } else if (page === 1) {
+        showNotification({ color: 'gray', title: 'Review comments', message: 'No review comments found' });
+      }
     } catch (e) {
       showNotification({ color: 'red', title: 'Failed to load review comments', message: e?.response?.data?.error || e.message });
     } finally {
@@ -209,7 +216,7 @@ export default function VcsPanel({ projectId }) {
       fileMap.get(tid).push(c);
     }
     for (const fileMap of byFile.values()) {
-      for (const [tid, arr] of fileMap.entries()) {
+      for (const [, arr] of fileMap.entries()) {
         arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       }
     }
@@ -1271,7 +1278,7 @@ export default function VcsPanel({ projectId }) {
       </Modal>
 
       {/* Compare Modal */}
-      <Modal opened={compareOpen} onClose={() => setCompareOpen(false)} title="Compare" size={compareFullScreen ? '100%' : 'xl'} fullScreen={compareFullScreen}>
+      <Modal opened={compareOpen} onClose={() => setCompareOpen(false)} title="Compare" size={compareFullScreen ? '90%' : 'xl'} centered radius="md" overlayProps={{ opacity: 0.55, blur: 2 }}>
         <Stack>
           <Group grow>
             <TextInput label="Base" placeholder="target branch or owner:branch" value={compareBase} onChange={(e) => setCompareBase(e.target.value)} />
@@ -1287,7 +1294,7 @@ export default function VcsPanel({ projectId }) {
             <SegmentedControl size="xs" value={diffMode} onChange={setDiffMode} data={[{ value: 'unified', label: 'Unified' }, { value: 'side-by-side', label: 'Side by side' }]} />
             <Group>
               <Switch size="xs" checked={colorfulDiff} onChange={(e) => setColorfulDiff(e.currentTarget.checked)} label="Colorful" />
-              <Button size="xs" variant="light" onClick={() => setCompareFullScreen(v => !v)}>{compareFullScreen ? 'Exit full screen' : 'Full screen'}</Button>
+              <Button size="xs" variant="light" onClick={() => setCompareFullScreen(v => !v)}>{compareFullScreen ? 'Standard size' : 'Expand'}</Button>
               <Button size="xs" variant="light" onClick={expandAllFiles} disabled={!compareFiles || compareFiles.length === 0}>Expand all</Button>
               <Button size="xs" variant="light" onClick={collapseAllFiles} disabled={expandedFiles.length === 0}>Collapse all</Button>
               <Button size="xs" variant="light" onClick={copyAllPatches} disabled={!compareFiles || compareFiles.length === 0}>Copy all patches</Button>
@@ -1331,7 +1338,7 @@ export default function VcsPanel({ projectId }) {
                           </Group>
                         </Accordion.Control>
                         <Accordion.Panel>
-                          <DiffViewer filename={f.filename} patch={f.patch || ''} mode={diffMode} additions={f.additions ?? 0} deletions={f.deletions ?? 0} colorful={colorfulDiff} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${f.filename} copied` })} />
+                          <DiffViewer filename={f.filename} patch={f.patch || ''} mode={diffMode} additions={f.additions ?? 0} deletions={f.deletions ?? 0} colorful={colorfulDiff} height={compareFullScreen ? '60vh' : 360} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${f.filename} copied` })} />
                           {(prDetails?.number || comparePrNumber) && (
                             <Stack mt="sm">
                               <Group justify="space-between">
@@ -1389,14 +1396,15 @@ export default function VcsPanel({ projectId }) {
         </Stack>
       </Modal>
 
-      {/* Focused file modal */}
-      <Modal opened={!!focusFile} onClose={() => setFocusFile(null)} title={focusFile?.filename || 'File'} fullScreen size="100%">
-        {focusFile && (
-          <Stack>
-            <DiffViewer filename={focusFile.filename} patch={focusFile.patch} mode={diffMode} additions={focusFile.additions} deletions={focusFile.deletions} colorful={true} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${focusFile.filename} copied` })} />
-          </Stack>
-        )}
-      </Modal>
+      {/* Focused file modal (large, centered) */}
+      <Modal opened={!!focusFile} onClose={() => setFocusFile(null)} title={focusFile?.filename || 'File'} size="90%" centered radius="md" overlayProps={{ opacity: 0.55, blur: 2 }}>
+         {focusFile && (
+           <Stack>
+-            <DiffViewer filename={focusFile.filename} patch={focusFile.patch} mode={diffMode} additions={focusFile.additions} deletions={focusFile.deletions} colorful={true} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${focusFile.filename} copied` })} />
++            <DiffViewer filename={focusFile.filename} patch={focusFile.patch} mode={diffMode} additions={focusFile.additions} deletions={focusFile.deletions} colorful={true} height={'75vh'} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${focusFile.filename} copied` })} />
+           </Stack>
+         )}
+       </Modal>
     </Paper>
   );
 }
