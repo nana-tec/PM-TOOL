@@ -97,6 +97,9 @@ export default function VcsPanel({ projectId }) {
   const [loadingCompareFromPr, setLoadingCompareFromPr] = useState(false);
   const [diffMode, setDiffMode] = useState('unified'); // 'unified' | 'side-by-side'
   const [expandedFiles, setExpandedFiles] = useState([]); // filenames opened in accordion
+  const [compareFullScreen, setCompareFullScreen] = useState(false);
+  const [colorfulDiff, setColorfulDiff] = useState(false);
+  const [focusFile, setFocusFile] = useState(null); // {filename, patch, additions, deletions}
 
   // PR statuses
   const [prStatuses, setPrStatuses] = useState([]);
@@ -121,6 +124,13 @@ export default function VcsPanel({ projectId }) {
   const [loadingIssueComments, setLoadingIssueComments] = useState(false);
   const [newIssueComment, setNewIssueComment] = useState('');
   const [submittingIssueComment, setSubmittingIssueComment] = useState(false);
+
+  // File-level review comments
+  const [reviewComments, setReviewComments] = useState([]); // flat list from API
+  const [reviewCommentsPage, setReviewCommentsPage] = useState(1);
+  const [reviewCommentsHasNext, setReviewCommentsHasNext] = useState(false);
+  const [loadingReviewThreads, setLoadingReviewThreads] = useState(false);
+  const [replyBodies, setReplyBodies] = useState({}); // {threadId: text}
 
   const providerIcon = useMemo(() => PROVIDERS.find(p => p.value === (integration?.provider || provider))?.icon, [integration, provider]);
 
@@ -157,6 +167,54 @@ export default function VcsPanel({ projectId }) {
       return fallback;
     }
   };
+
+  // File-level review comments API (hoisted declaration)
+  async function fetchPullReviewComments(number, page = 1) {
+    if (!number) return;
+    setLoadingReviewThreads(true);
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.review-comments', [projectId, number]), { params: { ...tokenParams(), page, per_page: 50 } });
+      setReviewComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
+      setReviewCommentsHasNext(!!data.has_next);
+      setReviewCommentsPage(page);
+    } catch (e) {
+      showNotification({ color: 'red', title: 'Failed to load review comments', message: e?.response?.data?.error || e.message });
+    } finally {
+      setLoadingReviewThreads(false);
+    }
+  }
+
+  async function replyToThread(threadId) {
+    if (!prDetails || !threadId) return;
+    const body = (replyBodies[threadId] || '').trim();
+    if (!body) return;
+    try {
+      await axios.post(route('projects.vcs.pulls.review-comments.reply', [projectId, prDetails.number, threadId]), { body }, { params: tokenParams() });
+      setReplyBodies(prev => ({ ...prev, [threadId]: '' }));
+      await fetchPullReviewComments(prDetails.number, 1);
+      showNotification({ color: 'green', title: 'Reply posted', message: 'Your reply was added to the thread.' });
+    } catch (e) {
+      showNotification({ color: 'red', title: 'Failed to reply', message: e?.response?.data?.error || e.message });
+    }
+  }
+
+  const groupReviewThreadsByFile = useMemo(() => {
+    const byFile = new Map();
+    for (const c of reviewComments) {
+      const path = c.path || '';
+      if (!byFile.has(path)) byFile.set(path, new Map());
+      const fileMap = byFile.get(path);
+      const tid = String(c.thread_id);
+      if (!fileMap.has(tid)) fileMap.set(tid, []);
+      fileMap.get(tid).push(c);
+    }
+    for (const fileMap of byFile.values()) {
+      for (const [tid, arr] of fileMap.entries()) {
+        arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      }
+    }
+    return byFile;
+  }, [reviewComments]);
 
   const loadIntegration = async () => {
     setLoading(true);
@@ -456,6 +514,7 @@ export default function VcsPanel({ projectId }) {
         fetchRequiredChecks(number),
         fetchPrComments(number, 1),
         fetchReviewers(number, 1),
+        fetchPullReviewComments(number, 1),
       ]);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
@@ -720,6 +779,8 @@ export default function VcsPanel({ projectId }) {
       setCompareCommits(data.commits || []);
       setCompareFiles(data.files || []);
       setExpandedFiles((data.files || []).slice(0, 5).map(f => f.filename));
+      // Also load file-level review comments for this PR
+      await fetchPullReviewComments(num, 1);
       if (!data.base || !data.head) {
         showNotification({ color: 'yellow', title: 'Missing data', message: 'Could not determine base/head from PR' });
       }
@@ -750,7 +811,7 @@ export default function VcsPanel({ projectId }) {
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
-      try { document.execCommand('copy'); } catch (_) {}
+      try { document.execCommand('copy'); } catch (_) { /* ignore fallback copy failure */ }
       document.body.removeChild(ta);
       showNotification({ color: 'green', title: 'Copied', message: 'All patches copied to clipboard' });
     }
@@ -763,6 +824,17 @@ export default function VcsPanel({ projectId }) {
     if (!requiredChecks || requiredChecks.length === 0) return false;
     return requiredChecks.every(ctx => (prStatuses.find(s => s.context === ctx)?.state || 'pending') === 'success');
   }, [integration, prDetails, requiredChecks, prStatuses]);
+
+  const reRequestReviewer = async (username) => {
+    if (!prDetails || !username) return;
+    try {
+      await axios.post(route('projects.vcs.pulls.reviewers.add', [projectId, prDetails.number]), { usernames: [username] }, { params: tokenParams() });
+      showNotification({ color: 'green', title: 'Review re-requested', message: `Requested review from ${username}` });
+      await openPrDetails(prDetails.number);
+    } catch (e) {
+      showNotification({ color: 'red', title: 'Failed to re-request', message: e?.response?.data?.error || e.message });
+    }
+  };
 
   return (
     <Paper withBorder p="md" radius="md">
@@ -1007,7 +1079,7 @@ export default function VcsPanel({ projectId }) {
       </Modal>
 
       {/* PR Details Modal */}
-      <Modal opened={prDetailsOpen} onClose={() => setPrDetailsOpen(false)} title="Request details" size="lg">
+      <Modal opened={prDetailsOpen} onClose={() => setPrDetailsOpen(false)} title="Request details" size="xl">
         {!prDetails || loadingPrDetails ? (
           <Group justify="center" my="md"><Loader size="sm" /></Group>
         ) : (
@@ -1116,7 +1188,12 @@ export default function VcsPanel({ projectId }) {
                 <Group gap={6} wrap="wrap">
                   <Text size="sm" fw={600}>Requested:</Text>
                   {prDetails.requested_reviewers.map(u => (
-                    <Badge key={u} size="xs" variant="light">{u}</Badge>
+                    <Group key={u} gap={4} align="center">
+                      <Badge size="xs" variant="light">{u}</Badge>
+                      <Tooltip label="Re-request review">
+                        <ActionIcon size="xs" variant="subtle" onClick={() => reRequestReviewer(u)}><IconRefresh size={14} /></ActionIcon>
+                      </Tooltip>
+                    </Group>
                   ))}
                 </Group>
               )}
@@ -1194,7 +1271,7 @@ export default function VcsPanel({ projectId }) {
       </Modal>
 
       {/* Compare Modal */}
-      <Modal opened={compareOpen} onClose={() => setCompareOpen(false)} title="Compare" size="lg">
+      <Modal opened={compareOpen} onClose={() => setCompareOpen(false)} title="Compare" size={compareFullScreen ? '100%' : 'xl'} fullScreen={compareFullScreen}>
         <Stack>
           <Group grow>
             <TextInput label="Base" placeholder="target branch or owner:branch" value={compareBase} onChange={(e) => setCompareBase(e.target.value)} />
@@ -1209,6 +1286,8 @@ export default function VcsPanel({ projectId }) {
           <Group justify="space-between" align="center">
             <SegmentedControl size="xs" value={diffMode} onChange={setDiffMode} data={[{ value: 'unified', label: 'Unified' }, { value: 'side-by-side', label: 'Side by side' }]} />
             <Group>
+              <Switch size="xs" checked={colorfulDiff} onChange={(e) => setColorfulDiff(e.currentTarget.checked)} label="Colorful" />
+              <Button size="xs" variant="light" onClick={() => setCompareFullScreen(v => !v)}>{compareFullScreen ? 'Exit full screen' : 'Full screen'}</Button>
               <Button size="xs" variant="light" onClick={expandAllFiles} disabled={!compareFiles || compareFiles.length === 0}>Expand all</Button>
               <Button size="xs" variant="light" onClick={collapseAllFiles} disabled={expandedFiles.length === 0}>Collapse all</Button>
               <Button size="xs" variant="light" onClick={copyAllPatches} disabled={!compareFiles || compareFiles.length === 0}>Copy all patches</Button>
@@ -1247,13 +1326,52 @@ export default function VcsPanel({ projectId }) {
                             <Group gap={6}>
                               <Badge size="xs" color="green" variant="light">+{f.additions ?? 0}</Badge>
                               <Badge size="xs" color="red" variant="light">-{f.deletions ?? 0}</Badge>
+                              <Button size="xs" variant="subtle" onClick={(e) => { e.stopPropagation(); setFocusFile({ filename: f.filename, patch: f.patch || '', additions: f.additions ?? 0, deletions: f.deletions ?? 0 }); }}>Open</Button>
                             </Group>
                           </Group>
                         </Accordion.Control>
                         <Accordion.Panel>
-                          <ScrollArea.Autosize mah={360} type="always" scrollbarSize={10}>
-                            <DiffViewer filename={f.filename} patch={f.patch || ''} mode={diffMode} additions={f.additions ?? 0} deletions={f.deletions ?? 0} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${f.filename} copied` })} />
-                          </ScrollArea.Autosize>
+                          <DiffViewer filename={f.filename} patch={f.patch || ''} mode={diffMode} additions={f.additions ?? 0} deletions={f.deletions ?? 0} colorful={colorfulDiff} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${f.filename} copied` })} />
+                          {(prDetails?.number || comparePrNumber) && (
+                            <Stack mt="sm">
+                              <Group justify="space-between">
+                                <Text fw={600} size="sm">Review comments</Text>
+                                {reviewCommentsHasNext && (
+                                  <Button size="xs" variant="subtle" onClick={() => fetchPullReviewComments(prDetails?.number || comparePrNumber, reviewCommentsPage + 1)} loading={loadingReviewThreads}>Load more</Button>
+                                )}
+                              </Group>
+                              {(() => {
+                                const fileThreads = groupReviewThreadsByFile.get(f.filename) || new Map();
+                                const tids = Array.from(fileThreads.keys());
+                                if (tids.length === 0) return <Text c="dimmed">No review comments for this file.</Text>;
+                                return (
+                                  <Stack>
+                                    {tids.map((tid) => (
+                                      <Paper key={tid} withBorder p="xs" radius="sm">
+                                        <Stack gap={6}>
+                                          {(fileThreads.get(tid) || []).map((cmt) => (
+                                            <div key={cmt.id}>
+                                              <Group justify="space-between">
+                                                <Text size="sm" fw={600}>{cmt.user || 'User'}</Text>
+                                                <Text size="xs" c="dimmed">{cmt.created_at ? new Date(cmt.created_at).toLocaleString() : ''}</Text>
+                                              </Group>
+                                              <Text size="sm" mt={2}>{cmt.body}</Text>
+                                            </div>
+                                          ))}
+                                          {prDetails && (
+                                            <Group align="flex-end" wrap="nowrap">
+                                              <TextInput placeholder="Reply" value={replyBodies[tid] || ''} onChange={(e) => setReplyBodies(prev => ({ ...prev, [tid]: e.target.value }))} style={{ flex: 1 }} />
+                                              <Button size="xs" variant="light" onClick={() => replyToThread(tid)} disabled={!((replyBodies[tid] || '').trim())}>Reply</Button>
+                                            </Group>
+                                          )}
+                                        </Stack>
+                                      </Paper>
+                                    ))}
+                                  </Stack>
+                                );
+                              })()}
+                            </Stack>
+                          )}
                         </Accordion.Panel>
                       </Accordion.Item>
                     ))}
@@ -1269,6 +1387,15 @@ export default function VcsPanel({ projectId }) {
             </Group>
           </Group>
         </Stack>
+      </Modal>
+
+      {/* Focused file modal */}
+      <Modal opened={!!focusFile} onClose={() => setFocusFile(null)} title={focusFile?.filename || 'File'} fullScreen size="100%">
+        {focusFile && (
+          <Stack>
+            <DiffViewer filename={focusFile.filename} patch={focusFile.patch} mode={diffMode} additions={focusFile.additions} deletions={focusFile.deletions} colorful={true} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${focusFile.filename} copied` })} />
+          </Stack>
+        )}
       </Modal>
     </Paper>
   );

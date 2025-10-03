@@ -68,6 +68,7 @@ What you can do
 - See PR/MR details: mergeability, draft status, head SHA, status checks (classic + GitHub Actions check-runs), required checks (GitHub), and current reviewers.
 - Request reviewers with a list picker.
 - Add comments on PRs/MRs and on issues (with pagination of comments).
+- File-level review comments: view threaded discussions per file and reply inline from the diff view (GitHub/GitLab).
 - Compare branches/PRs and preview inline diffs per file:
   - Unified and side-by-side modes
   - Expand/Collapse all files
@@ -76,6 +77,13 @@ What you can do
 - Merge using supported strategies (merge/squash/rebase depending on provider).
 - "Merge when ready" (GitHub): enabled only when required checks pass and PR is not a draft.
 - Convert draft PRs to ready-for-review (GitHub).
+- Re-request review: quickly ping a previously requested reviewer to review again (GitHub/GitLab where supported).
+
+Diff viewer ergonomics
+
+- Full-screen mode for Compare, plus per-file pop-out to focus on a single file with a large, colorful diff.
+- Light virtualization for large diffs keeps rendering smooth by only mounting rows near the viewport.
+- Subtle animations on diff rows improve scanability during review.
 
 Setup
 

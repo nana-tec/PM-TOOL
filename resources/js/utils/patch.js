@@ -5,9 +5,19 @@ export function parseUnifiedPatch(patch) {
   const lines = patch.split(/\r?\n/);
   const hunks = [];
   let current = null;
+  let oldLine = 0;
+  let newLine = 0;
   for (let raw of lines) {
     if (raw.startsWith('@@')) {
       if (current) hunks.push(current);
+      // parse header: @@ -a,b +c,d @@
+      const m = raw.match(/@@\s+-(\d+),(\d+)\s+\+(\d+),(\d+)\s+@@/);
+      if (m) {
+        oldLine = parseInt(m[1], 10);
+        newLine = parseInt(m[3], 10);
+      } else {
+        oldLine = 0; newLine = 0;
+      }
       current = { header: raw, lines: [] };
       continue;
     }
@@ -16,20 +26,20 @@ export function parseUnifiedPatch(patch) {
       continue;
     }
     if (raw.startsWith('+')) {
-      current.lines.push({ type: 'add', text: raw.slice(1) });
+      current.lines.push({ type: 'add', text: raw.slice(1), oldLine: null, newLine: newLine });
+      newLine += 1;
     } else if (raw.startsWith('-')) {
-      current.lines.push({ type: 'del', text: raw.slice(1) });
+      current.lines.push({ type: 'del', text: raw.slice(1), oldLine: oldLine, newLine: null });
+      oldLine += 1;
     } else if (raw.startsWith(' ') || raw === '') {
-      current.lines.push({ type: 'ctx', text: raw.slice(1) });
+      current.lines.push({ type: 'ctx', text: raw.slice(1), oldLine: oldLine, newLine: newLine });
+      oldLine += 1; newLine += 1;
     } else if (raw.startsWith('\\')) {
-      // meta like "\\ No newline at end of file"
-      current.lines.push({ type: 'meta', text: raw });
+      current.lines.push({ type: 'meta', text: raw, oldLine: null, newLine: null });
     } else if (raw.startsWith('---') || raw.startsWith('+++')) {
-      // file markers inside hunk - treat as meta
-      current.lines.push({ type: 'meta', text: raw });
+      current.lines.push({ type: 'meta', text: raw, oldLine: null, newLine: null });
     } else {
-      // unknown -> treat as context
-      current.lines.push({ type: 'ctx', text: raw });
+      current.lines.push({ type: 'ctx', text: raw, oldLine: null, newLine: null });
     }
   }
   if (current) hunks.push(current);
@@ -44,30 +54,36 @@ export function buildSideBySide(hunks) {
     const rows = [];
     let leftBlock = [];
     let rightBlock = [];
+    let leftNums = [];
+    let rightNums = [];
     const flushBlocks = () => {
       const maxLen = Math.max(leftBlock.length, rightBlock.length);
       for (let i = 0; i < maxLen; i++) {
         const l = leftBlock[i] ?? '';
         const r = rightBlock[i] ?? '';
+        const lNum = leftNums[i] ?? null;
+        const rNum = rightNums[i] ?? null;
         let kind = 'change';
         if (l && !r) kind = 'del';
         else if (!l && r) kind = 'add';
-        rows.push({ left: l, right: r, kind });
+        rows.push({ left: l, right: r, kind, leftLine: lNum, rightLine: rNum });
       }
-      leftBlock = [];
-      rightBlock = [];
+      leftBlock = []; rightBlock = [];
+      leftNums = []; rightNums = [];
     };
     for (const ln of h.lines) {
       if (ln.type === 'del') {
         leftBlock.push(ln.text);
+        leftNums.push(ln.oldLine);
       } else if (ln.type === 'add') {
         rightBlock.push(ln.text);
+        rightNums.push(ln.newLine);
       } else if (ln.type === 'ctx') {
         flushBlocks();
-        rows.push({ left: ln.text, right: ln.text, kind: 'ctx' });
+        rows.push({ left: ln.text, right: ln.text, kind: 'ctx', leftLine: ln.oldLine, rightLine: ln.newLine });
       } else if (ln.type === 'meta') {
         flushBlocks();
-        rows.push({ left: ln.text, right: ln.text, kind: 'meta' });
+        rows.push({ left: ln.text, right: ln.text, kind: 'meta', leftLine: null, rightLine: null });
       }
     }
     flushBlocks();
@@ -90,9 +106,8 @@ export function copyToClipboard(text) {
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
-    try { document.execCommand('copy'); } catch (_) {}
+    try { document.execCommand('copy'); } catch (_) { /* best-effort fallback copy may fail silently */ }
     document.body.removeChild(ta);
     resolve();
   });
 }
-
