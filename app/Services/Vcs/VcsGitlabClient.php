@@ -196,7 +196,7 @@ class VcsGitlabClient implements VcsClientInterface
     public function compare(string $base, string $head): array
     {
         // GitLab uses from (base) and to (head)
-        [$data] = $this->request('GET', '/repository/compare?from=' . rawurlencode($base) . '&to=' . rawurlencode($head));
+        [$data] = $this->request('GET', '/repository/compare?from='.rawurlencode($base).'&to='.rawurlencode($head));
         $commits = array_map(fn ($c) => [
             'sha' => $c['id'],
             'message' => $c['title'] ?? ($c['message'] ?? ''),
@@ -210,12 +210,20 @@ class VcsGitlabClient implements VcsClientInterface
             $filename = $d['new_path'] ?? $d['old_path'] ?? 'file';
             $patch = $d['diff'] ?? '';
             // Compute additions/deletions by counting leading + / - while skipping file headers
-            $adds = 0; $dels = 0;
+            $adds = 0;
+            $dels = 0;
             foreach (preg_split('/\r?\n/', (string) $patch) as $line) {
-                if ($line === '' || $line[0] === '@') { continue; }
-                if (str_starts_with($line, '+++') || str_starts_with($line, '---')) { continue; }
-                if (isset($line[0]) && $line[0] === '+') { $adds++; }
-                elseif (isset($line[0]) && $line[0] === '-') { $dels++; }
+                if ($line === '' || $line[0] === '@') {
+                    continue;
+                }
+                if (str_starts_with($line, '+++') || str_starts_with($line, '---')) {
+                    continue;
+                }
+                if (isset($line[0]) && $line[0] === '+') {
+                    $adds++;
+                } elseif (isset($line[0]) && $line[0] === '-') {
+                    $dels++;
+                }
             }
             $files[] = [
                 'filename' => $filename,
