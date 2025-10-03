@@ -343,6 +343,7 @@ class VcsGithubClient implements VcsClientInterface
         $items = array_map(function ($c) {
             // Thread id: top-level comment id; replies have in_reply_to_id
             $threadId = $c['in_reply_to_id'] ?? $c['id'];
+
             return [
                 'id' => $c['id'],
                 'thread_id' => $threadId,
