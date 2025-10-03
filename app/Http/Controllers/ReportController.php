@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -560,7 +561,22 @@ class ReportController extends Controller
 
     public function teamMetricsJson(Request $request)
     {
-        $data = $this->computeTeamMetrics($request);
+        // Short server-side cache (60s) to reduce dashboard load
+        $start = $request->dateRange ? Carbon::parse($request->dateRange[0])->startOfDay() : now()->startOfWeek();
+        $end = $request->dateRange ? Carbon::parse($request->dateRange[1])->endOfDay() : now()->endOfWeek();
+        $norm = [
+            'start' => $start->toDateString(),
+            'end' => $end->toDateString(),
+            'weekly_capacity' => (float) ($request->get('weekly_capacity', 40)),
+            'rank_by' => $request->get('rank_by') ?: 'performance',
+            'users' => array_values(array_map('intval', (array) $request->get('users', []))),
+        ];
+        $uid = auth()->id() ?: 0;
+        $key = 'team-metrics:json:u:'.$uid.':'.md5(json_encode($norm));
+        $data = Cache::remember($key, 60, function () use ($request) {
+            return $this->computeTeamMetrics($request);
+        });
+
         $limit = (int) $request->get('limit', 20);
 
         return response()->json([

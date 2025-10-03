@@ -123,7 +123,13 @@ class VcsGitlabClient implements VcsClientInterface
             default => 'opened',
         };
         [$data, $headers] = $this->request('GET', '/merge_requests?state='.urlencode($gitlabState).'&per_page='.$perPage.'&page='.$page);
-        $items = array_map(fn ($m) => ['number' => $m['iid'], 'title' => $m['title'], 'state' => $m['state'], 'url' => $m['web_url'] ?? null], $data);
+        $items = array_map(fn ($m) => [
+            'number' => $m['iid'],
+            'title' => $m['title'],
+            'state' => $m['state'],
+            'url' => $m['web_url'] ?? null,
+            'created_at' => $m['created_at'] ?? null,
+        ], $data);
 
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
@@ -136,7 +142,13 @@ class VcsGitlabClient implements VcsClientInterface
             default => 'opened',
         };
         [$data, $headers] = $this->request('GET', '/issues?state='.urlencode($gitlabState).'&per_page='.$perPage.'&page='.$page);
-        $items = array_map(fn ($i) => ['id' => $i['iid'] ?? $i['id'] ?? 0, 'title' => $i['title'], 'state' => $i['state'], 'url' => $i['web_url'] ?? null], $data);
+        $items = array_map(fn ($i) => [
+            'id' => $i['iid'] ?? $i['id'] ?? 0,
+            'title' => $i['title'],
+            'state' => $i['state'],
+            'url' => $i['web_url'] ?? null,
+            'created_at' => $i['created_at'] ?? null,
+        ], $data);
 
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }

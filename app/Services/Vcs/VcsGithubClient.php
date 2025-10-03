@@ -127,14 +127,26 @@ class VcsGithubClient implements VcsClientInterface
             foreach ($data as $p) {
                 $detail = $this->api('GET', '/pulls/'.$p['number']);
                 if (! empty($detail['merged_at'])) {
-                    $merged[] = ['number' => $p['number'], 'title' => $p['title'], 'state' => 'merged', 'url' => $p['html_url'] ?? null];
+                    $merged[] = [
+                        'number' => $p['number'],
+                        'title' => $p['title'],
+                        'state' => 'merged',
+                        'url' => $p['html_url'] ?? null,
+                        'created_at' => $p['created_at'] ?? ($detail['created_at'] ?? null),
+                    ];
                 }
             }
 
             return ['items' => $merged, 'has_next' => $this->hasNextFromHeaders($headers)];
         }
         [$data, $headers] = $this->request('GET', '/pulls?state='.urlencode($state).'&per_page='.$perPage.'&page='.$page);
-        $items = array_map(fn ($p) => ['number' => $p['number'], 'title' => $p['title'], 'state' => $p['state'], 'url' => $p['html_url'] ?? null], $data);
+        $items = array_map(fn ($p) => [
+            'number' => $p['number'],
+            'title' => $p['title'],
+            'state' => $p['state'],
+            'url' => $p['html_url'] ?? null,
+            'created_at' => $p['created_at'] ?? null,
+        ], $data);
 
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
@@ -144,7 +156,13 @@ class VcsGithubClient implements VcsClientInterface
         [$data, $headers] = $this->request('GET', '/issues?state='.urlencode($state).'&per_page='.$perPage.'&page='.$page);
         // Pull requests also appear in issues; filter out PRs by presence of 'pull_request' key
         $data = array_values(array_filter($data, fn ($i) => ! isset($i['pull_request'])));
-        $items = array_map(fn ($i) => ['id' => $i['number'] ?? $i['id'] ?? 0, 'title' => $i['title'], 'state' => $i['state'], 'url' => $i['html_url'] ?? null], $data);
+        $items = array_map(fn ($i) => [
+            'id' => $i['number'] ?? $i['id'] ?? 0,
+            'title' => $i['title'],
+            'state' => $i['state'],
+            'url' => $i['html_url'] ?? null,
+            'created_at' => $i['created_at'] ?? null,
+        ], $data);
 
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
