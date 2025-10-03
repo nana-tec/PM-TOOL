@@ -460,4 +460,33 @@ class VcsController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
     }
+
+    public function listPullReviewComments(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('view', $project);
+        try {
+            $page = (int) $request->query('page', 1);
+            $perPage = (int) $request->query('per_page', 50);
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->listPullReviewComments($number, $page, $perPage);
+
+            return response()->json(['comments' => $res['items'], 'has_next' => $res['has_next']]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function replyPullReviewComment(Project $project, Request $request, int|string $number, int|string $threadId)
+    {
+        $this->authorize('update', $project);
+        $data = $request->validate(['body' => 'required|string|min:1']);
+        try {
+            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
+            $res = $client->replyPullReviewComment($number, $threadId, $data['body']);
+
+            return response()->json($res);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
 }

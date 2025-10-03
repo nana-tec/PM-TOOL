@@ -336,4 +336,32 @@ class VcsGithubClient implements VcsClientInterface
 
         return ['status' => 'ok'];
     }
+
+    public function listPullReviewComments(int|string $number, int $page = 1, int $perPage = 50): array
+    {
+        [$data, $headers] = $this->request('GET', '/pulls/'.urlencode((string) $number).'/comments?per_page='.$perPage.'&page='.$page);
+        $items = array_map(function ($c) {
+            // Thread id: top-level comment id; replies have in_reply_to_id
+            $threadId = $c['in_reply_to_id'] ?? $c['id'];
+            return [
+                'id' => $c['id'],
+                'thread_id' => $threadId,
+                'path' => $c['path'] ?? null,
+                'line' => $c['line'] ?? null,
+                'user' => $c['user']['login'] ?? null,
+                'body' => $c['body'] ?? '',
+                'created_at' => $c['created_at'] ?? '',
+            ];
+        }, $data);
+
+        return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
+    }
+
+    public function replyPullReviewComment(int|string $number, int|string $threadId, string $body): array
+    {
+        // GitHub replies are created via the comment reply endpoint; number is unused here but kept for interface consistency
+        $this->api('POST', '/pulls/comments/'.urlencode((string) $threadId).'/replies', ['json' => ['body' => $body]]);
+
+        return ['status' => 'ok'];
+    }
 }

@@ -72,4 +72,18 @@ interface VcsClientInterface
 
     /** @return array{id:int|string, url?:string} */
     public function createIssueComment(int|string $issueId, string $body): array;
+
+    /**
+     * List inline/file-level review comments on a PR/MR.
+     *
+     * @return array{items: array<int, array{id:int|string, thread_id:int|string, path?:string|null, line?:int|null, user?:string|null, body:string, created_at:string}>, has_next: bool}
+     */
+    public function listPullReviewComments(int|string $number, int $page = 1, int $perPage = 50): array;
+
+    /**
+     * Reply to an existing inline/file-level review comment thread.
+     *
+     * @return array{status:string}
+     */
+    public function replyPullReviewComment(int|string $number, int|string $threadId, string $body): array;
 }

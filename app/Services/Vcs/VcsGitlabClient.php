@@ -303,4 +303,36 @@ class VcsGitlabClient implements VcsClientInterface
 
         return ['id' => $data['id'] ?? 0, 'url' => $data['web_url'] ?? null];
     }
+
+    public function listPullReviewComments(int|string $number, int $page = 1, int $perPage = 50): array
+    {
+        [$data, $headers] = $this->request('GET', '/merge_requests/'.urlencode((string) $number).'/discussions?per_page='.$perPage.'&page='.$page);
+        $items = [];
+        foreach ($data as $discussion) {
+            $threadId = $discussion['id'];
+            foreach ($discussion['notes'] ?? [] as $n) {
+                $pos = $n['position'] ?? [];
+                $path = $pos['new_path'] ?? ($pos['old_path'] ?? null);
+                $line = $pos['new_line'] ?? ($pos['old_line'] ?? null);
+                $items[] = [
+                    'id' => $n['id'],
+                    'thread_id' => $threadId,
+                    'path' => $path,
+                    'line' => $line,
+                    'user' => $n['author']['username'] ?? null,
+                    'body' => $n['body'] ?? '',
+                    'created_at' => $n['created_at'] ?? '',
+                ];
+            }
+        }
+
+        return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
+    }
+
+    public function replyPullReviewComment(int|string $number, int|string $threadId, string $body): array
+    {
+        $this->api('POST', '/merge_requests/'.urlencode((string) $number).'/discussions/'.urlencode((string) $threadId).'/notes', ['form_params' => ['body' => $body]]);
+
+        return ['status' => 'ok'];
+    }
 }
