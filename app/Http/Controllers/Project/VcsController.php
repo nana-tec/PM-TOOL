@@ -8,9 +8,43 @@ use App\Models\ProjectVcsIntegration;
 use App\Models\ProjectVcsUserToken;
 use App\Services\Vcs\VcsClientFactory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class VcsController extends Controller
 {
+    private function cacheTtl(): int
+    {
+        return (int) (config('vcs.cache_ttl', 300)); // default 5 minutes
+    }
+
+    private function cacheVersion(Project $project): int
+    {
+        $key = "vcs:proj:{$project->id}:ver";
+        return (int) Cache::get($key, 1);
+    }
+
+    private function bumpProjectCache(Project $project): void
+    {
+        $key = "vcs:proj:{$project->id}:ver";
+        $ver = (int) Cache::get($key, 1);
+        Cache::forever($key, $ver + 1);
+    }
+
+    /**
+     * Cache helper that namespaces keys by project, provider, repo, token mode and version.
+     * If a user token is used, the auth user id is included to avoid leaking across users.
+     */
+    private function cacheRemember(Project $project, ProjectVcsIntegration $integration, string $section, array $params, bool $usingUserToken, \Closure $callback)
+    {
+        $ver = $this->cacheVersion($project);
+        $uidSeg = $usingUserToken ? ('u:'.(auth()->id() ?: '0')) : 'p';
+        $hash = md5($section.':'.json_encode($params));
+        $repoHash = md5((string) $integration->repo);
+        $key = "vcs:proj:{$project->id}:v{$ver}:{$integration->provider}:{$repoHash}:{$uidSeg}:{$hash}";
+
+        return Cache::remember($key, $this->cacheTtl(), $callback);
+    }
+
     public function showIntegration(Project $project): \Illuminate\Http\JsonResponse
     {
         $this->authorize('view', $project);
@@ -58,6 +92,9 @@ class VcsController extends Controller
         $integration->project()->associate($project);
         $integration->save();
 
+        // Invalidate cached data after integration changes
+        $this->bumpProjectCache($project);
+
         return response()->json(['status' => 'ok']);
     }
 
@@ -67,6 +104,8 @@ class VcsController extends Controller
         if ($project->vcsIntegration) {
             $project->vcsIntegration->delete();
         }
+
+        $this->bumpProjectCache($project);
 
         return response()->json(['status' => 'ok']);
     }
@@ -89,6 +128,8 @@ class VcsController extends Controller
             ]
         );
 
+        $this->bumpProjectCache($project);
+
         return response()->json(['status' => 'ok']);
     }
 
@@ -100,6 +141,8 @@ class VcsController extends Controller
             ->where('user_id', auth()->id())
             ->where('provider', $integration->provider)
             ->delete();
+
+        $this->bumpProjectCache($project);
 
         return response()->json(['status' => 'ok']);
     }
@@ -136,10 +179,14 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $integration = $this->requireIntegration($project);
-            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 30);
-            $res = $client->listBranches($page, $perPage);
+            $res = $this->cacheRemember($project, $integration, 'branches', compact('page', 'perPage'), $usingUserToken, function () use ($integration, $token, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listBranches($page, $perPage);
+            });
 
             return response()->json(['branches' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -155,8 +202,12 @@ class VcsController extends Controller
             $branch = $request->query('branch') ?: ($integration->default_branch ?: 'main');
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 20);
-            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
-            $res = $client->listCommits($branch, $page, $perPage);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'commits', compact('branch', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $branch, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listCommits($branch, $page, $perPage);
+            });
 
             return response()->json(['commits' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -171,8 +222,13 @@ class VcsController extends Controller
             $state = (string) $request->query('state', 'open');
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 20);
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->listIssues($state, $page, $perPage);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'issues', compact('state', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $state, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listIssues($state, $page, $perPage);
+            });
 
             return response()->json(['issues' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -187,8 +243,13 @@ class VcsController extends Controller
             $state = (string) $request->query('state', 'open');
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 20);
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->listPullRequests($state, $page, $perPage);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'pulls', compact('state', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $state, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listPullRequests($state, $page, $perPage);
+            });
 
             return response()->json(['pulls' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -200,8 +261,13 @@ class VcsController extends Controller
     {
         $this->authorize('view', $project);
         try {
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $pr = $client->getPullRequest($number);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $pr = $this->cacheRemember($project, $integration, 'pull_details', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->getPullRequest($number);
+            });
 
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
@@ -215,8 +281,13 @@ class VcsController extends Controller
         try {
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 20);
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->listPullComments($number, $page, $perPage);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'pull_comments', compact('number', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $number, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listPullComments($number, $page, $perPage);
+            });
 
             return response()->json(['comments' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -231,6 +302,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $c = $client->createPullComment($number, $data['body']);
+            $this->bumpProjectCache($project);
 
             return response()->json(['comment' => $c]);
         } catch (\Throwable $e) {
@@ -248,6 +320,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $res = $client->submitReview($number, $data['event'], $data['body'] ?? null);
+            $this->bumpProjectCache($project);
 
             return response()->json($res);
         } catch (\Throwable $e) {
@@ -263,8 +336,15 @@ class VcsController extends Controller
             'head' => 'required|string',
         ]);
         try {
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->compare($data['base'], $data['head']);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $base = $data['base'];
+            $head = $data['head'];
+            $res = $this->cacheRemember($project, $integration, 'compare', compact('base', 'head'), $usingUserToken, function () use ($integration, $token, $base, $head) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->compare($base, $head);
+            });
 
             return response()->json($res);
         } catch (\Throwable $e) {
@@ -278,8 +358,13 @@ class VcsController extends Controller
         try {
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 50);
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->listPotentialReviewers($page, $perPage);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'reviewers', compact('page', 'perPage'), $usingUserToken, function () use ($integration, $token, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listPotentialReviewers($page, $perPage);
+            });
 
             return response()->json(['reviewers' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -297,6 +382,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $res = $client->requestReviewers($number, $data['usernames']);
+            $this->bumpProjectCache($project);
 
             return response()->json($res);
         } catch (\Throwable $e) {
@@ -308,8 +394,13 @@ class VcsController extends Controller
     {
         $this->authorize('view', $project);
         try {
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->getPullStatuses($number);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'pull_statuses', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->getPullStatuses($number);
+            });
 
             return response()->json($res);
         } catch (\Throwable $e) {
@@ -322,17 +413,23 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $integration = $this->requireIntegration($project);
-            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
-            // Get base branch from PR details
-            $pr = $client->getPullRequest($number);
-            $base = $pr['base'] ?? null;
-            $required = [];
-            if ($base && method_exists($client, 'getRequiredStatusContexts')) {
-                /** @var array $required */
-                $required = $client->getRequiredStatusContexts($base);
-            }
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            // This returns array of contexts; safe to cache quickly
+            $res = $this->cacheRemember($project, $integration, 'pull_required_checks', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
+                $client = VcsClientFactory::make($integration, $token);
+                // Get base branch from PR details
+                $pr = $client->getPullRequest($number);
+                $base = $pr['base'] ?? null;
+                $required = [];
+                if ($base && method_exists($client, 'getRequiredStatusContexts')) {
+                    /** @var array $required */
+                    $required = $client->getRequiredStatusContexts($base);
+                }
+                return ['required' => array_values($required)];
+            });
 
-            return response()->json(['required' => array_values($required)]);
+            return response()->json($res);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
@@ -344,8 +441,13 @@ class VcsController extends Controller
         try {
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 20);
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->listIssueComments($issueId, $page, $perPage);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'issue_comments', compact('issueId', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $issueId, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listIssueComments($issueId, $page, $perPage);
+            });
 
             return response()->json(['comments' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -360,6 +462,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $c = $client->createIssueComment($issueId, $data['body']);
+            $this->bumpProjectCache($project);
 
             return response()->json(['comment' => $c]);
         } catch (\Throwable $e) {
@@ -378,6 +481,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $issue = $client->createIssue($data['title'], $data['body'] ?? null);
+            $this->bumpProjectCache($project);
 
             return response()->json(['issue' => $issue]);
         } catch (\Throwable $e) {
@@ -398,6 +502,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $pr = $client->openMergeRequest($data['source_branch'], $data['target_branch'], $data['title'], $data['body'] ?? null, ['draft' => (bool) ($data['draft'] ?? false)]);
+            $this->bumpProjectCache($project);
 
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
@@ -415,6 +520,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $res = $client->mergeRequest($data['number'], $data['strategy'] ?? null);
+            $this->bumpProjectCache($project);
 
             return response()->json($res);
         } catch (\Throwable $e) {
@@ -431,6 +537,7 @@ class VcsController extends Controller
             if (method_exists($client, 'markReadyForReview')) {
                 /** @var array $res */
                 $res = $client->markReadyForReview($number);
+                $this->bumpProjectCache($project);
 
                 return response()->json($res);
             }
@@ -446,14 +553,21 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $integration = $this->requireIntegration($project);
-            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
-            $pr = $client->getPullRequest($number);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $pr = $this->cacheRemember($project, $integration, 'pull_details', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->getPullRequest($number);
+            });
             $base = $pr['base'] ?? null;
             $head = $pr['head'] ?? null;
             if (! $base || ! $head) {
                 abort(422, 'PR does not have base/head information');
             }
-            $res = $client->compare($base, $head);
+            $res = $this->cacheRemember($project, $integration, 'compare', compact('base', 'head'), $usingUserToken, function () use ($integration, $token, $base, $head) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->compare($base, $head);
+            });
 
             return response()->json($res + ['base' => $base, 'head' => $head]);
         } catch (\Throwable $e) {
@@ -467,8 +581,13 @@ class VcsController extends Controller
         try {
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 50);
-            $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->listPullReviewComments($number, $page, $perPage);
+            $integration = $this->requireIntegration($project);
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = !is_null($token);
+            $res = $this->cacheRemember($project, $integration, 'pull_review_comments', compact('number', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $number, $page, $perPage) {
+                $client = VcsClientFactory::make($integration, $token);
+                return $client->listPullReviewComments($number, $page, $perPage);
+            });
 
             return response()->json(['comments' => $res['items'], 'has_next' => $res['has_next']]);
         } catch (\Throwable $e) {
@@ -483,6 +602,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $res = $client->replyPullReviewComment($number, $threadId, $data['body']);
+            $this->bumpProjectCache($project);
 
             return response()->json($res);
         } catch (\Throwable $e) {
@@ -495,126 +615,162 @@ class VcsController extends Controller
         $this->authorize('view', $project);
         try {
             $integration = $this->requireIntegration($project);
-            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
             $defaultBranch = $integration->default_branch ?: 'main';
             $branch = (string) ($request->query('branch') ?: $defaultBranch);
-             $maxPages = (int) $request->query('pages', 5); // fetch up to ~5 pages of commits
-             $perPage = (int) $request->query('per_page', 50);
+            $maxPages = (int) $request->query('pages', 5);
+            $perPage = (int) $request->query('per_page', 50);
 
-             $fetchCommits = function (string $ref) use ($client, $maxPages, $perPage) {
-                $acc = [];
-                for ($page = 1; $page <= max(1, $maxPages); $page++) {
-                    $res = $client->listCommits($ref, $page, $perPage);
-                    $items = $res['items'] ?? [];
-                    foreach ($items as $c) {
-                        $acc[] = [
-                            'sha' => $c['sha'] ?? '',
-                            'message' => $c['message'] ?? '',
-                            'author' => $c['author'] ?? 'Unknown',
-                            'date' => $c['date'] ?? null,
-                            'url' => $c['url'] ?? null,
+            $token = $this->resolveToken($project, $integration, $request);
+            $usingUserToken = ! is_null($token);
+
+            $cached = $this->cacheRemember(
+                $project,
+                $integration,
+                'stats',
+                compact('branch', 'maxPages', 'perPage'),
+                $usingUserToken,
+                function () use ($integration, $token, $branch, $defaultBranch, $maxPages, $perPage) {
+                    $client = VcsClientFactory::make($integration, $token);
+
+                    $fetchCommits = function (string $ref) use ($client, $maxPages, $perPage) {
+                        $acc = [];
+                        for ($page = 1; $page <= max(1, $maxPages); $page++) {
+                            $res = $client->listCommits($ref, $page, $perPage);
+                            $items = $res['items'] ?? [];
+                            foreach ($items as $c) {
+                                $acc[] = [
+                                    'sha' => $c['sha'] ?? '',
+                                    'message' => $c['message'] ?? '',
+                                    'author' => $c['author'] ?? 'Unknown',
+                                    'date' => $c['date'] ?? null,
+                                    'url' => $c['url'] ?? null,
+                                ];
+                            }
+                            if (($res['has_next'] ?? false) === false) {
+                                break;
+                            }
+                        }
+                        return $acc;
+                    };
+
+                    $allCommits = $fetchCommits($branch);
+                    $allCommitsDefault = ($branch === $defaultBranch) ? $allCommits : $fetchCommits($defaultBranch);
+
+                    $latestCommits = array_slice($allCommits, 0, 10);
+
+                    $now = now();
+                    $windows = [
+                        'week' => $now->copy()->startOfWeek(),
+                        'month' => $now->copy()->startOfMonth(),
+                        'year' => $now->copy()->startOfYear(),
+                    ];
+                    $tops = ['week' => [], 'month' => [], 'year' => []];
+
+                    foreach ($windows as $key => $start) {
+                        $counts = [];
+                        foreach ($allCommitsDefault as $c) {
+                            if (empty($c['date'])) {
+                                continue;
+                            }
+                            $dt = \Illuminate\Support\Carbon::parse($c['date']);
+                            if ($dt->lt($start)) {
+                                continue;
+                            }
+                            $author = $c['author'] ?: 'Unknown';
+                            $counts[$author] = ($counts[$author] ?? 0) + 1;
+                        }
+                        arsort($counts);
+                        $tops[$key] = array_map(
+                            fn ($name, $count) => ['name' => $name, 'count' => $count],
+                            array_keys($counts),
+                            array_values($counts)
+                        );
+                        $tops[$key] = array_slice($tops[$key], 0, 10);
+                    }
+
+                    $recentPulls = [];
+                    try {
+                        $open = $client->listPullRequests('open', 1, 10)['items'] ?? [];
+                        $merged = $client->listPullRequests('merged', 1, 10)['items'] ?? [];
+                        foreach ([$open, $merged] as $list) {
+                            foreach ($list as $p) {
+                                $recentPulls[] = [
+                                    'number' => $p['number'] ?? null,
+                                    'title' => $p['title'] ?? '',
+                                    'state' => $p['state'] ?? 'open',
+                                    'url' => $p['url'] ?? null,
+                                ];
+                            }
+                        }
+                    } catch (\Throwable $_) {
+                        // provider may not support listing merged separately; ignore
+                    }
+
+                    $byDay = [];
+                    $byWeek = [];
+                    try {
+                        $sample = array_slice($recentPulls, 0, 20);
+                        foreach ($sample as $rp) {
+                            if (! isset($rp['number'])) {
+                                continue;
+                            }
+                            try {
+                                $pr = $client->getPullRequest($rp['number']);
+                            } catch (\Throwable $_e) {
+                                continue;
+                            }
+                            $created = $pr['created_at'] ?? null;
+                            $mergedAt = $pr['merged_at'] ?? ($pr['closed_at'] ?? null);
+                            if ($created) {
+                                $d = \Illuminate\Support\Carbon::parse($created)->toDateString();
+                                $w = \Illuminate\Support\Carbon::parse($created)->isoFormat('GGGG-[W]WW');
+                                $byDay[$d]['opened'] = ($byDay[$d]['opened'] ?? 0) + 1;
+                                $byWeek[$w]['opened'] = ($byWeek[$w]['opened'] ?? 0) + 1;
+                            }
+                            if (($rp['state'] ?? null) === 'merged' && $mergedAt) {
+                                $d = \Illuminate\Support\Carbon::parse($mergedAt)->toDateString();
+                                $w = \Illuminate\Support\Carbon::parse($mergedAt)->isoFormat('GGGG-[W]WW');
+                                $byDay[$d]['merged'] = ($byDay[$d]['merged'] ?? 0) + 1;
+                                $byWeek[$w]['merged'] = ($byWeek[$w]['merged'] ?? 0) + 1;
+                            }
+                        }
+                    } catch (\Throwable $_) {
+                        // ignore if provider does not expose timestamps
+                    }
+
+                    ksort($byDay);
+                    ksort($byWeek);
+                    $byDayArr = [];
+                    foreach ($byDay as $d => $vals) {
+                        $byDayArr[] = [
+                            'date' => $d,
+                            'opened' => (int) ($vals['opened'] ?? 0),
+                            'merged' => (int) ($vals['merged'] ?? 0),
                         ];
                     }
-                    if (($res['has_next'] ?? false) === false) break;
-                }
-                return $acc;
-            };
-
-            $allCommits = $fetchCommits($branch);
-            $allCommitsDefault = ($branch === $defaultBranch) ? $allCommits : $fetchCommits($defaultBranch);
-
-             // latest commits (most recent first as returned by provider)
-             $latestCommits = array_slice($allCommits, 0, 10);
-
-             // Top committers by windows (week, month, year)
-             $now = now();
-             $windows = [
-                 'week' => $now->copy()->startOfWeek(),
-                 'month' => $now->copy()->startOfMonth(),
-                 'year' => $now->copy()->startOfYear(),
-             ];
-             $tops = [ 'week' => [], 'month' => [], 'year' => [] ];
-
-             foreach ($windows as $key => $start) {
-                 $counts = [];
-                foreach ($allCommitsDefault as $c) {
-                     if (empty($c['date'])) continue;
-                     $dt = \Illuminate\Support\Carbon::parse($c['date']);
-                     if ($dt->lt($start)) continue;
-                     $author = $c['author'] ?: 'Unknown';
-                     $counts[$author] = ($counts[$author] ?? 0) + 1;
-                 }
-                 arsort($counts);
-                 $tops[$key] = array_map(function ($name, $count) {
-                     return ['name' => $name, 'count' => $count];
-                 }, array_keys($counts), array_values($counts));
-                 $tops[$key] = array_slice($tops[$key], 0, 10);
-             }
-
-             // Recent PRs: take first page of open + merged for a quick view
-             $recentPulls = [];
-             try {
-                 $open = $client->listPullRequests('open', 1, 10)['items'] ?? [];
-                 $merged = $client->listPullRequests('merged', 1, 10)['items'] ?? [];
-                 foreach ([$open, $merged] as $list) {
-                     foreach ($list as $p) {
-                         $recentPulls[] = [
-                             'number' => $p['number'] ?? null,
-                             'title' => $p['title'] ?? '',
-                             'state' => $p['state'] ?? 'open',
-                             'url' => $p['url'] ?? null,
-                         ];
-                     }
-                 }
-             } catch (\Throwable $_) {
-                 // provider may not support listing merged separately; ignore
-             }
-
-            // PR activity (best-effort): group opened/merged counts by day and by ISO week
-            $byDay = [];
-            $byWeek = [];
-            try {
-                $sample = array_slice($recentPulls, 0, 20);
-                foreach ($sample as $rp) {
-                    if (!isset($rp['number'])) continue;
-                    try {
-                        $pr = $client->getPullRequest($rp['number']);
-                    } catch (\Throwable $_e) { continue; }
-                    $created = $pr['created_at'] ?? null;
-                    $mergedAt = $pr['merged_at'] ?? ($pr['closed_at'] ?? null);
-                    if ($created) {
-                        $d = \Illuminate\Support\Carbon::parse($created)->toDateString();
-                        $w = \Illuminate\Support\Carbon::parse($created)->isoFormat('GGGG-[W]WW');
-                        $byDay[$d]['opened'] = ($byDay[$d]['opened'] ?? 0) + 1;
-                        $byWeek[$w]['opened'] = ($byWeek[$w]['opened'] ?? 0) + 1;
+                    $byWeekArr = [];
+                    foreach ($byWeek as $w => $vals) {
+                        $byWeekArr[] = [
+                            'week' => $w,
+                            'opened' => (int) ($vals['opened'] ?? 0),
+                            'merged' => (int) ($vals['merged'] ?? 0),
+                        ];
                     }
-                    if ($rp['state'] === 'merged' && $mergedAt) {
-                        $d = \Illuminate\Support\Carbon::parse($mergedAt)->toDateString();
-                        $w = \Illuminate\Support\Carbon::parse($mergedAt)->isoFormat('GGGG-[W]WW');
-                        $byDay[$d]['merged'] = ($byDay[$d]['merged'] ?? 0) + 1;
-                        $byWeek[$w]['merged'] = ($byWeek[$w]['merged'] ?? 0) + 1;
-                    }
-                }
-            } catch (\Throwable $_) {
-                // ignore if provider does not expose timestamps
-            }
-            ksort($byDay);
-            ksort($byWeek);
-            $byDayArr = [];
-            foreach ($byDay as $d => $vals) { $byDayArr[] = ['date' => $d, 'opened' => (int)($vals['opened'] ?? 0), 'merged' => (int)($vals['merged'] ?? 0)]; }
-            $byWeekArr = [];
-            foreach ($byWeek as $w => $vals) { $byWeekArr[] = ['week' => $w, 'opened' => (int)($vals['opened'] ?? 0), 'merged' => (int)($vals['merged'] ?? 0)]; }
 
-             return response()->json([
-                'default_branch' => $defaultBranch,
-                'branch' => $branch,
-                 'latest_commits' => $latestCommits,
-                 'top_committers' => $tops,
-                 'recent_pulls' => array_slice($recentPulls, 0, 10),
-                'pr_activity' => [ 'by_day' => $byDayArr, 'by_week' => $byWeekArr ],
-             ]);
-         } catch (\Throwable $e) {
-             return response()->json(['error' => $e->getMessage()], 422);
-         }
-     }
+                    return [
+                        'default_branch' => $defaultBranch,
+                        'branch' => $branch,
+                        'latest_commits' => $latestCommits,
+                        'top_committers' => $tops,
+                        'recent_pulls' => array_slice($recentPulls, 0, 10),
+                        'pr_activity' => ['by_day' => $byDayArr, 'by_week' => $byWeekArr],
+                        ];
+                }
+            );
+
+            return response()->json($cached);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
 }
