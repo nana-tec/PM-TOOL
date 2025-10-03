@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, Group, Stack, Title, Text, Badge, Loader, Alert, SimpleGrid, Anchor, Select, Tooltip } from '@mantine/core';
 import { IconAlertCircle, IconExternalLink } from '@tabler/icons-react';
 import axios from 'axios';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   BarElement,

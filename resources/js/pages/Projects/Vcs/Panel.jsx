@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, MultiSelect, Accordion, SegmentedControl } from '@mantine/core';
+import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, MultiSelect, Accordion, SegmentedControl, SimpleGrid } from '@mantine/core';
 import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle, IconInfoCircle, IconDownload } from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
@@ -936,7 +936,7 @@ export default function VcsPanel({ projectId }) {
                 </Group>
               </Group>
 
-              <Group align="flex-start" grow>
+              <SimpleGrid cols={{ base: 1, lg: 2, xl: 3 }} spacing="md">
                 {/* Branches & commits */}
                 <Paper withBorder p="sm" radius="sm">
                   <Group gap="sm" justify="space-between" align="center">
@@ -1052,7 +1052,7 @@ export default function VcsPanel({ projectId }) {
                     </Stack>
                   </ScrollArea.Autosize>
                 </Paper>
-              </Group>
+              </SimpleGrid>
             </Stack>
           )}
         </Stack>

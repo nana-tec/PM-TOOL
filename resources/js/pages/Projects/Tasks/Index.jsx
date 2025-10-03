@@ -122,10 +122,10 @@ const TasksIndex = () => {
       <Grid columns={12} gutter={50} mt="xl" className={`${tasksView}-view`}>
         {tasksView === 'vcs' && (
           <>
-            <Grid.Col span={{ base: 12, md: 8 }}>
+            <Grid.Col span={{ base: 12, md: 12 }}>
               <VcsDashboard projectId={project.id} />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 4 }}>
+            <Grid.Col span={{ base: 12, md: 12 }}>
               <VcsPanel projectId={project.id} />
             </Grid.Col>
           </>

@@ -606,7 +606,6 @@ class VcsController extends Controller
             foreach ($byWeek as $w => $vals) { $byWeekArr[] = ['week' => $w, 'opened' => (int)($vals['opened'] ?? 0), 'merged' => (int)($vals['merged'] ?? 0)]; }
 
              return response()->json([
-                'branch' => $branch,
                 'default_branch' => $defaultBranch,
                 'branch' => $branch,
                  'latest_commits' => $latestCommits,
