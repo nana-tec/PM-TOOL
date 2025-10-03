@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, MultiSelect } from '@mantine/core';
+import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, MultiSelect, Accordion, SegmentedControl } from '@mantine/core';
 import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle, IconInfoCircle, IconDownload } from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
+import DiffViewer from '@/components/DiffViewer';
 
 const PROVIDERS = [
   { value: 'github', label: 'GitHub', icon: IconBrandGithub },
@@ -94,6 +95,8 @@ export default function VcsPanel({ projectId }) {
   const [compareFiles, setCompareFiles] = useState([]);
   const [comparePrNumber, setComparePrNumber] = useState('');
   const [loadingCompareFromPr, setLoadingCompareFromPr] = useState(false);
+  const [diffMode, setDiffMode] = useState('unified'); // 'unified' | 'side-by-side'
+  const [expandedFiles, setExpandedFiles] = useState([]); // filenames opened in accordion
 
   // PR statuses
   const [prStatuses, setPrStatuses] = useState([]);
@@ -692,6 +695,7 @@ export default function VcsPanel({ projectId }) {
       const { data } = await axios.post(route('projects.vcs.compare', projectId), { base: compareBase, head: compareHead }, { params: tokenParams() });
       setCompareCommits(data.commits || []);
       setCompareFiles(data.files || []);
+      setExpandedFiles((data.files || []).slice(0, 5).map(f => f.filename)); // open first few by default
       if ((data.commits || []).length === 0 && (!data.files || data.files.length === 0)) {
         showNotification({ color: 'yellow', title: 'No differences', message: 'No commits or file changes found for this comparison.' });
       }
@@ -715,6 +719,7 @@ export default function VcsPanel({ projectId }) {
       setCompareHead(data.head || '');
       setCompareCommits(data.commits || []);
       setCompareFiles(data.files || []);
+      setExpandedFiles((data.files || []).slice(0, 5).map(f => f.filename));
       if (!data.base || !data.head) {
         showNotification({ color: 'yellow', title: 'Missing data', message: 'Could not determine base/head from PR' });
       }
@@ -727,19 +732,37 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  // Merge gating (GitHub: required checks must be success; also not draft)
-  const requiredCheckStates = useMemo(() => {
-    const map = new Map();
-    prStatuses.forEach(s => { map.set(s.context, s.state); });
-    return map;
-  }, [prStatuses]);
+  const expandAllFiles = () => {
+    setExpandedFiles((compareFiles || []).map(f => f.filename));
+  };
+  const collapseAllFiles = () => setExpandedFiles([]);
+  const copyAllPatches = async () => {
+    const patches = (compareFiles || []).map(f => `--- ${f.filename}\n+++ ${f.filename}\n${f.patch || ''}`).join('\n');
+    try {
+      await navigator.clipboard.writeText(patches);
+      showNotification({ color: 'green', title: 'Copied', message: 'All patches copied to clipboard' });
+    } catch (_) {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = patches;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+      showNotification({ color: 'green', title: 'Copied', message: 'All patches copied to clipboard' });
+    }
+  };
 
-  const githubRequiredPassing = useMemo(() => {
-    if (!integration || integration.provider !== 'github') return true;
-    if (prDetails?.draft) return false;
-    if (!requiredChecks || requiredChecks.length === 0) return true;
-    return requiredChecks.every(ctx => (requiredCheckStates.get(ctx) || 'pending') === 'success');
-  }, [integration, prDetails, requiredChecks, requiredCheckStates]);
+  // PR gating (GitHub: required checks must be success; also not draft)
+  const prGating = useMemo(() => {
+    if (!integration || integration.provider !== 'github') return false;
+    if (prDetails?.draft) return true;
+    if (!requiredChecks || requiredChecks.length === 0) return false;
+    return requiredChecks.every(ctx => (prStatuses.find(s => s.context === ctx)?.state || 'pending') === 'success');
+  }, [integration, prDetails, requiredChecks, prStatuses]);
 
   return (
     <Paper withBorder p="md" radius="md">
@@ -1014,8 +1037,8 @@ export default function VcsPanel({ projectId }) {
                   <Select data={[{ value: 'merge', label: 'Merge' }, { value: 'squash', label: 'Squash' }, { value: 'rebase', label: 'Rebase' }]} value={mergeStrategy} onChange={setMergeStrategy} size="xs" w={140} />
                   <Button size="xs" color="green" variant="filled" onClick={() => mergePull(prDetails.number, mergeStrategy)} leftSection={<IconGitMerge size={14} />}>Merge</Button>
                   {integration?.provider === 'github' && (
-                    <Tooltip label={githubRequiredPassing ? 'All required checks are passing' : 'Waiting for required checks to pass'}>
-                      <Button size="xs" variant="outline" color={githubRequiredPassing ? 'green' : 'gray'} disabled={!githubRequiredPassing} onClick={() => mergePull(prDetails.number, mergeStrategy)}>Merge when ready</Button>
+                    <Tooltip label={prGating ? 'All required checks are passing' : 'Waiting for required checks to pass'}>
+                      <Button size="xs" variant="outline" color={prGating ? 'green' : 'gray'} disabled={!prGating} onClick={() => mergePull(prDetails.number, mergeStrategy)}>Merge when ready</Button>
                     </Tooltip>
                   )}
                   {integration?.provider === 'github' && prDetails?.draft && (
@@ -1183,13 +1206,21 @@ export default function VcsPanel({ projectId }) {
             <div style={{ flex: 1 }} />
             <Button onClick={doCompare} loading={compareLoading} disabled={!compareBase.trim() || !compareHead.trim()}>Compare</Button>
           </Group>
+          <Group justify="space-between" align="center">
+            <SegmentedControl size="xs" value={diffMode} onChange={setDiffMode} data={[{ value: 'unified', label: 'Unified' }, { value: 'side-by-side', label: 'Side by side' }]} />
+            <Group>
+              <Button size="xs" variant="light" onClick={expandAllFiles} disabled={!compareFiles || compareFiles.length === 0}>Expand all</Button>
+              <Button size="xs" variant="light" onClick={collapseAllFiles} disabled={expandedFiles.length === 0}>Collapse all</Button>
+              <Button size="xs" variant="light" onClick={copyAllPatches} disabled={!compareFiles || compareFiles.length === 0}>Copy all patches</Button>
+            </Group>
+          </Group>
           {compareLoading ? (
             <Group justify="center" my="md"><Loader size="sm" /></Group>
           ) : (
-            <Group align="flex-start" grow>
+            <Stack>
               <Paper withBorder p="sm" radius="sm">
                 <Text fw={600} mb={6}>Commits</Text>
-                <ScrollArea.Autosize mah={260} type="always" scrollbarSize={8}>
+                <ScrollArea.Autosize mah={200} type="always" scrollbarSize={10}>
                   <Stack gap={6}>
                     {compareCommits.length === 0 && <Text c="dimmed">No commits.</Text>}
                     {compareCommits.map(c => (
@@ -1201,21 +1232,35 @@ export default function VcsPanel({ projectId }) {
                   </Stack>
                 </ScrollArea.Autosize>
               </Paper>
+
               <Paper withBorder p="sm" radius="sm">
                 <Text fw={600} mb={6}>Files</Text>
-                <ScrollArea.Autosize mah={260} type="always" scrollbarSize={8}>
-                  <Stack gap={6}>
-                    {(!compareFiles || compareFiles.length === 0) && <Text c="dimmed">No file list available.</Text>}
-                    {compareFiles.map(f => (
-                      <Group key={f.filename} justify="space-between">
-                        <Text size="sm">{f.filename}</Text>
-                        <Badge size="xs" variant="light">+{f.additions} / -{f.deletions}</Badge>
-                      </Group>
+                {(!compareFiles || compareFiles.length === 0) ? (
+                  <Text c="dimmed">No file changes.</Text>
+                ) : (
+                  <Accordion multiple value={expandedFiles} onChange={setExpandedFiles} styles={{ item: { borderColor: 'var(--mantine-color-dark-5)' } }}>
+                    {compareFiles.map((f) => (
+                      <Accordion.Item key={f.filename} value={f.filename}>
+                        <Accordion.Control>
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="sm">{f.filename}</Text>
+                            <Group gap={6}>
+                              <Badge size="xs" color="green" variant="light">+{f.additions ?? 0}</Badge>
+                              <Badge size="xs" color="red" variant="light">-{f.deletions ?? 0}</Badge>
+                            </Group>
+                          </Group>
+                        </Accordion.Control>
+                        <Accordion.Panel>
+                          <ScrollArea.Autosize mah={360} type="always" scrollbarSize={10}>
+                            <DiffViewer filename={f.filename} patch={f.patch || ''} mode={diffMode} additions={f.additions ?? 0} deletions={f.deletions ?? 0} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${f.filename} copied` })} />
+                          </ScrollArea.Autosize>
+                        </Accordion.Panel>
+                      </Accordion.Item>
                     ))}
-                  </Stack>
-                </ScrollArea.Autosize>
+                  </Accordion>
+                )}
               </Paper>
-            </Group>
+            </Stack>
           )}
           <Group justify="space-between" mt="sm">
             <Group>
