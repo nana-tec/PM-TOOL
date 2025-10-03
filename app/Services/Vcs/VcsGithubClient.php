@@ -197,7 +197,7 @@ class VcsGithubClient implements VcsClientInterface
 
     public function compare(string $base, string $head): array
     {
-        $data = $this->api('GET', '/compare/' . rawurlencode($base) . '...' . rawurlencode($head));
+        $data = $this->api('GET', '/compare/'.rawurlencode($base).'...'.rawurlencode($head));
         $commits = array_map(fn ($c) => [
             'sha' => $c['sha'],
             'message' => $c['commit']['message'] ?? '',
