@@ -17,10 +17,11 @@ LaraCollab, developed with Laravel and React, serves as a project management too
 - Activity page for projects or selected ones.
 - Invoice generation from billable tasks with logged time.
 - Print or download invoices directly from the platform.
-- Dashboard offering project progress, overdue tasks, recently assigned tasks, and recent comments.
+- Dashboard offering project progress, overdue tasks, recently assigned tasks, recent comments, and recent VCS activity (commits, issues, PRs/MRs).
 - Additional reports for daily logged time per user and total logged time.
 - Dark mode support for user preference.
 - Version control integration (GitHub/GitLab): view branches/commits, issues, pull/merge requests, reviews, status checks, and compare changes with inline diffs.
+- Recent VCS activity card on the main dashboard shows the latest commits, issues, and PRs/MRs across your VCS-enabled projects.
 
 ## Screenshots
 
@@ -128,6 +129,21 @@ Troubleshooting
   - Wait for limits to reset or switch to a different token (toggle personal vs project token in the panel).
 - Scrollbars in lists/diffs
   - Scrollbars are always visible in the VCS lists and diff panes for easier mouse interaction. If your OS hides scrollbars, hovering or scrolling should reveal them.
+
+### Caching and rate limits
+
+To avoid hitting provider rate limits, VCS read endpoints are cached on the server for a short time (2–5 minutes). The default TTL is 300 seconds and can be changed via `.env`:
+
+```
+VCS_CACHE_TTL=300
+```
+
+Cache is automatically invalidated when you perform a write (creating/updating issues, posting comments, opening or merging PRs/MRs, changing reviewers, toggling ready-for-review), or when integration settings/tokens change. The main dashboard “Recent VCS activity” card uses the same cached stats endpoint.
+
+Notes:
+
+- Cache keys are scoped per project/provider/repo and per auth mode (project token vs personal token). Personal-token requests are isolated per user.
+- If you configure a self‑hosted GitLab `base_url`, the “Open repo” link uses it unless it points to localhost; otherwise it falls back to `https://gitlab.com`.
 
 ## Setup
 

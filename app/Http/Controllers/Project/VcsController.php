@@ -699,11 +699,28 @@ class VcsController extends Controller
                                     'title' => $p['title'] ?? '',
                                     'state' => $p['state'] ?? 'open',
                                     'url' => $p['url'] ?? null,
+                                    'created_at' => $p['created_at'] ?? null,
                                 ];
                             }
                         }
                     } catch (\Throwable $_) {
                         // provider may not support listing merged separately; ignore
+                    }
+
+                    $recentIssues = [];
+                    try {
+                        $openIssues = $client->listIssues('open', 1, 10)['items'] ?? [];
+                        foreach ($openIssues as $i) {
+                            $recentIssues[] = [
+                                'id' => $i['id'] ?? null,
+                                'title' => $i['title'] ?? '',
+                                'state' => $i['state'] ?? 'open',
+                                'url' => $i['url'] ?? null,
+                                'created_at' => $i['created_at'] ?? null,
+                            ];
+                        }
+                    } catch (\Throwable $_) {
+                        // ignore issues if provider does not support endpoint
                     }
 
                     $byDay = [];
@@ -763,8 +780,9 @@ class VcsController extends Controller
                         'latest_commits' => $latestCommits,
                         'top_committers' => $tops,
                         'recent_pulls' => array_slice($recentPulls, 0, 10),
+                        'recent_issues' => array_slice($recentIssues, 0, 10),
                         'pr_activity' => ['by_day' => $byDayArr, 'by_week' => $byWeekArr],
-                        ];
+                    ];
                 }
             );
 
