@@ -920,9 +920,24 @@ export default function VcsPanel({ projectId }) {
                 <Group gap="xs">
                   {providerIcon && (providerIcon ? <providerIcon size={18} /> : null)}
                   <Text fw={600}>{integration.repo}</Text>
-                  <Anchor href="#" onClick={(e) => { e.preventDefault(); window.open((integration.provider === 'github' ? `https://github.com/${integration.repo}` : `${integration.base_url || 'https://gitlab.com'}/${integration.repo}`), '_blank'); }}>
-                    Open repo <IconExternalLink size={14} style={{ verticalAlign: 'middle' }} />
-                  </Anchor>
+                  {(() => {
+                    const isLocalHost = (u) => {
+                      try {
+                        const x = new URL(u);
+                        return ['localhost', '127.0.0.1', '::1'].includes(x.hostname);
+                      } catch { return true; }
+                    };
+                    const baseDefault = integration.provider === 'github' ? 'https://github.com' : 'https://gitlab.com';
+                    const rawBase = integration.base_url || baseDefault;
+                    const base = isLocalHost(rawBase) ? baseDefault : rawBase;
+                    const repoPath = String(integration.repo || '').replace(/^\/+/, '');
+                    const url = `${base.replace(/\/$/, '')}/${repoPath}`;
+                    return (
+                      <Anchor href={url} target="_blank" rel="noreferrer">
+                        Open repo <IconExternalLink size={14} style={{ verticalAlign: 'middle' }} />
+                      </Anchor>
+                    );
+                  })()}
                 </Group>
                 <Group gap="xs">
                   <Tooltip label="Reload data">
