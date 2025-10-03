@@ -92,6 +92,7 @@ export default function VcsPanel({ projectId }) {
   const [prStatuses, setPrStatuses] = useState([]);
   const [prStatusSha, setPrStatusSha] = useState('');
   const [loadingStatuses, setLoadingStatuses] = useState(false);
+  const [requiredChecks, setRequiredChecks] = useState([]);
 
   // Reviewers picker
   const [reviewers, setReviewers] = useState([]); // [{username, name}]
@@ -425,6 +426,7 @@ export default function VcsPanel({ projectId }) {
       setPrDetails(data.pull);
       await Promise.all([
         fetchPrStatuses(number),
+        fetchRequiredChecks(number),
         fetchPrComments(number, 1),
         fetchReviewers(number, 1),
       ]);
@@ -451,6 +453,27 @@ export default function VcsPanel({ projectId }) {
       showNotification({ color: 'red', title: 'Failed to fetch statuses', message: msg });
     } finally {
       setLoadingStatuses(false);
+    }
+  };
+
+  const fetchRequiredChecks = async (number) => {
+    if (!number) return;
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.required-checks', [projectId, number]), { params: tokenParams() });
+      setRequiredChecks(data.required || []);
+    } catch (e) {
+      // non-fatal; ignore silently
+    }
+  };
+
+  // Lightweight PR details refresh (without comments/reviewers)
+  const refreshPrDetailsOnly = async (number) => {
+    if (!number) return;
+    try {
+      const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), { params: tokenParams() });
+      setPrDetails(data.pull);
+    } catch (_) {
+      // ignore transient errors during polling
     }
   };
 
@@ -627,6 +650,7 @@ export default function VcsPanel({ projectId }) {
       if (stopped) return;
       await Promise.all([
         fetchPrStatuses(number),
+        fetchRequiredChecks(number),
         refreshPrDetailsOnly(number),
       ]);
     };
@@ -929,9 +953,27 @@ export default function VcsPanel({ projectId }) {
             <Stack>
               <Group justify="space-between">
                 <Text fw={600}>Status checks</Text>
-                <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} loading={loadingStatuses} onClick={() => fetchPrStatuses(prDetails.number)}>Refresh statuses</Button>
+                <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} loading={loadingStatuses} onClick={() => { fetchPrStatuses(prDetails.number); fetchRequiredChecks(prDetails.number); }}>Refresh statuses</Button>
               </Group>
               {prStatusSha && <Text size="xs" c="dimmed">Head SHA: {prStatusSha}</Text>}
+              {requiredChecks.length > 0 && (
+                <Stack gap={6}>
+                  <Text size="sm" fw={600}>Required checks</Text>
+                  <Stack>
+                    {requiredChecks.map((ctx) => {
+                      const st = prStatuses.find(s => s.context === ctx);
+                      const state = st?.state || 'pending';
+                      const color = state === 'success' ? 'green' : (state === 'failure' || state === 'error') ? 'red' : state === 'pending' ? 'yellow' : 'gray';
+                      return (
+                        <Group key={ctx} justify="space-between">
+                          <Text size="sm">{ctx}</Text>
+                          <Badge size="xs" color={color}>{state}</Badge>
+                        </Group>
+                      );
+                    })}
+                  </Stack>
+                </Stack>
+              )}
               <Stack>
                 {prStatuses.length === 0 ? (
                   <Text c="dimmed">No statuses.</Text>

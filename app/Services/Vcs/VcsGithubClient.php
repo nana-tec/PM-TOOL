@@ -226,6 +226,23 @@ class VcsGithubClient implements VcsClientInterface
         return ['sha' => $sha, 'statuses' => $statuses];
     }
 
+    /**
+     * Get required status check contexts for a branch (branch protection).
+     * Returns an array of strings (contexts). If not protected or insufficient permissions, returns empty array.
+     */
+    public function getRequiredStatusContexts(string $branch): array
+    {
+        try {
+            $data = $this->api('GET', '/branches/' . rawurlencode($branch) . '/protection/required_status_checks');
+            $contexts = $data['contexts'] ?? [];
+            if (!is_array($contexts)) return [];
+            return array_values(array_unique(array_map('strval', $contexts)));
+        } catch (\Throwable $e) {
+            // Not protected or no permissions
+            return [];
+        }
+    }
+
     public function listIssueComments(int|string $issueId, int $page = 1, int $perPage = 20): array
     {
         [$data, $headers] = $this->request('GET', '/issues/' . urlencode((string) $issueId) . '/comments?per_page=' . $perPage . '&page=' . $page);

@@ -317,6 +317,26 @@ class VcsController extends Controller
         }
     }
 
+    public function pullRequiredChecks(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('view', $project);
+        try {
+            $integration = $this->requireIntegration($project);
+            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            // Get base branch from PR details
+            $pr = $client->getPullRequest($number);
+            $base = $pr['base'] ?? null;
+            $required = [];
+            if ($base && method_exists($client, 'getRequiredStatusContexts')) {
+                /** @var array $required */
+                $required = $client->getRequiredStatusContexts($base);
+            }
+            return response()->json(['required' => array_values($required)]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
     public function issueComments(Project $project, Request $request, int|string $issueId)
     {
         $this->authorize('view', $project);
