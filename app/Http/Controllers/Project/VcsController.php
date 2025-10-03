@@ -20,6 +20,7 @@ class VcsController extends Controller
     private function cacheVersion(Project $project): int
     {
         $key = "vcs:proj:{$project->id}:ver";
+
         return (int) Cache::get($key, 1);
     }
 
@@ -180,11 +181,12 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 30);
             $res = $this->cacheRemember($project, $integration, 'branches', compact('page', 'perPage'), $usingUserToken, function () use ($integration, $token, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listBranches($page, $perPage);
             });
 
@@ -203,9 +205,10 @@ class VcsController extends Controller
             $page = (int) $request->query('page', 1);
             $perPage = (int) $request->query('per_page', 20);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'commits', compact('branch', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $branch, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listCommits($branch, $page, $perPage);
             });
 
@@ -224,9 +227,10 @@ class VcsController extends Controller
             $perPage = (int) $request->query('per_page', 20);
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'issues', compact('state', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $state, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listIssues($state, $page, $perPage);
             });
 
@@ -245,9 +249,10 @@ class VcsController extends Controller
             $perPage = (int) $request->query('per_page', 20);
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'pulls', compact('state', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $state, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listPullRequests($state, $page, $perPage);
             });
 
@@ -263,9 +268,10 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $pr = $this->cacheRemember($project, $integration, 'pull_details', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->getPullRequest($number);
             });
 
@@ -283,9 +289,10 @@ class VcsController extends Controller
             $perPage = (int) $request->query('per_page', 20);
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'pull_comments', compact('number', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $number, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listPullComments($number, $page, $perPage);
             });
 
@@ -338,11 +345,12 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $base = $data['base'];
             $head = $data['head'];
             $res = $this->cacheRemember($project, $integration, 'compare', compact('base', 'head'), $usingUserToken, function () use ($integration, $token, $base, $head) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->compare($base, $head);
             });
 
@@ -360,9 +368,10 @@ class VcsController extends Controller
             $perPage = (int) $request->query('per_page', 50);
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'reviewers', compact('page', 'perPage'), $usingUserToken, function () use ($integration, $token, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listPotentialReviewers($page, $perPage);
             });
 
@@ -396,9 +405,10 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'pull_statuses', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->getPullStatuses($number);
             });
 
@@ -414,7 +424,7 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             // This returns array of contexts; safe to cache quickly
             $res = $this->cacheRemember($project, $integration, 'pull_required_checks', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
                 $client = VcsClientFactory::make($integration, $token);
@@ -426,6 +436,7 @@ class VcsController extends Controller
                     /** @var array $required */
                     $required = $client->getRequiredStatusContexts($base);
                 }
+
                 return ['required' => array_values($required)];
             });
 
@@ -443,9 +454,10 @@ class VcsController extends Controller
             $perPage = (int) $request->query('per_page', 20);
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'issue_comments', compact('issueId', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $issueId, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listIssueComments($issueId, $page, $perPage);
             });
 
@@ -554,9 +566,10 @@ class VcsController extends Controller
         try {
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $pr = $this->cacheRemember($project, $integration, 'pull_details', compact('number'), $usingUserToken, function () use ($integration, $token, $number) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->getPullRequest($number);
             });
             $base = $pr['base'] ?? null;
@@ -566,6 +579,7 @@ class VcsController extends Controller
             }
             $res = $this->cacheRemember($project, $integration, 'compare', compact('base', 'head'), $usingUserToken, function () use ($integration, $token, $base, $head) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->compare($base, $head);
             });
 
@@ -583,9 +597,10 @@ class VcsController extends Controller
             $perPage = (int) $request->query('per_page', 50);
             $integration = $this->requireIntegration($project);
             $token = $this->resolveToken($project, $integration, $request);
-            $usingUserToken = !is_null($token);
+            $usingUserToken = ! is_null($token);
             $res = $this->cacheRemember($project, $integration, 'pull_review_comments', compact('number', 'page', 'perPage'), $usingUserToken, function () use ($integration, $token, $number, $page, $perPage) {
                 $client = VcsClientFactory::make($integration, $token);
+
                 return $client->listPullReviewComments($number, $page, $perPage);
             });
 
@@ -650,6 +665,7 @@ class VcsController extends Controller
                                 break;
                             }
                         }
+
                         return $acc;
                     };
 
