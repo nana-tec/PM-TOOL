@@ -30,6 +30,10 @@ class DropdownValuesController extends Controller
             return $collection->put('mentionProjectUsers', $users->pluck('name'));
         });
 
+        $dropdowns->when($request->has('projects'), function (Collection $collection) {
+            return $collection->put('projects', Project::dropdownValues());
+        });
+
         return response()->json($dropdowns);
     }
 }

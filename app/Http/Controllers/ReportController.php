@@ -16,6 +16,192 @@ use Inertia\Response;
 
 class ReportController extends Controller
 {
+    private function computeTeamMetrics(Request $request): array
+    {
+        Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
+
+        $start = $request->dateRange ? Carbon::parse($request->dateRange[0])->startOfDay() : now()->startOfWeek();
+        $end = $request->dateRange ? Carbon::parse($request->dateRange[1])->endOfDay() : now()->endOfWeek();
+        $days = max(1, $start->diffInDays($end) + 1);
+        $weeks = $days / 7;
+        $weeklyCapacity = (float) ($request->get('weekly_capacity', 40));
+        $capacityHours = $weeklyCapacity * $weeks;
+        $rankBy = in_array($request->get('rank_by'), ['performance', 'availability', 'risk', 'utilization', 'planned', 'actual']) ? $request->get('rank_by') : 'performance';
+
+        $usersQuery = User::query()->withoutRole('client');
+        if ($request->users) {
+            $usersQuery->whereIn('id', $request->users);
+        }
+        $users = $usersQuery->get(['id', 'name', 'avatar']);
+        $userIds = $users->pluck('id');
+
+        $tasksBase = DB::table('tasks')
+            ->whereIn('assigned_to_user_id', $userIds)
+            ->whereNull('tasks.archived_at');
+
+        $pendingCounts = (clone $tasksBase)
+            ->whereNull('tasks.completed_at')
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS pending')
+            ->pluck('pending', 'user_id');
+
+        $overdueCounts = (clone $tasksBase)
+            ->whereNull('tasks.completed_at')
+            ->whereNotNull('tasks.due_on')
+            ->whereDate('tasks.due_on', '<', now()->toDateString())
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS overdue')
+            ->pluck('overdue', 'user_id');
+
+        $completedCounts = (clone $tasksBase)
+            ->whereNotNull('tasks.completed_at')
+            ->whereBetween('tasks.completed_at', [$start, $end])
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS completed')
+            ->pluck('completed', 'user_id');
+
+        $assignedCounts = (clone $tasksBase)
+            ->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS assigned')
+            ->pluck('assigned', 'user_id');
+
+        $windowWorkload = (clone $tasksBase)
+            ->whereNull('tasks.completed_at')
+            ->whereNotNull('tasks.due_on')
+            ->whereBetween('tasks.due_on', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('assigned_to_user_id AS user_id, COALESCE(SUM(COALESCE(tasks.estimation, 0)), 0) AS hours')
+            ->groupBy('assigned_to_user_id')
+            ->pluck('hours', 'user_id');
+
+        $projectsCounts = DB::table('tasks')
+            ->whereIn('assigned_to_user_id', $userIds)
+            ->where(function ($q) use ($start, $end) {
+                $q->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
+                    ->orWhereBetween('tasks.completed_at', [$start, $end]);
+            })
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw('assigned_to_user_id AS user_id, COUNT(DISTINCT project_id) AS projects')
+            ->pluck('projects', 'user_id');
+
+        $timeLogged = DB::table('time_logs')
+            ->join('tasks', 'tasks.id', '=', 'time_logs.task_id')
+            ->whereIn('time_logs.user_id', $userIds)
+            ->whereBetween('time_logs.created_at', [$start, $end])
+            ->groupBy('time_logs.user_id')
+            ->selectRaw('time_logs.user_id AS user_id, SUM(time_logs.minutes)/60 AS hours, COUNT(DISTINCT DATE(time_logs.created_at)) AS active_days')
+            ->get()
+            ->keyBy('user_id');
+
+        $activeDays = $timeLogged->mapWithKeys(fn ($r, $uid) => [$uid => (int) $r->active_days]);
+        $loggedHours = $timeLogged->mapWithKeys(fn ($r, $uid) => [$uid => (float) $r->hours]);
+
+        $firstLogs = DB::table('time_logs')
+            ->selectRaw('task_id, MIN(created_at) AS first_log_at')
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('task_id');
+
+        $latencyRows = DB::table('tasks')
+            ->joinSub($firstLogs, 'first_logs', function ($join) {
+                $join->on('first_logs.task_id', '=', 'tasks.id');
+            })
+            ->whereIn('tasks.assigned_to_user_id', $userIds)
+            ->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
+            ->selectRaw('assigned_to_user_id AS user_id, AVG(TIMESTAMPDIFF(MINUTE, COALESCE(tasks.assigned_at, tasks.created_at), first_logs.first_log_at))/60 AS latency_hours')
+            ->groupBy('assigned_to_user_id')
+            ->pluck('latency_hours', 'user_id');
+
+        $items = $users->map(function ($user) use ($capacityHours, $weeks, $pendingCounts, $overdueCounts, $completedCounts, $assignedCounts, $windowWorkload, $projectsCounts, $activeDays, $loggedHours, $latencyRows, $days) {
+            $pending = (int) ($pendingCounts[$user->id] ?? 0);
+            $overdue = (int) ($overdueCounts[$user->id] ?? 0);
+            $completed = (int) ($completedCounts[$user->id] ?? 0);
+            $assigned = (int) ($assignedCounts[$user->id] ?? 0);
+            $projects = (int) ($projectsCounts[$user->id] ?? 0);
+            $windowHours = (float) ($windowWorkload[$user->id] ?? 0.0);
+            $hoursLogged = (float) ($loggedHours[$user->id] ?? 0.0);
+            $actDays = (int) ($activeDays[$user->id] ?? 0);
+            $idleDays = round(max(0, $days - $actDays), 1);
+            $avgDaily = $actDays > 0 ? round($hoursLogged / $actDays, 2) : 0.0;
+            $throughput = $weeks > 0 ? round($completed / $weeks, 2) : $completed;
+            $completionRate = $assigned > 0 ? round(($completed / $assigned) * 100, 1) : null;
+            $plannedUtil = $capacityHours > 0 ? round(min(100, ($windowHours / $capacityHours) * 100), 1) : null;
+            $actualUtil = $capacityHours > 0 ? round(min(100, ($hoursLogged / $capacityHours) * 100), 1) : null;
+            $availabilityHours = max(0.0, round($capacityHours - $windowHours, 2));
+            $latency = isset($latencyRows[$user->id]) ? round(max(0, (float) $latencyRows[$user->id]), 2) : null; // hours
+
+            $risk = 0.0;
+            $risk += min(40, $overdue * 2.5);
+            if (($plannedUtil ?? 0) >= 100) {
+                $risk += 20;
+            } elseif (($plannedUtil ?? 0) >= 90) {
+                $risk += 10;
+            } elseif (($plannedUtil ?? 0) >= 75) {
+                $risk += 5;
+            }
+            $risk += min(20, ($idleDays / $days) * 20);
+            if (! is_null($completionRate)) {
+                if ($completionRate < 50) {
+                    $risk += 20;
+                } elseif ($completionRate < 70) {
+                    $risk += 10;
+                } elseif ($completionRate < 85) {
+                    $risk += 5;
+                }
+            }
+            $riskScore = round(min(100, $risk), 1);
+
+            return [
+                'user' => ['id' => $user->id, 'name' => $user->name, 'avatar' => $user->avatar],
+                'rank' => 0,
+                'availability_hours' => $availabilityHours,
+                'planned_utilization' => $plannedUtil,
+                'actual_utilization' => $actualUtil,
+                'pending' => $pending,
+                'overdue' => $overdue,
+                'completed' => $completed,
+                'assigned' => $assigned,
+                'projects' => $projects,
+                'time_logged_hours' => round($hoursLogged, 2),
+                'active_days' => $actDays,
+                'idle_days' => $idleDays,
+                'avg_daily_hours' => $avgDaily,
+                'start_latency_hours' => $latency,
+                'throughput_per_week' => $throughput,
+                'completion_rate' => $completionRate,
+                'risk_score' => $riskScore,
+            ];
+        });
+
+        $ranked = match ($rankBy) {
+            'availability' => $items->sortByDesc('availability_hours')->values(),
+            'risk' => $items->sortByDesc('risk_score')->values(),
+            'utilization', 'planned' => $items->sortByDesc(fn ($i) => $i['planned_utilization'] ?? -1)->values(),
+            'actual' => $items->sortByDesc(fn ($i) => $i['actual_utilization'] ?? -1)->values(),
+            default => $items->sortByDesc(function ($i) {
+                return [$i['completion_rate'] ?? -1, $i['throughput_per_week']];
+            })->values(),
+        };
+
+        $ranked = $ranked->map(function ($i, $idx) {
+            $i['rank'] = $idx + 1;
+
+            return $i;
+        });
+
+        return [
+            'items' => $ranked->all(),
+            'meta' => [
+                'start' => $start->toDateString(),
+                'end' => $end->toDateString(),
+                'capacity_hours' => $capacityHours,
+                'weekly_capacity' => $weeklyCapacity,
+                'rank_by' => $rankBy,
+            ],
+            'dropdowns' => ['users' => User::userDropdownValues(['client'])],
+        ];
+    }
+
     public function loggedTimeSum(Request $request): Response
     {
         Gate::allowIf(fn (User $user) => $user->can('view logged time sum report'));
@@ -286,7 +472,7 @@ class ReportController extends Controller
                 'completion_rate' => $completionRate,
                 'throughput_per_week' => $throughput,
             ];
-        })->values();
+        });
 
         // Ranking
         if ($rankBy === 'planned') {
@@ -363,5 +549,54 @@ class ReportController extends Controller
         $tasks = $q->limit(100)->get();
 
         return response()->json(['tasks' => $tasks]);
+    }
+
+    public function teamMetrics(Request $request): Response
+    {
+        $data = $this->computeTeamMetrics($request);
+
+        return Inertia::render('Reports/TeamMetrics', $data);
+    }
+
+    public function teamMetricsJson(Request $request)
+    {
+        $data = $this->computeTeamMetrics($request);
+        $limit = (int) $request->get('limit', 20);
+
+        return response()->json([
+            'items' => collect($data['items'] ?? [])->take($limit)->values(),
+            'meta' => $data['meta'] ?? [],
+        ]);
+    }
+
+    public function suggestAssignees(Request $request)
+    {
+        Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
+
+        $request->validate([
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'dateRange' => ['array'],
+            'weekly_capacity' => ['nullable', 'numeric', 'min:1', 'max:80'],
+        ]);
+
+        $limit = (int) ($request->get('limit', 5));
+
+        // Determine eligible users
+        if ($request->project_id) {
+            $project = Project::findOrFail($request->project_id);
+            $eligible = \App\Services\PermissionService::usersWithAccessToProject($project)->pluck('id');
+        } else {
+            $eligible = User::withoutRole('client')->pluck('id');
+        }
+
+        // Reuse computation but restrict users
+        $req = new Request(array_merge($request->all(), ['users' => $eligible->toArray(), 'rank_by' => 'availability']));
+        $data = $this->computeTeamMetrics($req);
+        $items = collect($data['items'] ?? [])->sortByDesc('availability_hours')->take($limit)->values()->map(function ($i) {
+            return collect($i)->only(['user', 'availability_hours', 'planned_utilization', 'actual_utilization', 'pending', 'overdue', 'projects']);
+        });
+
+        return response()->json(['candidates' => $items]);
     }
 }

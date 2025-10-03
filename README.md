@@ -19,6 +19,7 @@ LaraCollab, developed with Laravel and React, serves as a project management too
 - Print or download invoices directly from the platform.
 - Dashboard offering project progress, overdue tasks, recently assigned tasks, recent comments, and recent VCS activity (commits, issues, PRs/MRs).
 - Additional reports for daily logged time per user and total logged time.
+- Team metrics report: rank members by performance, availability, risk, or utilization; see active/idle days, start latency, throughput, completion, overdue, pending, and more.
 - Dark mode support for user preference.
 - Version control integration (GitHub/GitLab): view branches/commits, issues, pull/merge requests, reviews, status checks, and compare changes with inline diffs.
 - Recent VCS activity card on the main dashboard shows the latest commits, issues, and PRs/MRs across your VCS-enabled projects.
@@ -211,3 +212,35 @@ To use Pusher, sign up, then create a project and copy paste app keys to `.env` 
 - [ ] Write tests.
 - [ ] Optimize frontend and backend.
 - [ ] Consider moving to TypeScript.
+
+## Reports: Team metrics
+
+Analyze your team at a glance and rank members by what matters most to you.
+
+Open: Reports → Team metrics (or navigate to /reports/team-metrics)
+
+Filters and controls
+
+- Date range (default: current week)
+- Weekly capacity (default: 40h)
+- Members filter
+- Rank by: Performance, Availability, Risk, Utilization (Planned), Actual
+- View: Cards or Table
+
+Metrics per member
+
+- Availability hours: remaining free hours (capacity − planned hours due in range)
+- Planned/Actual utilization: percent vs capacity
+- Active/Idle days: days with/without logged time in the period
+- Avg daily hours: average logged hours across active days
+- Start latency: average time from assignment to first time log
+- Throughput per week: completed tasks per week
+- Completion rate: completed/assigned in the period
+- Risk score: composite score of overdue work, high utilization, idle days, and low completion
+- Counts: Pending, Overdue, Completed, Projects worked
+
+Tips
+
+- Choose “Availability” to quickly find who’s free to take new work.
+- Use “Risk” to spot potential overloads or slipping performance early.
+- Switch between Cards and Table for a quick overview or a sortable grid.

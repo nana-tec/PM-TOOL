@@ -124,6 +124,12 @@ export default function Sidebar() {
             active: route().current("reports.team-capacity"),
             visible: can("view team capacity report"),
           },
+          {
+            label: "Team metrics",
+            link: route("reports.team-metrics"),
+            active: route().current("reports.team-metrics"),
+            visible: can("view team capacity report"),
+          },
         ],
       },
       {

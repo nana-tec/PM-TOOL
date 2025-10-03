@@ -7,6 +7,7 @@ import { ProjectCard } from "./Cards/ProjectCard";
 import RecentComments from "./Cards/RecentComments";
 import RecentlyAssignedTasks from "./Cards/RecentlyAssignedTasks";
 import TeamCapacityCard from "./Cards/TeamCapacityCard";
+import TeamInsightsCard from "./Cards/TeamInsights";
 import RecentVcs from "./Cards/RecentVcs";
 import classes from "./css/Index.module.css";
 
@@ -28,6 +29,7 @@ const Dashboard = () => {
         columnClassName={classes.myMasonryGridColumn}
       >
         {teamCapacity && <TeamCapacityCard capacityData={teamCapacity} />}
+        <TeamInsightsCard />
         {projects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}
