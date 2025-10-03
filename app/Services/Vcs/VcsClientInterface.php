@@ -15,11 +15,21 @@ interface VcsClientInterface
     /** @return array{id:int|string, url?:string} */
     public function createIssue(string $title, ?string $body = null): array; // not paginated
 
-    /** @return array{number:int|string, url?:string} */
-    public function openMergeRequest(string $sourceBranch, string $targetBranch, string $title, ?string $body = null): array;
+    /**
+     * Open a PR/MR.
+     * Options may include provider-specific flags like ['draft' => true].
+     *
+     * @return array{number:int|string, url?:string}
+     */
+    public function openMergeRequest(string $sourceBranch, string $targetBranch, string $title, ?string $body = null, array $options = []): array;
 
-    /** @return array{merged:bool, message?:string} */
-    public function mergeRequest(int|string $number): array;
+    /**
+     * Merge a PR/MR.
+     * Provider may support strategies like 'merge' | 'squash' | 'rebase'.
+     *
+     * @return array{merged:bool, message?:string}
+     */
+    public function mergeRequest(int|string $number, ?string $strategy = null): array;
 
     /** @return array{items: array<int, array{number:int|string, title:string, state:string, url?:string}>, has_next: bool} */
     public function listPullRequests(string $state = 'open', int $page = 1, int $perPage = 20): array;
@@ -27,7 +37,7 @@ interface VcsClientInterface
     /** @return array{items: array<int, array{id:int|string, title:string, state:string, url?:string}>, has_next: bool} */
     public function listIssues(string $state = 'open', int $page = 1, int $perPage = 20): array;
 
-    /** @return array{number:int|string, title:string, state:string, mergeable?:bool|null, merged?:bool|null, requested_reviewers?:array, url?:string, base?:string|null, head?:string|null} */
+    /** @return array{number:int|string, title:string, state:string, mergeable?:bool|null, merged?:bool|null, requested_reviewers?:array, url?:string, base?:string|null, head?:string|null, draft?:bool|null} */
     public function getPullRequest(int|string $number): array;
 
     /** @return array{items: array<int, array{id:int|string, user?:string, body:string, created_at:string}>, has_next: bool} */
@@ -50,7 +60,11 @@ interface VcsClientInterface
     /** @return array{status:string, added?:array} */
     public function requestReviewers(int|string $number, array $usernames): array;
 
-    /** @return array{sha?:string, statuses: array<int, array{context:string, state:string, description?:string, url?:string}>} */
+    /**
+     * Returns head SHA and mixed status list (classic statuses + check runs as normalized entries).
+     *
+     * @return array{sha?:string, statuses: array<int, array{context:string, state:string, description?:string, url?:string}>}
+     */
     public function getPullStatuses(int|string $number): array;
 
     /** @return array{items: array<int, array{id:int|string, user?:string, body:string, created_at:string}>, has_next: bool} */

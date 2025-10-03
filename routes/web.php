@@ -66,10 +66,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::post('pulls/{number}/comments', [VcsController::class, 'addPullComment'])->name('pulls.comments.add')->scopeBindings();
             Route::post('pulls/{number}/reviews', [VcsController::class, 'submitReview'])->name('pulls.reviews.submit')->scopeBindings();
             Route::post('compare', [VcsController::class, 'compare'])->name('compare')->scopeBindings();
+            Route::get('compare/pr/{number}', [VcsController::class, 'compareByPr'])->name('compare.by-pr')->scopeBindings();
 
             Route::post('issues', [VcsController::class, 'createIssue'])->name('issues.create')->scopeBindings();
             Route::post('pulls', [VcsController::class, 'openPr'])->name('pulls.open')->scopeBindings();
             Route::post('merge', [VcsController::class, 'merge'])->name('merge')->scopeBindings();
+            Route::post('pulls/{number}/ready-for-review', [VcsController::class, 'readyForReview'])->name('pulls.ready')->scopeBindings();
 
             Route::get('pulls/{number}/reviewers', [VcsController::class, 'listReviewers'])->name('pulls.reviewers')->scopeBindings();
             Route::post('pulls/{number}/reviewers', [VcsController::class, 'addReviewers'])->name('pulls.reviewers.add')->scopeBindings();

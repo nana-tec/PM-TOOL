@@ -8,14 +8,13 @@ use GuzzleHttp\Exception\GuzzleException;
 
 class VcsGitlabClient implements VcsClientInterface
 {
-    public function __construct(private Client $http, private ProjectVcsIntegration $integration, private ?string $token = null)
-    {
-    }
+    public function __construct(private Client $http, private ProjectVcsIntegration $integration, private ?string $token = null) {}
 
     private function baseApi(): string
     {
         $base = $this->integration->base_url ?: 'https://gitlab.com';
-        return rtrim($base, '/') . '/api/v4';
+
+        return rtrim($base, '/').'/api/v4';
     }
 
     private function headers(): array
@@ -29,18 +28,20 @@ class VcsGitlabClient implements VcsClientInterface
     private function request(string $method, string $path, array $options = []): array
     {
         $projectId = rawurlencode($this->integration->repo); // path like group/project
-        $url = $this->baseApi() . '/projects/' . $projectId . $path;
+        $url = $this->baseApi().'/projects/'.$projectId.$path;
         $options['headers'] = ($options['headers'] ?? []) + $this->headers();
         $res = $this->http->request($method, $url, $options);
         $body = (string) $res->getBody();
         $data = $body !== '' ? json_decode($body, true) : [];
         $headers = $res->getHeaders();
+
         return [$data, $headers];
     }
 
     private function hasNextFromHeaders(array $headers): bool
     {
         $next = $headers['X-Next-Page'][0] ?? '';
+
         return is_string($next) && $next !== '';
     }
 
@@ -48,6 +49,7 @@ class VcsGitlabClient implements VcsClientInterface
     {
         try {
             [$data] = $this->request($method, $path, $options);
+
             return $data;
         } catch (GuzzleException $e) {
             throw $e;
@@ -56,14 +58,15 @@ class VcsGitlabClient implements VcsClientInterface
 
     public function listBranches(int $page = 1, int $perPage = 30): array
     {
-        [$data, $headers] = $this->request('GET', '/repository/branches?per_page=' . $perPage . '&page=' . $page);
+        [$data, $headers] = $this->request('GET', '/repository/branches?per_page='.$perPage.'&page='.$page);
         $items = array_map(fn ($b) => ['name' => $b['name'], 'commit_sha' => $b['commit']['id'] ?? null], $data);
+
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
 
     public function listCommits(string $branch, int $page = 1, int $perPage = 20): array
     {
-        [$data, $headers] = $this->request('GET', '/repository/commits?ref_name=' . urlencode($branch) . '&per_page=' . $perPage . '&page=' . $page);
+        [$data, $headers] = $this->request('GET', '/repository/commits?ref_name='.urlencode($branch).'&per_page='.$perPage.'&page='.$page);
         $items = array_map(function ($c) {
             return [
                 'sha' => $c['id'],
@@ -73,6 +76,7 @@ class VcsGitlabClient implements VcsClientInterface
                 'url' => $c['web_url'] ?? null,
             ];
         }, $data);
+
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
 
@@ -80,20 +84,33 @@ class VcsGitlabClient implements VcsClientInterface
     {
         $payload = ['form_params' => array_filter(['title' => $title, 'description' => $body], fn ($v) => $v !== null)];
         $data = $this->api('POST', '/issues', $payload);
+
         return ['id' => $data['iid'] ?? $data['id'] ?? 0, 'url' => $data['web_url'] ?? null];
     }
 
-    public function openMergeRequest(string $sourceBranch, string $targetBranch, string $title, ?string $body = null): array
+    public function openMergeRequest(string $sourceBranch, string $targetBranch, string $title, ?string $body = null, array $options = []): array
     {
         $payload = ['form_params' => ['source_branch' => $sourceBranch, 'target_branch' => $targetBranch, 'title' => $title, 'description' => $body]];
+        // GitLab supports draft via prefix in title (e.g., Draft: ) or WIP. We will use draft option to prefix title.
+        if (! empty($options['draft'])) {
+            if (! str_starts_with(strtolower($title), 'draft:')) {
+                $payload['form_params']['title'] = 'Draft: '.$title;
+            }
+        }
         $data = $this->api('POST', '/merge_requests', $payload);
+
         return ['number' => $data['iid'] ?? 0, 'url' => $data['web_url'] ?? null];
     }
 
-    public function mergeRequest(int|string $number): array
+    public function mergeRequest(int|string $number, ?string $strategy = null): array
     {
-        $data = $this->api('PUT', '/merge_requests/' . urlencode((string) $number) . '/merge', ['form_params' => []]);
+        $form = [];
+        if ($strategy && strtolower($strategy) === 'squash') {
+            $form['squash'] = true;
+        }
+        $data = $this->api('PUT', '/merge_requests/'.urlencode((string) $number).'/merge', ['form_params' => $form]);
         $merged = isset($data['merged']) ? (bool) $data['merged'] : (($data['state'] ?? '') === 'merged');
+
         return ['merged' => $merged, 'message' => $data['message'] ?? null];
     }
 
@@ -105,8 +122,9 @@ class VcsGitlabClient implements VcsClientInterface
             'merged' => 'merged',
             default => 'opened',
         };
-        [$data, $headers] = $this->request('GET', '/merge_requests?state=' . urlencode($gitlabState) . '&per_page=' . $perPage . '&page=' . $page);
+        [$data, $headers] = $this->request('GET', '/merge_requests?state='.urlencode($gitlabState).'&per_page='.$perPage.'&page='.$page);
         $items = array_map(fn ($m) => ['number' => $m['iid'], 'title' => $m['title'], 'state' => $m['state'], 'url' => $m['web_url'] ?? null], $data);
+
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
 
@@ -117,14 +135,16 @@ class VcsGitlabClient implements VcsClientInterface
             'closed' => 'closed',
             default => 'opened',
         };
-        [$data, $headers] = $this->request('GET', '/issues?state=' . urlencode($gitlabState) . '&per_page=' . $perPage . '&page=' . $page);
+        [$data, $headers] = $this->request('GET', '/issues?state='.urlencode($gitlabState).'&per_page='.$perPage.'&page='.$page);
         $items = array_map(fn ($i) => ['id' => $i['iid'] ?? $i['id'] ?? 0, 'title' => $i['title'], 'state' => $i['state'], 'url' => $i['web_url'] ?? null], $data);
+
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
 
     public function getPullRequest(int|string $number): array
     {
-        $m = $this->api('GET', '/merge_requests/' . urlencode((string) $number));
+        $m = $this->api('GET', '/merge_requests/'.urlencode((string) $number));
+
         return [
             'number' => $m['iid'],
             'title' => $m['title'],
@@ -135,24 +155,27 @@ class VcsGitlabClient implements VcsClientInterface
             'url' => $m['web_url'] ?? null,
             'base' => $m['target_branch'] ?? null,
             'head' => $m['source_branch'] ?? null,
+            'draft' => null,
         ];
     }
 
     public function listPullComments(int|string $number, int $page = 1, int $perPage = 20): array
     {
-        [$data, $headers] = $this->request('GET', '/merge_requests/' . urlencode((string) $number) . '/notes?per_page=' . $perPage . '&page=' . $page);
+        [$data, $headers] = $this->request('GET', '/merge_requests/'.urlencode((string) $number).'/notes?per_page='.$perPage.'&page='.$page);
         $items = array_map(fn ($n) => [
             'id' => $n['id'],
             'user' => $n['author']['username'] ?? null,
             'body' => $n['body'] ?? '',
             'created_at' => $n['created_at'] ?? '',
         ], $data);
+
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
 
     public function createPullComment(int|string $number, string $body): array
     {
-        $data = $this->api('POST', '/merge_requests/' . urlencode((string) $number) . '/notes', ['form_params' => ['body' => $body]]);
+        $data = $this->api('POST', '/merge_requests/'.urlencode((string) $number).'/notes', ['form_params' => ['body' => $body]]);
+
         return ['id' => $data['id'] ?? 0, 'url' => $data['web_url'] ?? null];
     }
 
@@ -160,24 +183,27 @@ class VcsGitlabClient implements VcsClientInterface
     {
         $event = strtoupper($event);
         if ($event === 'APPROVE') {
-            $this->api('POST', '/merge_requests/' . urlencode((string) $number) . '/approve', ['form_params' => []]);
+            $this->api('POST', '/merge_requests/'.urlencode((string) $number).'/approve', ['form_params' => []]);
+
             return ['status' => 'ok'];
         }
         // GitLab has no direct REQUEST_CHANGES; add a note
         $this->createPullComment($number, $body ?: ($event === 'REQUEST_CHANGES' ? 'Requesting changes.' : 'Comment'));
+
         return ['status' => 'ok'];
     }
 
     public function compare(string $base, string $head): array
     {
         // GitLab uses from (base) and to (head)
-        [$data] = $this->request('GET', '/repository/compare?from=' . rawurlencode($base) . '&to=' . rawurlencode($head));
+        [$data] = $this->request('GET', '/repository/compare?from='.rawurlencode($base).'&to='.rawurlencode($head));
         $commits = array_map(fn ($c) => [
             'sha' => $c['id'],
             'message' => $c['title'] ?? ($c['message'] ?? ''),
             'author' => $c['author_name'] ?? null,
             'date' => $c['created_at'] ?? null,
         ], $data['commits'] ?? []);
+
         // GitLab compare API may include diffs elsewhere; omit files if not present
         return ['commits' => $commits];
     }
@@ -185,14 +211,16 @@ class VcsGitlabClient implements VcsClientInterface
     public function getRepositoryUrl(): string
     {
         $base = $this->integration->base_url ?: 'https://gitlab.com';
-        return rtrim($base, '/') . '/' . $this->integration->repo;
+
+        return rtrim($base, '/').'/'.$this->integration->repo;
     }
 
     public function listPotentialReviewers(int $page = 1, int $perPage = 50): array
     {
         try {
-            [$data, $headers] = $this->request('GET', '/members/all?per_page=' . $perPage . '&page=' . $page);
+            [$data, $headers] = $this->request('GET', '/members/all?per_page='.$perPage.'&page='.$page);
             $items = array_map(fn ($u) => ['username' => $u['username'], 'name' => $u['name'] ?? null], $data);
+
             return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
         } catch (GuzzleException $e) {
             throw $e;
@@ -211,17 +239,18 @@ class VcsGitlabClient implements VcsClientInterface
             }
         }
         // Update MR reviewers (GitLab supports reviewers as array of user IDs)
-        $this->api('PUT', '/merge_requests/' . urlencode((string) $number), ['form_params' => ['reviewer_ids' => $ids]]);
+        $this->api('PUT', '/merge_requests/'.urlencode((string) $number), ['form_params' => ['reviewer_ids' => $ids]]);
+
         return ['status' => 'ok', 'added' => $usernames];
     }
 
     public function getPullStatuses(int|string $number): array
     {
-        $mr = $this->api('GET', '/merge_requests/' . urlencode((string) $number));
+        $mr = $this->api('GET', '/merge_requests/'.urlencode((string) $number));
         $sha = $mr['sha'] ?? ($mr['diff_refs']['head_sha'] ?? null);
         $statuses = [];
         if ($sha) {
-            [$data] = $this->request('GET', '/repository/commits/' . urlencode($sha) . '/statuses');
+            [$data] = $this->request('GET', '/repository/commits/'.urlencode($sha).'/statuses');
             foreach ($data as $s) {
                 $statuses[] = [
                     'context' => $s['name'] ?? 'status',
@@ -231,24 +260,27 @@ class VcsGitlabClient implements VcsClientInterface
                 ];
             }
         }
+
         return ['sha' => $sha, 'statuses' => $statuses];
     }
 
     public function listIssueComments(int|string $issueId, int $page = 1, int $perPage = 20): array
     {
-        [$data, $headers] = $this->request('GET', '/issues/' . urlencode((string) $issueId) . '/notes?per_page=' . $perPage . '&page=' . $page);
+        [$data, $headers] = $this->request('GET', '/issues/'.urlencode((string) $issueId).'/notes?per_page='.$perPage.'&page='.$page);
         $items = array_map(fn ($n) => [
             'id' => $n['id'],
             'user' => $n['author']['username'] ?? null,
             'body' => $n['body'] ?? '',
             'created_at' => $n['created_at'] ?? '',
         ], $data);
+
         return ['items' => $items, 'has_next' => $this->hasNextFromHeaders($headers)];
     }
 
     public function createIssueComment(int|string $issueId, string $body): array
     {
-        $data = $this->api('POST', '/issues/' . urlencode((string) $issueId) . '/notes', ['form_params' => ['body' => $body]]);
+        $data = $this->api('POST', '/issues/'.urlencode((string) $issueId).'/notes', ['form_params' => ['body' => $body]]);
+
         return ['id' => $data['id'] ?? 0, 'url' => $data['web_url'] ?? null];
     }
 }

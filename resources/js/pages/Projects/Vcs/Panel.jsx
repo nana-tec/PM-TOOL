@@ -66,7 +66,11 @@ export default function VcsPanel({ projectId }) {
   const [prTarget, setPrTarget] = useState('');
   const [prTitle, setPrTitle] = useState('');
   const [prBody, setPrBody] = useState('');
+  const [prDraft, setPrDraft] = useState(false);
   const [creatingPr, setCreatingPr] = useState(false);
+
+  // Merge options
+  const [mergeStrategy, setMergeStrategy] = useState('merge'); // merge|squash|rebase (provider-dependent)
 
   // PR details modal
   const [prDetailsOpen, setPrDetailsOpen] = useState(false);
@@ -79,6 +83,7 @@ export default function VcsPanel({ projectId }) {
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [markingReady, setMarkingReady] = useState(false);
 
   // Compare modal
   const [compareOpen, setCompareOpen] = useState(false);
@@ -87,6 +92,8 @@ export default function VcsPanel({ projectId }) {
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareCommits, setCompareCommits] = useState([]);
   const [compareFiles, setCompareFiles] = useState([]);
+  const [comparePrNumber, setComparePrNumber] = useState('');
+  const [loadingCompareFromPr, setLoadingCompareFromPr] = useState(false);
 
   // PR statuses
   const [prStatuses, setPrStatuses] = useState([]);
@@ -379,12 +386,13 @@ export default function VcsPanel({ projectId }) {
     setCreatingPr(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.pulls.open', projectId), { source_branch: prSource, target_branch: prTarget, title: prTitle, body: prBody || null }, { params: tokenParams() });
+      await axios.post(route('projects.vcs.pulls.open', projectId), { source_branch: prSource, target_branch: prTarget, title: prTitle, body: prBody || null, draft: provider === 'github' ? !!prDraft : undefined }, { params: tokenParams() });
       setPrOpen(false);
       setPrSource('');
       setPrTarget('');
       setPrTitle('');
       setPrBody('');
+      setPrDraft(false);
       await fetchPulls(pullsState, 1);
       notifySuccess('Request opened', `${integration.provider === 'github' ? 'Pull request' : 'Merge request'} opened`);
     } catch (e) {
@@ -396,17 +404,33 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const mergePull = async (number) => {
+  const mergePull = async (number, strategy = mergeStrategy) => {
     if (!number) return;
     setError('');
     try {
-      await axios.post(route('projects.vcs.merge', projectId), { number }, { params: tokenParams() });
+      await axios.post(route('projects.vcs.merge', projectId), { number, strategy: strategy || null }, { params: tokenParams() });
       await fetchPulls(pullsState, 1);
       notifySuccess('Merged', 'Request merged successfully');
     } catch (e) {
       const msg = parseApiError(e, 'Merge failed');
       setError(msg);
       notifyError('Merge failed', msg);
+    }
+  };
+
+  const markReadyForReview = async (number) => {
+    if (!number) return;
+    setMarkingReady(true);
+    try {
+      await axios.post(route('projects.vcs.pulls.ready', [projectId, number]), {}, { params: tokenParams() });
+      await openPrDetails(number);
+      showNotification({ color: 'green', title: 'Ready for review', message: 'PR marked as ready' });
+    } catch (e) {
+      const msg = parseApiError(e, 'Failed to mark ready');
+      setError(msg);
+      showNotification({ color: 'red', title: 'Failed to mark ready', message: msg });
+    } finally {
+      setMarkingReady(false);
     }
   };
 
@@ -680,6 +704,43 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
+  const loadCompareFromPr = async () => {
+    const num = String(comparePrNumber || '').trim();
+    if (!num) return;
+    setLoadingCompareFromPr(true);
+    setError('');
+    try {
+      const { data } = await axios.get(route('projects.vcs.compare.by-pr', [projectId, num]), { params: tokenParams() });
+      setCompareBase(data.base || '');
+      setCompareHead(data.head || '');
+      setCompareCommits(data.commits || []);
+      setCompareFiles(data.files || []);
+      if (!data.base || !data.head) {
+        showNotification({ color: 'yellow', title: 'Missing data', message: 'Could not determine base/head from PR' });
+      }
+    } catch (e) {
+      const msg = e?.response?.data?.error || e.message;
+      setError(msg);
+      showNotification({ color: 'red', title: 'Compare by PR failed', message: msg });
+    } finally {
+      setLoadingCompareFromPr(false);
+    }
+  };
+
+  // Merge gating (GitHub: required checks must be success; also not draft)
+  const requiredCheckStates = useMemo(() => {
+    const map = new Map();
+    prStatuses.forEach(s => { map.set(s.context, s.state); });
+    return map;
+  }, [prStatuses]);
+
+  const githubRequiredPassing = useMemo(() => {
+    if (!integration || integration.provider !== 'github') return true;
+    if (prDetails?.draft) return false;
+    if (!requiredChecks || requiredChecks.length === 0) return true;
+    return requiredChecks.every(ctx => (requiredCheckStates.get(ctx) || 'pending') === 'success');
+  }, [integration, prDetails, requiredChecks, requiredCheckStates]);
+
   return (
     <Paper withBorder p="md" radius="md">
       <Group justify="space-between" mb="sm">
@@ -767,7 +828,7 @@ export default function VcsPanel({ projectId }) {
                       <IconRefresh size={16} />
                     </ActionIcon>
                   </Tooltip>
-                  <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => { setPrSource(selectedBranch || ''); setPrTarget(defaultBranch || 'main'); setPrTitle(''); setPrBody(''); setPrOpen(true); }}>
+                  <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => { setPrSource(selectedBranch || ''); setPrTarget(defaultBranch || 'main'); setPrTitle(''); setPrBody(''); setPrDraft(false); setPrOpen(true); }}>
                     Open {integration.provider === 'github' ? 'PR' : 'MR'}
                   </Button>
                 </Group>
@@ -799,7 +860,7 @@ export default function VcsPanel({ projectId }) {
                     )}
                   </Group>
                   <Divider my="xs" />
-                  <ScrollArea.Autosize mah={240} type="scroll">
+                  <ScrollArea.Autosize mah={240} type="always" scrollbarSize={8}>
                     <Stack gap="xs">
                       {commits.map((c) => (
                         <Group key={c.sha} gap="xs" align="flex-start" wrap="nowrap">
@@ -831,7 +892,7 @@ export default function VcsPanel({ projectId }) {
                     <Select value={issuesState} onChange={(v) => { setIssuesState(v); fetchIssues(v, 1); }} data={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }]} style={{ width: 120 }} />
                   </Group>
                   <Divider my="xs" />
-                  <ScrollArea.Autosize mah={240} type="scroll">
+                  <ScrollArea.Autosize mah={240} type="always" scrollbarSize={8}>
                     <Stack gap={8}>
                       {issues.map((i) => (
                         <Group key={i.id} gap="xs" wrap="nowrap" justify="space-between">
@@ -864,7 +925,7 @@ export default function VcsPanel({ projectId }) {
                     <Select value={pullsState} onChange={(v) => { setPullsState(v); fetchPulls(v, 1); }} data={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'merged', label: 'Merged' }]} style={{ width: 140 }} />
                   </Group>
                   <Divider my="xs" />
-                  <ScrollArea.Autosize mah={240} type="scroll">
+                  <ScrollArea.Autosize mah={240} type="always" scrollbarSize={8}>
                     <Stack gap={8}>
                       {pulls.map((p) => (
                         <Group key={p.number} gap="xs" wrap="nowrap" justify="space-between" align="center">
@@ -875,7 +936,7 @@ export default function VcsPanel({ projectId }) {
                           <Group gap="xs">
                             <Button size="xs" variant="light" onClick={() => openPrDetails(p.number)}>Details</Button>
                             {(pullsState === 'open' || p.state === 'open' || p.state === 'opened') && (
-                              <Tooltip label="Merge now">
+                              <Tooltip label="Merge now (strategy below)">
                                 <ActionIcon variant="light" color="green" onClick={() => mergePull(p.number)}><IconGitMerge size={16} /></ActionIcon>
                               </Tooltip>
                             )}
@@ -913,6 +974,9 @@ export default function VcsPanel({ projectId }) {
           <Select label="Target branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prTarget} onChange={setPrTarget} placeholder={defaultBranch || 'main'} />
           <TextInput label="Title" value={prTitle} onChange={(e) => setPrTitle(e.target.value)} required />
           <Textarea label="Description" value={prBody} onChange={(e) => setPrBody(e.target.value)} minRows={4} autosize />
+          {integration?.provider === 'github' && (
+            <Switch checked={prDraft} onChange={(e) => setPrDraft(e.currentTarget.checked)} label="Create as draft" />
+          )}
           <Group justify="flex-end">
             <Button onClick={openPr} loading={creatingPr} disabled={!prSource?.trim() || !prTarget?.trim() || !prTitle?.trim()}>Open {integration?.provider === 'github' ? 'PR' : 'MR'}</Button>
           </Group>
@@ -925,26 +989,40 @@ export default function VcsPanel({ projectId }) {
           <Group justify="center" my="md"><Loader size="sm" /></Group>
         ) : (
           <Stack>
-            <Group justify="space-between">
+            <Group justify="space-between" align="flex-start">
               <Stack gap={2}>
                 <Text fw={600}>{prDetails.title}</Text>
                 <Group gap={6}>
-                  <Badge size="xs" variant="light" color={prDetails.state === 'open' || prDetails.state === 'opened' ? 'green' : prDetails.state === 'merged' ? 'blue' : 'gray'}>{prDetails.state}</Badge>
+                  <Badge size="xs" variant="light" color={prDetails.state === 'open' || prDetails.state === 'opened' ? 'green' : prDetails.state === 'merged' ? 'blue' : 'gray'}>{prDetails.state}{prDetails.draft ? ' (draft)' : ''}</Badge>
                   {prDetails.mergeable !== null && (
                     <Badge size="xs" variant="light" color={prDetails.mergeable ? 'green' : 'red'}>{prDetails.mergeable ? 'Mergeable' : 'Not mergeable'}</Badge>
                   )}
                   {prDetails.url && <Anchor href={prDetails.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
                 </Group>
               </Stack>
-              <Group gap="xs">
-                <Button size="xs" variant="light" onClick={() => { setCompareBase(prDetails.base || ''); setCompareHead(prDetails.head || ''); setCompareOpen(true); }}>Compare</Button>
-                <Tooltip label="Approve">
-                  <Button size="xs" color="green" variant="light" loading={submittingReview} onClick={() => submitReview('APPROVE')}>Approve</Button>
-                </Tooltip>
-                <Tooltip label="Request changes">
-                  <Button size="xs" color="red" variant="light" loading={submittingReview} onClick={() => submitReview('REQUEST_CHANGES')}>Request changes</Button>
-                </Tooltip>
-              </Group>
+              <Stack gap={6} align="flex-end">
+                <Group gap="xs">
+                  <Button size="xs" variant="light" onClick={() => { setCompareBase(prDetails.base || ''); setCompareHead(prDetails.head || ''); setCompareOpen(true); }}>Compare</Button>
+                  <Tooltip label="Approve">
+                    <Button size="xs" color="green" variant="light" loading={submittingReview} onClick={() => submitReview('APPROVE')}>Approve</Button>
+                  </Tooltip>
+                  <Tooltip label="Request changes">
+                    <Button size="xs" color="red" variant="light" loading={submittingReview} onClick={() => submitReview('REQUEST_CHANGES')}>Request changes</Button>
+                  </Tooltip>
+                </Group>
+                <Group gap="xs" align="center">
+                  <Select data={[{ value: 'merge', label: 'Merge' }, { value: 'squash', label: 'Squash' }, { value: 'rebase', label: 'Rebase' }]} value={mergeStrategy} onChange={setMergeStrategy} size="xs" w={140} />
+                  <Button size="xs" color="green" variant="filled" onClick={() => mergePull(prDetails.number, mergeStrategy)} leftSection={<IconGitMerge size={14} />}>Merge</Button>
+                  {integration?.provider === 'github' && (
+                    <Tooltip label={githubRequiredPassing ? 'All required checks are passing' : 'Waiting for required checks to pass'}>
+                      <Button size="xs" variant="outline" color={githubRequiredPassing ? 'green' : 'gray'} disabled={!githubRequiredPassing} onClick={() => mergePull(prDetails.number, mergeStrategy)}>Merge when ready</Button>
+                    </Tooltip>
+                  )}
+                  {integration?.provider === 'github' && prDetails?.draft && (
+                    <Button size="xs" variant="light" onClick={() => markReadyForReview(prDetails.number)} loading={markingReady}>Mark ready for review</Button>
+                  )}
+                </Group>
+              </Stack>
             </Group>
 
             <Divider />
@@ -1099,7 +1177,10 @@ export default function VcsPanel({ projectId }) {
             <TextInput label="Base" placeholder="target branch or owner:branch" value={compareBase} onChange={(e) => setCompareBase(e.target.value)} />
             <TextInput label="Head" placeholder="source branch or owner:branch" value={compareHead} onChange={(e) => setCompareHead(e.target.value)} />
           </Group>
-          <Group justify="flex-end">
+          <Group gap="xs" align="flex-end">
+            <TextInput label="PR number" placeholder="e.g. 123" value={comparePrNumber} onChange={(e) => setComparePrNumber(e.target.value)} style={{ width: 140 }} />
+            <Button variant="light" onClick={loadCompareFromPr} loading={loadingCompareFromPr} disabled={!String(comparePrNumber || '').trim()}>Load from PR</Button>
+            <div style={{ flex: 1 }} />
             <Button onClick={doCompare} loading={compareLoading} disabled={!compareBase.trim() || !compareHead.trim()}>Compare</Button>
           </Group>
           {compareLoading ? (
@@ -1108,7 +1189,7 @@ export default function VcsPanel({ projectId }) {
             <Group align="flex-start" grow>
               <Paper withBorder p="sm" radius="sm">
                 <Text fw={600} mb={6}>Commits</Text>
-                <ScrollArea.Autosize mah={260} type="scroll">
+                <ScrollArea.Autosize mah={260} type="always" scrollbarSize={8}>
                   <Stack gap={6}>
                     {compareCommits.length === 0 && <Text c="dimmed">No commits.</Text>}
                     {compareCommits.map(c => (
@@ -1122,7 +1203,7 @@ export default function VcsPanel({ projectId }) {
               </Paper>
               <Paper withBorder p="sm" radius="sm">
                 <Text fw={600} mb={6}>Files</Text>
-                <ScrollArea.Autosize mah={260} type="scroll">
+                <ScrollArea.Autosize mah={260} type="always" scrollbarSize={8}>
                   <Stack gap={6}>
                     {(!compareFiles || compareFiles.length === 0) && <Text c="dimmed">No file list available.</Text>}
                     {compareFiles.map(f => (

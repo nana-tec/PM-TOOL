@@ -15,10 +15,11 @@ class VcsClientFactory
             'timeout' => 15,
         ]);
         $token = $overrideToken ?: $integration->token;
+
         return match ($provider) {
             'github' => new VcsGithubClient($http, $integration, $token),
             'gitlab' => new VcsGitlabClient($http, $integration, $token),
-            default => throw new InvalidArgumentException('Unsupported VCS provider: ' . $integration->provider),
+            default => throw new InvalidArgumentException('Unsupported VCS provider: '.$integration->provider),
         };
     }
 }

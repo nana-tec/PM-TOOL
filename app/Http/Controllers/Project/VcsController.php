@@ -331,6 +331,7 @@ class VcsController extends Controller
                 /** @var array $required */
                 $required = $client->getRequiredStatusContexts($base);
             }
+
             return response()->json(['required' => array_values($required)]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -377,6 +378,7 @@ class VcsController extends Controller
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
             $issue = $client->createIssue($data['title'], $data['body'] ?? null);
+
             return response()->json(['issue' => $issue]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -391,10 +393,12 @@ class VcsController extends Controller
             'target_branch' => 'required|string',
             'title' => 'required|string|min:1',
             'body' => 'nullable|string',
+            'draft' => 'sometimes|boolean',
         ]);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $pr = $client->openMergeRequest($data['source_branch'], $data['target_branch'], $data['title'], $data['body'] ?? null);
+            $pr = $client->openMergeRequest($data['source_branch'], $data['target_branch'], $data['title'], $data['body'] ?? null, ['draft' => (bool) ($data['draft'] ?? false)]);
+
             return response()->json(['pull' => $pr]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -406,11 +410,52 @@ class VcsController extends Controller
         $this->authorize('update', $project);
         $data = $request->validate([
             'number' => 'required',
+            'strategy' => 'sometimes|nullable|string|in:merge,squash,rebase',
         ]);
         try {
             $client = VcsClientFactory::make($this->requireIntegration($project), $this->resolveToken($project, $this->requireIntegration($project), $request));
-            $res = $client->mergeRequest($data['number']);
+            $res = $client->mergeRequest($data['number'], $data['strategy'] ?? null);
+
             return response()->json($res);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function readyForReview(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('update', $project);
+        try {
+            $integration = $this->requireIntegration($project);
+            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            if (method_exists($client, 'markReadyForReview')) {
+                /** @var array $res */
+                $res = $client->markReadyForReview($number);
+
+                return response()->json($res);
+            }
+
+            return response()->json(['status' => 'noop']);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function compareByPr(Project $project, Request $request, int|string $number)
+    {
+        $this->authorize('view', $project);
+        try {
+            $integration = $this->requireIntegration($project);
+            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            $pr = $client->getPullRequest($number);
+            $base = $pr['base'] ?? null;
+            $head = $pr['head'] ?? null;
+            if (! $base || ! $head) {
+                abort(422, 'PR does not have base/head information');
+            }
+            $res = $client->compare($base, $head);
+
+            return response()->json($res + ['base' => $base, 'head' => $head]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
