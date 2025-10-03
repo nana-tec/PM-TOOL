@@ -498,10 +498,10 @@ class VcsController extends Controller
             $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
             $defaultBranch = $integration->default_branch ?: 'main';
             $branch = (string) ($request->query('branch') ?: $defaultBranch);
-             $maxPages = (int) $request->query('pages', 5); // fetch up to ~5 pages of commits
-             $perPage = (int) $request->query('per_page', 50);
+            $maxPages = (int) $request->query('pages', 5); // fetch up to ~5 pages of commits
+            $perPage = (int) $request->query('per_page', 50);
 
-             $fetchCommits = function (string $ref) use ($client, $maxPages, $perPage) {
+            $fetchCommits = function (string $ref) use ($client, $maxPages, $perPage) {
                 $acc = [];
                 for ($page = 1; $page <= max(1, $maxPages); $page++) {
                     $res = $client->listCommits($ref, $page, $perPage);
@@ -515,60 +515,67 @@ class VcsController extends Controller
                             'url' => $c['url'] ?? null,
                         ];
                     }
-                    if (($res['has_next'] ?? false) === false) break;
+                    if (($res['has_next'] ?? false) === false) {
+                        break;
+                    }
                 }
+
                 return $acc;
             };
 
             $allCommits = $fetchCommits($branch);
             $allCommitsDefault = ($branch === $defaultBranch) ? $allCommits : $fetchCommits($defaultBranch);
 
-             // latest commits (most recent first as returned by provider)
-             $latestCommits = array_slice($allCommits, 0, 10);
+            // latest commits (most recent first as returned by provider)
+            $latestCommits = array_slice($allCommits, 0, 10);
 
-             // Top committers by windows (week, month, year)
-             $now = now();
-             $windows = [
-                 'week' => $now->copy()->startOfWeek(),
-                 'month' => $now->copy()->startOfMonth(),
-                 'year' => $now->copy()->startOfYear(),
-             ];
-             $tops = [ 'week' => [], 'month' => [], 'year' => [] ];
+            // Top committers by windows (week, month, year)
+            $now = now();
+            $windows = [
+                'week' => $now->copy()->startOfWeek(),
+                'month' => $now->copy()->startOfMonth(),
+                'year' => $now->copy()->startOfYear(),
+            ];
+            $tops = ['week' => [], 'month' => [], 'year' => []];
 
-             foreach ($windows as $key => $start) {
-                 $counts = [];
+            foreach ($windows as $key => $start) {
+                $counts = [];
                 foreach ($allCommitsDefault as $c) {
-                     if (empty($c['date'])) continue;
-                     $dt = \Illuminate\Support\Carbon::parse($c['date']);
-                     if ($dt->lt($start)) continue;
-                     $author = $c['author'] ?: 'Unknown';
-                     $counts[$author] = ($counts[$author] ?? 0) + 1;
-                 }
-                 arsort($counts);
-                 $tops[$key] = array_map(function ($name, $count) {
-                     return ['name' => $name, 'count' => $count];
-                 }, array_keys($counts), array_values($counts));
-                 $tops[$key] = array_slice($tops[$key], 0, 10);
-             }
+                    if (empty($c['date'])) {
+                        continue;
+                    }
+                    $dt = \Illuminate\Support\Carbon::parse($c['date']);
+                    if ($dt->lt($start)) {
+                        continue;
+                    }
+                    $author = $c['author'] ?: 'Unknown';
+                    $counts[$author] = ($counts[$author] ?? 0) + 1;
+                }
+                arsort($counts);
+                $tops[$key] = array_map(function ($name, $count) {
+                    return ['name' => $name, 'count' => $count];
+                }, array_keys($counts), array_values($counts));
+                $tops[$key] = array_slice($tops[$key], 0, 10);
+            }
 
-             // Recent PRs: take first page of open + merged for a quick view
-             $recentPulls = [];
-             try {
-                 $open = $client->listPullRequests('open', 1, 10)['items'] ?? [];
-                 $merged = $client->listPullRequests('merged', 1, 10)['items'] ?? [];
-                 foreach ([$open, $merged] as $list) {
-                     foreach ($list as $p) {
-                         $recentPulls[] = [
-                             'number' => $p['number'] ?? null,
-                             'title' => $p['title'] ?? '',
-                             'state' => $p['state'] ?? 'open',
-                             'url' => $p['url'] ?? null,
-                         ];
-                     }
-                 }
-             } catch (\Throwable $_) {
-                 // provider may not support listing merged separately; ignore
-             }
+            // Recent PRs: take first page of open + merged for a quick view
+            $recentPulls = [];
+            try {
+                $open = $client->listPullRequests('open', 1, 10)['items'] ?? [];
+                $merged = $client->listPullRequests('merged', 1, 10)['items'] ?? [];
+                foreach ([$open, $merged] as $list) {
+                    foreach ($list as $p) {
+                        $recentPulls[] = [
+                            'number' => $p['number'] ?? null,
+                            'title' => $p['title'] ?? '',
+                            'state' => $p['state'] ?? 'open',
+                            'url' => $p['url'] ?? null,
+                        ];
+                    }
+                }
+            } catch (\Throwable $_) {
+                // provider may not support listing merged separately; ignore
+            }
 
             // PR activity (best-effort): group opened/merged counts by day and by ISO week
             $byDay = [];
@@ -576,10 +583,14 @@ class VcsController extends Controller
             try {
                 $sample = array_slice($recentPulls, 0, 20);
                 foreach ($sample as $rp) {
-                    if (!isset($rp['number'])) continue;
+                    if (! isset($rp['number'])) {
+                        continue;
+                    }
                     try {
                         $pr = $client->getPullRequest($rp['number']);
-                    } catch (\Throwable $_e) { continue; }
+                    } catch (\Throwable $_e) {
+                        continue;
+                    }
                     $created = $pr['created_at'] ?? null;
                     $mergedAt = $pr['merged_at'] ?? ($pr['closed_at'] ?? null);
                     if ($created) {
@@ -601,20 +612,24 @@ class VcsController extends Controller
             ksort($byDay);
             ksort($byWeek);
             $byDayArr = [];
-            foreach ($byDay as $d => $vals) { $byDayArr[] = ['date' => $d, 'opened' => (int)($vals['opened'] ?? 0), 'merged' => (int)($vals['merged'] ?? 0)]; }
+            foreach ($byDay as $d => $vals) {
+                $byDayArr[] = ['date' => $d, 'opened' => (int) ($vals['opened'] ?? 0), 'merged' => (int) ($vals['merged'] ?? 0)];
+            }
             $byWeekArr = [];
-            foreach ($byWeek as $w => $vals) { $byWeekArr[] = ['week' => $w, 'opened' => (int)($vals['opened'] ?? 0), 'merged' => (int)($vals['merged'] ?? 0)]; }
+            foreach ($byWeek as $w => $vals) {
+                $byWeekArr[] = ['week' => $w, 'opened' => (int) ($vals['opened'] ?? 0), 'merged' => (int) ($vals['merged'] ?? 0)];
+            }
 
-             return response()->json([
+            return response()->json([
                 'default_branch' => $defaultBranch,
                 'branch' => $branch,
-                 'latest_commits' => $latestCommits,
-                 'top_committers' => $tops,
-                 'recent_pulls' => array_slice($recentPulls, 0, 10),
-                'pr_activity' => [ 'by_day' => $byDayArr, 'by_week' => $byWeekArr ],
-             ]);
-         } catch (\Throwable $e) {
-             return response()->json(['error' => $e->getMessage()], 422);
-         }
-     }
+                'latest_commits' => $latestCommits,
+                'top_committers' => $tops,
+                'recent_pulls' => array_slice($recentPulls, 0, 10),
+                'pr_activity' => ['by_day' => $byDayArr, 'by_week' => $byWeekArr],
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
 }
