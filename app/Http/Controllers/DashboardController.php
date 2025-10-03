@@ -34,6 +34,7 @@ class DashboardController extends Controller
                     'tasks AS overdue_tasks_count' => fn ($query) => $query->whereNull('completed_at')->whereDate('due_on', '<', now()),
                 ])
                 ->withExists('favoritedByAuthUser AS favorite')
+                ->withExists('vcsIntegration AS has_vcs')
                 ->orderBy('favorite', 'desc')
                 ->orderBy('name', 'asc')
                 ->get(['id', 'name']),

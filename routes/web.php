@@ -78,6 +78,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::get('pulls/{number}/statuses', [VcsController::class, 'pullStatuses'])->name('pulls.statuses')->scopeBindings();
             Route::get('pulls/{number}/required-checks', [VcsController::class, 'pullRequiredChecks'])->name('pulls.required-checks')->scopeBindings();
 
+            // Stats & dashboard
+            Route::get('stats', [VcsController::class, 'stats'])->name('stats')->scopeBindings();
+
             // File-level review comments
             Route::get('pulls/{number}/review-comments', [VcsController::class, 'listPullReviewComments'])->name('pulls.review-comments')->scopeBindings();
             Route::post('pulls/{number}/review-comments/{threadId}/reply', [VcsController::class, 'replyPullReviewComment'])->name('pulls.review-comments.reply')->scopeBindings();

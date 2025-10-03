@@ -16,6 +16,8 @@ import ArchivedItems from "./Index/Archive/ArchivedItems";
 import Filters from "./Index/Filters";
 import FiltersDrawer from "./Index/FiltersDrawer";
 import Header from "./Index/Header";
+import VcsPanel from "@/pages/Projects/Vcs/Panel";
+import VcsDashboard from "@/pages/Projects/Vcs/Dashboard";
 import CreateTasksGroupModal from "./Index/Modals/CreateTasksGroupModal";
 import TaskGroup from "./Index/TaskGroup";
 import classes from "./css/Index.module.css";
@@ -55,6 +57,7 @@ const TasksIndex = () => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'gantt') setTasksView('gantt');
+    if (view === 'vcs') setTasksView('vcs');
   }, []);
 
   const onDragEnd = ({ source, destination }) => {
@@ -117,8 +120,18 @@ const TasksIndex = () => {
       )}
 
       <Grid columns={12} gutter={50} mt="xl" className={`${tasksView}-view`}>
+        {tasksView === 'vcs' && (
+          <>
+            <Grid.Col span={{ base: 12, md: 8 }}>
+              <VcsDashboard projectId={project.id} />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 4 }}>
+              <VcsPanel projectId={project.id} />
+            </Grid.Col>
+          </>
+        )}
         {!route().params.archived ? (
-          <Grid.Col span={tasksView === "list" ? 9 : 12}>
+          <Grid.Col span={tasksView === "list" ? 9 : (tasksView === 'vcs' ? 0 : 12)} style={{ display: tasksView === 'vcs' ? 'none' : undefined }}>
             {tasksView === 'gantt' ? (
               <GanttChart
                 tasks={allTasks}
@@ -181,24 +194,24 @@ const TasksIndex = () => {
           </Grid.Col>
         )}
         {tasksView === "list" ? (
-          <Grid.Col span={3}>
-            <Stack>
-              <Filters />
-              <Box mt="md">
-                <NotesPanel projectId={project.id} />
-              </Box>
-            </Stack>
-          </Grid.Col>
+           <Grid.Col span={3}>
+             <Stack>
+               <Filters />
+               <Box mt="md">
+                 <NotesPanel projectId={project.id} />
+               </Box>
+             </Stack>
+           </Grid.Col>
         ) : (
-          <>
-            <Grid.Col span={12}>
-              <FiltersDrawer />
-            </Grid.Col>
-            <Grid.Col span={12}>
-              <NotesPanel projectId={project.id} />
-            </Grid.Col>
-          </>
-        )}
+           <>
+             <Grid.Col span={12}>
+               <FiltersDrawer />
+             </Grid.Col>
+            <Grid.Col span={12} style={{ display: tasksView === 'vcs' ? 'none' : undefined }}>
+               <NotesPanel projectId={project.id} />
+             </Grid.Col>
+           </>
+         )}
       </Grid>
     </>
   );

@@ -489,4 +489,89 @@ class VcsController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
     }
+
+    public function stats(Project $project, Request $request)
+    {
+        $this->authorize('view', $project);
+        try {
+            $integration = $this->requireIntegration($project);
+            $client = VcsClientFactory::make($integration, $this->resolveToken($project, $integration, $request));
+            $branch = $integration->default_branch ?: 'main';
+            $maxPages = (int) $request->query('pages', 5); // fetch up to ~5 pages of commits
+            $perPage = (int) $request->query('per_page', 50);
+
+            $allCommits = [];
+            for ($page = 1; $page <= max(1, $maxPages); $page++) {
+                $res = $client->listCommits($branch, $page, $perPage);
+                $items = $res['items'] ?? [];
+                foreach ($items as $c) {
+                    // normalize
+                    $allCommits[] = [
+                        'sha' => $c['sha'] ?? '',
+                        'message' => $c['message'] ?? '',
+                        'author' => $c['author'] ?? 'Unknown',
+                        'date' => $c['date'] ?? null,
+                        'url' => $c['url'] ?? null,
+                    ];
+                }
+                if (($res['has_next'] ?? false) === false) break;
+            }
+
+            // latest commits (most recent first as returned by provider)
+            $latestCommits = array_slice($allCommits, 0, 10);
+
+            // Top committers by windows (week, month, year)
+            $now = now();
+            $windows = [
+                'week' => $now->copy()->startOfWeek(),
+                'month' => $now->copy()->startOfMonth(),
+                'year' => $now->copy()->startOfYear(),
+            ];
+            $tops = [ 'week' => [], 'month' => [], 'year' => [] ];
+
+            foreach ($windows as $key => $start) {
+                $counts = [];
+                foreach ($allCommits as $c) {
+                    if (empty($c['date'])) continue;
+                    $dt = \Illuminate\Support\Carbon::parse($c['date']);
+                    if ($dt->lt($start)) continue;
+                    $author = $c['author'] ?: 'Unknown';
+                    $counts[$author] = ($counts[$author] ?? 0) + 1;
+                }
+                arsort($counts);
+                $tops[$key] = array_map(function ($name, $count) {
+                    return ['name' => $name, 'count' => $count];
+                }, array_keys($counts), array_values($counts));
+                $tops[$key] = array_slice($tops[$key], 0, 10);
+            }
+
+            // Recent PRs: take first page of open + merged for a quick view
+            $recentPulls = [];
+            try {
+                $open = $client->listPullRequests('open', 1, 10)['items'] ?? [];
+                $merged = $client->listPullRequests('merged', 1, 10)['items'] ?? [];
+                foreach ([$open, $merged] as $list) {
+                    foreach ($list as $p) {
+                        $recentPulls[] = [
+                            'number' => $p['number'] ?? null,
+                            'title' => $p['title'] ?? '',
+                            'state' => $p['state'] ?? 'open',
+                            'url' => $p['url'] ?? null,
+                        ];
+                    }
+                }
+            } catch (\Throwable $_) {
+                // provider may not support listing merged separately; ignore
+            }
+
+            return response()->json([
+                'branch' => $branch,
+                'latest_commits' => $latestCommits,
+                'top_committers' => $tops,
+                'recent_pulls' => array_slice($recentPulls, 0, 10),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
 }

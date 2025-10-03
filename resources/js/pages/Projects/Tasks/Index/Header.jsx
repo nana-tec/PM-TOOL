@@ -14,6 +14,7 @@ import {
   IconLayoutList,
   IconPlus,
   IconTable,
+  IconGitBranch,
 } from "@tabler/icons-react";
 
 export default function Header() {
@@ -86,6 +87,15 @@ export default function Header() {
               >
                 <Tooltip label="Gantt view" openDelay={250} withArrow>
                   <IconTable style={{ width: "45%", height: "45%" }} />
+                </Tooltip>
+              </ActionIcon>
+              <ActionIcon
+                size="lg"
+                variant={tasksView === "vcs" ? "filled" : "default"}
+                onClick={() => setTasksView("vcs")}
+              >
+                <Tooltip label="Version control" openDelay={250} withArrow>
+                  <IconGitBranch style={{ width: "45%", height: "45%" }} />
                 </Tooltip>
               </ActionIcon>
             </ActionIcon.Group>

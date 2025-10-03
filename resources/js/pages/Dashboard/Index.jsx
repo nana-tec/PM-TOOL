@@ -7,6 +7,7 @@ import { ProjectCard } from "./Cards/ProjectCard";
 import RecentComments from "./Cards/RecentComments";
 import RecentlyAssignedTasks from "./Cards/RecentlyAssignedTasks";
 import TeamCapacityCard from "./Cards/TeamCapacityCard";
+import RecentVcs from "./Cards/RecentVcs";
 import classes from "./css/Index.module.css";
 
 const Dashboard = () => {
@@ -30,6 +31,7 @@ const Dashboard = () => {
         {projects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}
+        <RecentVcs projects={projects} />
         <OverdueTasks tasks={overdueTasks} />
         <RecentlyAssignedTasks tasks={recentlyAssignedTasks} />
         <RecentComments comments={recentComments} />
