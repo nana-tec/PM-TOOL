@@ -1,26 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Card from '@/components/Card';
-import { Anchor, Badge, Divider, Group, Loader, ScrollArea, Stack, Text, Title, Tooltip } from '@mantine/core';
-import { IconExternalLink } from '@tabler/icons-react';
+import { Anchor, Badge, Divider, Group, Loader, ScrollArea, SegmentedControl, Stack, Text, Title, Tooltip } from '@mantine/core';
+import { IconExternalLink, IconBrandGithub, IconBrandGitlab } from '@tabler/icons-react';
+import { diffForHumans } from '@/utils/datetime';
 import axios from 'axios';
 
 export default function RecentVcs({ projects }) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [filterType, setFilterType] = useState('all'); // all | commit | pull | issue
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       setLoading(true);
       try {
-        // Only consider a reasonable number of VCS-enabled projects to keep the dashboard snappy
         const integrated = (projects || []).filter(p => p.has_vcs).slice(0, 6);
         const results = await Promise.all(
           integrated.map(async (p) => {
             try {
               const { data } = await axios.get(route('projects.vcs.stats', p.id));
+              const provider = data?.provider || 'github';
               const commits = (data?.latest_commits || []).slice(0, 5).map(c => ({
                 type: 'commit',
+                provider,
                 projectId: p.id,
                 projectName: p.name,
                 id: c.sha,
@@ -31,6 +34,7 @@ export default function RecentVcs({ projects }) {
               }));
               const pulls = (data?.recent_pulls || []).slice(0, 5).map(pr => ({
                 type: 'pull',
+                provider,
                 projectId: p.id,
                 projectName: p.name,
                 id: pr.number,
@@ -41,6 +45,7 @@ export default function RecentVcs({ projects }) {
               }));
               const issues = (data?.recent_issues || []).slice(0, 5).map(i => ({
                 type: 'issue',
+                provider,
                 projectId: p.id,
                 projectName: p.name,
                 id: i.id,
@@ -66,26 +71,50 @@ export default function RecentVcs({ projects }) {
     return () => { mounted = false; };
   }, [projects]);
 
+  const filtered = useMemo(() => {
+    if (filterType === 'all') return items;
+    return items.filter(i => i.type === filterType);
+  }, [items, filterType]);
+
   const typeBadge = (t) => {
     const map = { commit: { color: 'blue', label: 'Commit' }, pull: { color: 'grape', label: 'PR/MR' }, issue: { color: 'teal', label: 'Issue' } };
     const it = map[t] || { color: 'gray', label: t };
     return <Badge size="xs" variant="light" color={it.color}>{it.label}</Badge>;
   };
 
+  const providerIcon = (provider) => {
+    if (provider === 'gitlab') return <IconBrandGitlab size={14} />;
+    return <IconBrandGithub size={14} />;
+  };
+
   return (
     <Card bg="none">
-      <Title order={3} ml={15}>Recent VCS activity</Title>
+      <Group justify="space-between" align="center" px={10}>
+        <Title order={3}>Recent VCS activity</Title>
+        <SegmentedControl
+          size="xs"
+          value={filterType}
+          onChange={setFilterType}
+          data={[
+            { label: 'All', value: 'all' },
+            { label: 'Commits', value: 'commit' },
+            { label: 'PRs', value: 'pull' },
+            { label: 'Issues', value: 'issue' },
+          ]}
+        />
+      </Group>
       <Divider my={14} />
       {loading ? (
         <Group justify="center" my="sm"><Loader size="xs" /></Group>
       ) : (
         <ScrollArea h={300} scrollbarSize={7}>
           <Stack gap={10} px={6}>
-            {items.map((it, idx) => (
+            {filtered.map((it, idx) => (
               <Group key={`${it.type}-${it.projectId}-${it.id}-${idx}`} wrap="nowrap" justify="space-between" align="flex-start">
                 <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
                   <Group gap={8} wrap="nowrap">
                     {typeBadge(it.type)}
+                    {providerIcon(it.provider)}
                     <Text size="sm" fw={600} lineClamp={1} style={{ flex: 1 }}>{it.title}</Text>
                   </Group>
                   <Group gap={8} wrap="nowrap">
@@ -93,7 +122,9 @@ export default function RecentVcs({ projects }) {
                       <Text size="xs" c="dimmed" style={{ maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.projectName}</Text>
                     </Tooltip>
                     <Text size="xs" c="dimmed" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.subtitle}</Text>
-                    <Text size="xs" c="dimmed">{it.date ? new Date(it.date).toLocaleString() : ''}</Text>
+                    <Tooltip label={it.date ? new Date(it.date).toLocaleString() : ''} withArrow>
+                      <Text size="xs" c="dimmed">{it.date ? diffForHumans(it.date) : ''}</Text>
+                    </Tooltip>
                   </Group>
                 </Stack>
                 {it.url && (
@@ -103,7 +134,7 @@ export default function RecentVcs({ projects }) {
                 )}
               </Group>
             ))}
-            {items.length === 0 && (
+            {filtered.length === 0 && (
               <Text size="sm" c="dimmed" px={6}>No recent VCS activity.</Text>
             )}
           </Stack>

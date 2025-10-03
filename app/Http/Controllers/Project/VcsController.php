@@ -775,6 +775,7 @@ class VcsController extends Controller
                     }
 
                     return [
+                        'provider' => $integration->provider,
                         'default_branch' => $defaultBranch,
                         'branch' => $branch,
                         'latest_commits' => $latestCommits,
