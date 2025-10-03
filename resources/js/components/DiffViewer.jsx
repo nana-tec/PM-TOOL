@@ -63,11 +63,13 @@ export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, 
     if (onCopy) onCopy();
   };
 
-  const lineBg = (type) => {
-    if (type === 'add') return colorful ? 'rgba(16,185,129,0.22)' : 'rgba(34,197,94,.15)';
-    if (type === 'del') return colorful ? 'rgba(239,68,68,0.22)' : 'rgba(239,68,68,.15)';
-    if (type === 'meta') return 'transparent';
-    return 'transparent';
+  const addColor = 'var(--mantine-color-green-6)';
+  const delColor = 'var(--mantine-color-red-6)';
+  const faint = (hexVar) => colorful ? (hexVar === addColor ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)') : 'transparent';
+  const borderLeftFor = (type) => {
+    if (type === 'add') return `3px solid ${addColor}`;
+    if (type === 'del') return `3px solid ${delColor}`;
+    return '3px solid transparent';
   };
 
   return (
@@ -85,23 +87,23 @@ export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, 
       {(!patch || hunks.length === 0) ? (
         <Text size="sm" c="dimmed">No patch available.</Text>
       ) : (
-        <div ref={containerRef} style={{ height, overflow: 'auto', border: '1px solid var(--mantine-color-dark-5)', borderRadius: 6, background: 'var(--mantine-color-dark-7)' }}>
+        <div ref={containerRef} style={{ height, overflow: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8, background: 'var(--mantine-color-body)' }}>
           <div style={{ height: totalHeight, position: 'relative' }}>
             <div style={{ position: 'absolute', top: startIndex * LINE_HEIGHT, left: 0, right: 0 }}>
               {mode === 'unified' ? (
                 unifiedRows.slice(startIndex, endIndex).map((r, idx) => {
                   if (r.kind === 'header') {
                     return (
-                      <div key={startIndex + idx} style={{ background: 'var(--mantine-color-dark-6)', color: 'var(--mantine-color-dimmed)', padding: '4px 8px', fontFamily: 'monospace', fontSize: 12, height: LINE_HEIGHT }}>
+                      <div key={startIndex + idx} style={{ background: 'var(--mantine-color-default-hover)', color: 'var(--mantine-color-dimmed)', padding: '4px 8px', fontFamily: 'monospace', fontSize: 12, height: LINE_HEIGHT }}>
                         {r.text}
                       </div>
                     );
                   }
                   const isMeta = r.type === 'meta';
-                  const bg = lineBg(r.type);
+                  const bg = r.type === 'add' ? faint(addColor) : r.type === 'del' ? faint(delColor) : 'transparent';
                   const color = isMeta ? 'var(--mantine-color-dimmed)' : 'inherit';
                   return (
-                    <pre key={startIndex + idx} style={{ margin: 0, padding: '2px 8px', background: bg, color, whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: 12, height: LINE_HEIGHT, animation: 'fadeIn 200ms ease-in' }}>
+                    <pre key={startIndex + idx} style={{ margin: 0, padding: '2px 8px', background: bg, color, whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: 12, height: LINE_HEIGHT, animation: 'fadeIn 200ms ease-in', borderLeft: borderLeftFor(r.type) }}>
                       {r.text}
                     </pre>
                   );
@@ -110,17 +112,17 @@ export default function DiffViewer({ filename, patch, mode = 'unified', onCopy, 
                 sbsRows.slice(startIndex, endIndex).map((r, idx) => {
                   if (r.kind === 'header') {
                     return (
-                      <div key={startIndex + idx} style={{ background: 'var(--mantine-color-dark-6)', color: 'var(--mantine-color-dimmed)', padding: '4px 8px', fontFamily: 'monospace', fontSize: 12, height: LINE_HEIGHT }}>
+                      <div key={startIndex + idx} style={{ background: 'var(--mantine-color-default-hover)', color: 'var(--mantine-color-dimmed)', padding: '4px 8px', fontFamily: 'monospace', fontSize: 12, height: LINE_HEIGHT }}>
                         {r.text}
                       </div>
                     );
                   }
-                  const leftBg = (r.row.kind === 'del' || r.row.kind === 'change') ? lineBg('del') : 'transparent';
-                  const rightBg = (r.row.kind === 'add' || r.row.kind === 'change') ? lineBg('add') : 'transparent';
+                  const leftBg = (r.row.kind === 'del' || r.row.kind === 'change') ? faint(delColor) : 'transparent';
+                  const rightBg = (r.row.kind === 'add' || r.row.kind === 'change') ? faint(addColor) : 'transparent';
                   return (
                     <div key={startIndex + idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', height: LINE_HEIGHT }}>
-                      <pre style={{ margin: 0, padding: '2px 8px', borderRight: '1px solid var(--mantine-color-dark-5)', background: leftBg, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', animation: 'fadeIn 200ms ease-in' }}>{r.row.left || ''}</pre>
-                      <pre style={{ margin: 0, padding: '2px 8px', background: rightBg, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', animation: 'fadeIn 200ms ease-in' }}>{r.row.right || ''}</pre>
+                      <pre style={{ margin: 0, padding: '2px 8px', borderRight: '1px solid var(--mantine-color-default-border)', background: leftBg, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', animation: 'fadeIn 200ms ease-in', borderLeft: (r.row.kind === 'del' || r.row.kind === 'change') ? `3px solid ${delColor}` : '3px solid transparent' }}>{r.row.left || ''}</pre>
+                      <pre style={{ margin: 0, padding: '2px 8px', background: rightBg, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', animation: 'fadeIn 200ms ease-in', borderLeft: (r.row.kind === 'add' || r.row.kind === 'change') ? `3px solid ${addColor}` : '3px solid transparent' }}>{r.row.right || ''}</pre>
                     </div>
                   );
                 })
