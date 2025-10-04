@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\Complexity;
 use App\Enums\Priority;
 use App\Models\Project;
-use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,4 +50,3 @@ class SubtaskController extends Controller
         return response()->json(['subtask' => $subtask->load('assignedToUser:id,name,avatar')], 201);
     }
 }
-

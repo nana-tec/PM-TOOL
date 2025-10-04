@@ -1,7 +1,7 @@
 <?php
 
-use App\Enums\Priority;
 use App\Enums\Complexity;
+use App\Enums\Priority;
 use App\Models\ClientCompany;
 use App\Models\Project;
 use App\Models\Task;
@@ -87,4 +87,3 @@ it('creates a subtask with priority and complexity and preserves relations', fun
     expect($child->priority)->toBe(Priority::CRITICAL);
     expect($child->complexity)->toBe(Complexity::EXTREME);
 });
-

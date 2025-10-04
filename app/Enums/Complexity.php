@@ -10,4 +10,3 @@ enum Complexity: string
     case HARD = 'hard';
     case EXTREME = 'extreme';
 }
-

@@ -49,4 +49,3 @@ class Subtask extends Model
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 }
-

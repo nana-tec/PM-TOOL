@@ -90,4 +90,3 @@ it('prevents setting a task parent to one of its descendants to avoid cycles', f
     // The update should be ignored due to cycle prevention; A stays root
     expect($taskA->fresh()->parent_id)->toBeNull();
 });
-

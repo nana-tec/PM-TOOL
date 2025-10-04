@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\Complexity;
 use App\Enums\PricingType;
 use App\Enums\Priority;
-use App\Enums\Complexity;
 use App\Models\Filters\IsNullFilter;
 use App\Models\Filters\TaskCompletedFilter;
 use App\Models\Filters\TaskOverdueFilter;

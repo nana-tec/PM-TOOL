@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Task;
 
+use App\Enums\Complexity;
 use App\Enums\PricingType;
 use App\Enums\Priority;
-use App\Enums\Complexity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
