@@ -348,7 +348,7 @@ export default function SubTasks({ task }) {
       {loading ? (
         <Group justify='center' py='md'><Loader size='sm' /></Group>
       ) : nodes.length === 0 ? (
-        <Text size='sm' c='dimmed'>No subtasks yet. Use "Add subtask" to create one.</Text>
+        <Text size='sm' c='dimmed'>No subtasks yet. Use Add subtask to create one.</Text>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
           <Tree items={nodes} parentId={null} />
