@@ -18,6 +18,7 @@ class SubTaskController extends Controller
             return null;
         }
         $exists = SubTask::where('task_id', $task->id)->where('id', $parentId)->exists();
+
         return $exists ? $parentId : null;
     }
 
@@ -28,10 +29,15 @@ class SubTaskController extends Controller
         $current = $candidateParentId;
         while ($current !== null && $guard++ < 1000) {
             $row = SubTask::where('task_id', $task->id)->where('id', $current)->first(['parent_id']);
-            if (! $row) break;
-            if ($current === $childId) return true;
+            if (! $row) {
+                break;
+            }
+            if ($current === $childId) {
+                return true;
+            }
             $current = $row->parent_id ? (int) $row->parent_id : null;
         }
+
         return false;
     }
 
@@ -90,10 +96,14 @@ class SubTaskController extends Controller
 
         foreach ($items as $item) {
             $id = (int) ($item['id'] ?? 0);
-            if (! $id) continue;
+            if (! $id) {
+                continue;
+            }
 
             $parentId = $this->normalizeParentId($task, isset($item['parent_id']) ? (int) $item['parent_id'] : null);
-            if ($parentId === $id) { $parentId = null; } // disallow self as parent
+            if ($parentId === $id) {
+                $parentId = null;
+            } // disallow self as parent
             if ($parentId !== null && $this->isDescendant($task, $parentId, $id)) {
                 $parentId = null; // sanitize to prevent cycles
             }

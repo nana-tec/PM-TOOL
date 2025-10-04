@@ -9,4 +9,3 @@ enum TaskPriority: string
     case HIGH = 'high';
     case URGENT = 'urgent';
 }
-

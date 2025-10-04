@@ -24,7 +24,8 @@ use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
-use App\Models\SubTask; // import for relations
+
+// import for relations
 
 class Task extends Model implements AuditableContract, Sortable
 {
