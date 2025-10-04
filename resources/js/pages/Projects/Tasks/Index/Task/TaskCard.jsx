@@ -4,13 +4,28 @@ import { isOverdue } from "@/utils/task";
 import { getInitials } from "@/utils/user";
 import { Draggable } from "@hello-pangea/dnd";
 import { Link } from "@inertiajs/react";
-import { Avatar, Group, Text, Tooltip, rem, useComputedColorScheme } from "@mantine/core";
+import { Avatar, Group, Text, Tooltip, Pill, rem, useComputedColorScheme } from "@mantine/core";
 import TaskActions from "../TaskActions";
 import classes from "./css/TaskCard.module.css";
 
 export default function TaskCard({ task, index }) {
   const { openEditTask } = useTaskDrawerStore();
   const computedColorScheme = useComputedColorScheme();
+
+  const priorityColor = {
+    urgent: 'red',
+    high: 'orange',
+    medium: 'blue',
+    low: 'gray',
+  };
+
+  const complexityColor = {
+    xs: 'teal',
+    s: 'cyan',
+    m: 'gray',
+    l: 'violet',
+    xl: 'grape',
+  };
 
   return (
     <Draggable draggableId={"task-" + task.id} index={index}>
@@ -44,6 +59,16 @@ export default function TaskCard({ task, index }) {
                     dot={false}
                   />
                 ))}
+                {task.priority && (
+                  <Pill size="sm" color={priorityColor[task.priority] || 'gray'}>
+                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  </Pill>
+                )}
+                {task.complexity && (
+                  <Pill size="sm" color={complexityColor[task.complexity] || 'gray'}>
+                    {task.complexity.toUpperCase()}
+                  </Pill>
+                )}
               </Group>
 
               {task.assigned_to_user && (

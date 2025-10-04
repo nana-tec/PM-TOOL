@@ -14,6 +14,21 @@ export default function TaskRow({ task, index }) {
   const { complete } = useTasksStore();
   const { openEditTask } = useTaskDrawerStore();
 
+  const priorityColor = {
+    urgent: "red",
+    high: "orange",
+    medium: "blue",
+    low: "gray",
+  };
+
+  const complexityColor = {
+    xs: "teal",
+    s: "cyan",
+    m: "gray",
+    l: "violet",
+    xl: "grape",
+  };
+
   return (
     <Draggable draggableId={"task-" + task.id} index={index}>
       {(provided, snapshot) => (
@@ -70,6 +85,16 @@ export default function TaskRow({ task, index }) {
               {task.labels.map((label) => (
                 <Label key={label.id} name={label.name} color={label.color} />
               ))}
+              {task.priority && (
+                <Pill size="sm" color={priorityColor[task.priority] || "gray"}>
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                </Pill>
+              )}
+              {task.complexity && (
+                <Pill size="sm" color={complexityColor[task.complexity] || "gray"}>
+                  {task.complexity.toUpperCase()}
+                </Pill>
+              )}
             </Group>
 
             {(can("archive task") || can("restore task")) && (
