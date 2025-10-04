@@ -4,9 +4,30 @@ import { isOverdue } from "@/utils/task";
 import { getInitials } from "@/utils/user";
 import { Draggable } from "@hello-pangea/dnd";
 import { Link } from "@inertiajs/react";
-import { Avatar, Group, Text, Tooltip, rem, useComputedColorScheme } from "@mantine/core";
+import { Avatar, Badge, Group, Text, Tooltip, rem, useComputedColorScheme } from "@mantine/core";
 import TaskActions from "../TaskActions";
 import classes from "./css/TaskCard.module.css";
+
+function priorityColor(p) {
+  switch (p) {
+    case 'low': return 'gray';
+    case 'medium': return 'blue';
+    case 'high': return 'orange';
+    case 'critical': return 'red';
+    default: return 'gray';
+  }
+}
+
+function complexityColor(c) {
+  switch (c) {
+    case 'trivial': return 'gray';
+    case 'easy': return 'green';
+    case 'medium': return 'blue';
+    case 'hard': return 'grape';
+    case 'extreme': return 'dark';
+    default: return 'gray';
+  }
+}
 
 export default function TaskCard({ task, index }) {
   const { openEditTask } = useTaskDrawerStore();
@@ -34,7 +55,17 @@ export default function TaskCard({ task, index }) {
             </Text>
 
             <Group wrap="nowrap" justify="space-between">
-              <Group wrap="wrap" style={{ rowGap: rem(3), columnGap: rem(12) }} mt={5}>
+              <Group wrap="wrap" style={{ rowGap: rem(3), columnGap: rem(8) }} mt={5}>
+                {task.priority && (
+                  <Badge size="xs" variant="light" color={priorityColor(task.priority)} radius="sm">
+                    {String(task.priority).charAt(0).toUpperCase() + String(task.priority).slice(1)}
+                  </Badge>
+                )}
+                {task.complexity && (
+                  <Badge size="xs" variant="light" color={complexityColor(task.complexity)} radius="sm">
+                    {String(task.complexity).charAt(0).toUpperCase() + String(task.complexity).slice(1)}
+                  </Badge>
+                )}
                 {task.labels.map((label) => (
                   <Label
                     key={label.id}

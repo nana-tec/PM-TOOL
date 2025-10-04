@@ -27,6 +27,7 @@ import Timer from './Timer';
 import classes from './css/TaskDrawer.module.css';
 import { PricingType, Priority, Complexity } from '@/utils/enums';
 import TaskHistory from './TaskHistory';
+import Subtasks from './Subtasks';
 
 export function EditTaskDrawer() {
   const editorRef = useRef(null);
@@ -42,6 +43,7 @@ export function EditTaskDrawer() {
     currency,
     tasksForParentPicker,
     auth: { user },
+    project,
   } = usePage().props;
 
   useEffect(() => {
@@ -275,6 +277,9 @@ export function EditTaskDrawer() {
               )}
 
               {can('view comments') && <Comments task={task} />}
+
+              {/* Subtasks panel */}
+              <Subtasks parent={task} projectId={project.id} />
             </div>
             <div className={classes.sidebar}>
               {/* Also expose history from sidebar top */}
