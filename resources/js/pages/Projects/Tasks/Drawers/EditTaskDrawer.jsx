@@ -27,6 +27,7 @@ import Timer from './Timer';
 import classes from './css/TaskDrawer.module.css';
 import { PricingType, TaskPriority, TaskComplexity } from '@/utils/enums';
 import TaskHistory from './TaskHistory';
+import SubTasks from './SubTasks';
 
 export function EditTaskDrawer() {
   const editorRef = useRef(null);
@@ -54,6 +55,7 @@ export function EditTaskDrawer() {
     assigned_to_user_id: '',
     name: '',
     description: '',
+    implementation_plan: '',
     pricing_type: PricingType.HOURLY,
     estimation: 0,
     fixed_price: 0,
@@ -79,6 +81,7 @@ export function EditTaskDrawer() {
         assigned_to_user_id: task?.assigned_to_user_id || '',
         name: task?.name || '',
         description: task?.description || '',
+        implementation_plan: task?.implementation_plan || '',
         pricing_type: task?.pricing_type || PricingType.HOURLY,
         estimation: task?.estimation || 0,
         fixed_price: task?.fixed_price ? task.fixed_price / 100 : 0,
@@ -101,7 +104,7 @@ export function EditTaskDrawer() {
     setData({ ...data, [field]: value });
 
     const dropdowns = ['labels', 'subscribed_users'];
-    const onBlurInputs = ['name', 'description', 'fixed_price'];
+    const onBlurInputs = ['name', 'description', 'implementation_plan', 'fixed_price'];
 
     if (dropdowns.includes(field)) {
       const options = {
@@ -157,6 +160,7 @@ export function EditTaskDrawer() {
       assigned_to_user_id: updated?.assigned_to_user_id || '',
       name: updated?.name || '',
       description: updated?.description || '',
+      implementation_plan: updated?.implementation_plan || '',
       pricing_type: updated?.pricing_type || PricingType.HOURLY,
       estimation: updated?.estimation || 0,
       fixed_price: updated?.fixed_price ? updated.fixed_price / 100 : 0,
@@ -257,6 +261,16 @@ export function EditTaskDrawer() {
                 readOnly={!can('edit task')}
               />
 
+              <RichTextEditor
+                mt='xl'
+                placeholder='Implementation plan (steps, risks, notes)'
+                content={data.implementation_plan}
+                height={220}
+                onChange={content => updateValue('implementation_plan', content)}
+                onBlur={() => onBlurUpdate('implementation_plan')}
+                readOnly={!can('edit task')}
+              />
+
               {can('edit task') && (
                 <Dropzone
                   mt='xl'
@@ -267,6 +281,11 @@ export function EditTaskDrawer() {
               )}
 
               {can('view comments') && <Comments task={task} />}
+
+              {/* Subtasks management */}
+              <div style={{ marginTop: 24 }}>
+                <SubTasks task={task} />
+              </div>
             </div>
             <div className={classes.sidebar}>
               {/* Also expose history from sidebar top */}

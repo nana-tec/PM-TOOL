@@ -131,6 +131,15 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::get('comment', [CommentController::class, 'index'])->name('comments');
             Route::post('comment', [CommentController::class, 'store'])->name('comments.store');
         })->scopeBindings();
+
+        // SUBTASKS
+        Route::group(['prefix' => '{project}/tasks/{task}', 'as' => 'tasks.'], function () {
+            Route::get('subtasks', [\App\Http\Controllers\SubTaskController::class, 'index'])->name('subtasks.index');
+            Route::post('subtasks', [\App\Http\Controllers\SubTaskController::class, 'store'])->name('subtasks.store');
+            Route::put('subtasks/{subtask}', [\App\Http\Controllers\SubTaskController::class, 'update'])->name('subtasks.update');
+            Route::post('subtasks/reorder', [\App\Http\Controllers\SubTaskController::class, 'reorder'])->name('subtasks.reorder');
+            Route::delete('subtasks/{subtask}', [\App\Http\Controllers\SubTaskController::class, 'destroy'])->name('subtasks.destroy');
+        })->scopeBindings();
     });
 
     // My Work

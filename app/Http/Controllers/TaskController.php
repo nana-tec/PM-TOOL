@@ -187,6 +187,7 @@ class TaskController extends Controller
         $allowed = [
             'name',
             'description',
+            'implementation_plan',
             'due_on',
             'estimation',
             'assigned_to_user_id',

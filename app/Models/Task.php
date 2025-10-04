@@ -24,6 +24,7 @@ use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
+use App\Models\SubTask; // import for relations
 
 class Task extends Model implements AuditableContract, Sortable
 {
@@ -38,6 +39,7 @@ class Task extends Model implements AuditableContract, Sortable
         'name',
         'number',
         'description',
+        'implementation_plan',
         'due_on',
         'estimation',
         'pricing_type',
@@ -85,6 +87,8 @@ class Task extends Model implements AuditableContract, Sortable
         'labels:id,name,color',
         'attachments',
         'timeLogs.user:id,name',
+        'allSubTasks:id,task_id,parent_id,name,completed_at,assigned_to_user_id,order_column,due_on,estimation',
+        'allSubTasks.assignedToUser:id,name,avatar',
     ];
 
     public function filters(): array
@@ -171,6 +175,16 @@ class Task extends Model implements AuditableContract, Sortable
     public function activities(): MorphMany
     {
         return $this->morphMany(Activity::class, 'activity_capable');
+    }
+
+    public function subTasks(): HasMany
+    {
+        return $this->hasMany(SubTask::class)->whereNull('parent_id')->orderBy('order_column');
+    }
+
+    public function allSubTasks(): HasMany
+    {
+        return $this->hasMany(SubTask::class)->orderBy('order_column');
     }
 
     public function isFixedPrice(): bool

@@ -39,6 +39,7 @@ export function CreateTaskDrawer() {
     assigned_to_user_id: '',
     name: '',
     description: '',
+    implementation_plan: '',
     pricing_type: project?.default_pricing_type || PricingType.HOURLY,
     estimation: '',
     fixed_price: '',
@@ -156,6 +157,13 @@ export function CreateTaskDrawer() {
             placeholder='Task description'
             height={260}
             onChange={content => updateValue('description', content)}
+          />
+
+          <RichTextEditor
+            mt='xl'
+            placeholder='Implementation plan (steps, risks, notes)'
+            height={220}
+            onChange={content => updateValue('implementation_plan', content)}
           />
 
           <Dropzone

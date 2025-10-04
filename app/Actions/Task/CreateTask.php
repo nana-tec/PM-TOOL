@@ -35,6 +35,7 @@ class CreateTask
                 'name' => $data['name'],
                 'number' => $project->tasks()->withArchived()->count() + 1,
                 'description' => $data['description'],
+                'implementation_plan' => $data['implementation_plan'] ?? null,
                 'due_on' => $data['due_on'],
                 'estimation' => $data['estimation'],
                 'pricing_type' => $data['pricing_type'],
