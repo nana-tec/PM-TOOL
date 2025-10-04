@@ -48,6 +48,18 @@ class TaskController extends Controller
                         ->when($request->user()->hasRole('client'), fn ($query) => $query->where('hidden_from_clients', false))
                         ->when($request->has('archived'), fn ($query) => $query->onlyArchived())
                         ->when(! $request->has('status'), fn ($query) => $query->whereNull('completed_at'))
+                        ->when($request->get('sort') === 'priority', function ($query) {
+                            $query->withoutGlobalScope('ordered')
+                                ->orderByRaw("CASE WHEN priority IN ('urgent','high','medium','low') THEN 0 ELSE 1 END")
+                                ->orderByRaw("FIELD(priority, 'urgent','high','medium','low')")
+                                ->orderBy('order_column');
+                        })
+                        ->when($request->get('sort') === 'complexity', function ($query) {
+                            $query->withoutGlobalScope('ordered')
+                                ->orderByRaw("CASE WHEN complexity IN ('xl','l','m','s','xs') THEN 0 ELSE 1 END")
+                                ->orderByRaw("FIELD(complexity, 'xl','l','m','s','xs')")
+                                ->orderBy('order_column');
+                        })
                         ->withDefault()
                         ->when($project->isArchived(), fn ($query) => $query->with(['project' => fn ($query) => $query->withArchived()]))
                         ->get(),
