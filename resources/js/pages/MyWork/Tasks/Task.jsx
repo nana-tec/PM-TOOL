@@ -48,6 +48,22 @@ export default function Task({ task, enhanced = false, showProject = false }) {
     normal: 'gray'
   };
 
+  // Badge color maps for persisted task priority/complexity
+  const taskPriorityColor = {
+    urgent: 'red',
+    high: 'orange',
+    medium: 'blue',
+    low: 'gray',
+  };
+
+  const taskComplexityColor = {
+    xs: 'teal',
+    s: 'cyan',
+    m: 'gray',
+    l: 'violet',
+    xl: 'grape',
+  };
+
   const formatDueDate = () => {
     if (!task.due_on) return null;
 
@@ -121,11 +137,21 @@ export default function Task({ task, enhanced = false, showProject = false }) {
           </Text>
         </Tooltip>
 
-        {/* Labels */}
+        {/* Labels and task badges */}
         <Group wrap="wrap" style={{ rowGap: rem(3), columnGap: rem(8) }}>
           {task.labels.map((label) => (
             <Label key={label.id} name={label.name} color={label.color} />
           ))}
+          {task.priority && (
+            <Pill size="sm" color={taskPriorityColor[task.priority] || 'gray'}>
+              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+            </Pill>
+          )}
+          {task.complexity && (
+            <Pill size="sm" color={taskComplexityColor[task.complexity] || 'gray'}>
+              {task.complexity.toUpperCase()}
+            </Pill>
+          )}
         </Group>
       </Group>
 
