@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Button, Group, List, Loader, Text, TextInput } from '@mantine/core';
+import { Button, Group, List, Loader, Text, TextInput } from '@mantine/core';
 import { IconPlus, IconChevronRight } from '@tabler/icons-react';
-import axios from 'axios';
 
 export default function Subtasks({ parent, projectId }) {
   const [loading, setLoading] = useState(false);
@@ -9,6 +8,11 @@ export default function Subtasks({ parent, projectId }) {
   const [name, setName] = useState('');
 
   const parentId = parent?.id;
+
+  const csrf = () => {
+    const el = document.head.querySelector('meta[name="csrf-token"]');
+    return el?.getAttribute('content') || '';
+  };
 
   useEffect(() => {
     // Initialize from preloaded children, else fetch
@@ -18,9 +22,13 @@ export default function Subtasks({ parent, projectId }) {
     }
     if (!parentId) return;
     setLoading(true);
-    axios
-      .get(route('projects.tasks.subtasks', [projectId, parentId]))
-      .then((res) => setItems(res.data.subtasks || []))
+    fetch(route('projects.tasks.subtasks', [projectId, parentId]), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+      .then((res) => res.json())
+      .then((data) => setItems(data?.subtasks || []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [parentId]);
@@ -47,14 +55,24 @@ export default function Subtasks({ parent, projectId }) {
         labels: [],
       };
 
-      const res = await axios.post(
-        route('projects.tasks.store', [projectId]),
-        payload,
-        { headers: { Accept: 'application/json' }, progress: false }
-      );
+      const res = await fetch(route('projects.tasks.store', [projectId]), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': csrf(),
+        },
+        body: JSON.stringify(payload),
+        credentials: 'same-origin',
+      });
 
-      const created = res.data.task;
-      setItems((prev) => [...prev, created]);
+      if (!res.ok) {
+        throw new Error('Failed to create');
+      }
+      const data = await res.json();
+      const created = data?.task;
+      if (created) setItems((prev) => [...prev, created]);
       setName('');
     } catch (e) {
       alert('Failed to create subtask');
@@ -98,11 +116,12 @@ export default function Subtasks({ parent, projectId }) {
       ) : (
         <List spacing="xs" center>
           {items.map((t) => (
-            <List.Item key={t.id} icon={<IconChevronRight size={14} />}>#{t.number} · {t.name}</List.Item>
+            <List.Item key={t.id} icon={<IconChevronRight size={14} />}>
+              #{t.number} · {t.name}
+            </List.Item>
           ))}
         </List>
       )}
     </div>
   );
 }
-
