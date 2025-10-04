@@ -180,6 +180,8 @@ class TaskController extends Controller
             'assigned_to_user_id',
             'pricing_type',
             'fixed_price',
+            'priority',
+            'complexity',
             'hidden_from_clients',
             'billable',
             'group_id',
