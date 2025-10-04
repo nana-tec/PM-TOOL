@@ -28,6 +28,7 @@ import {
   Title,
   Tooltip,
   rem,
+  Pill,
 } from "@mantine/core";
 import { useDidUpdate } from "@mantine/hooks";
 import { IconSearch } from "@tabler/icons-react";
@@ -258,6 +259,16 @@ export const InvoiceCreate = () => {
                               {task.labels.map((label) => (
                                 <Label key={label.id} name={label.name} color={label.color} />
                               ))}
+                              {task.priority && (
+                                <Pill size='sm' color={{ urgent: 'red', high: 'orange', medium: 'blue', low: 'gray' }[task.priority] || 'gray'}>
+                                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                </Pill>
+                              )}
+                              {task.complexity && (
+                                <Pill size='sm' color={{ xs: 'teal', s: 'cyan', m: 'gray', l: 'violet', xl: 'grape' }[task.complexity] || 'gray'}>
+                                  {task.complexity.toUpperCase()}
+                                </Pill>
+                              )}
                             </Group>
                           </Stack>
                         </Group>

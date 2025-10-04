@@ -19,6 +19,21 @@ import { PricingType } from '@/utils/enums';
 export default function Task({ task, selectedTasks, toggleTask, currency, type, hourlyRate }) {
   const computedColorScheme = useComputedColorScheme();
 
+  const priorityColor = {
+    urgent: 'red',
+    high: 'orange',
+    medium: 'blue',
+    low: 'gray',
+  };
+
+  const complexityColor = {
+    xs: 'teal',
+    s: 'cyan',
+    m: 'gray',
+    l: 'violet',
+    xl: 'grape',
+  };
+
   return (
     <Flex
       className={classes.task}
@@ -60,6 +75,16 @@ export default function Task({ task, selectedTasks, toggleTask, currency, type, 
                 color={label.color}
               />
             ))}
+            {task.priority && (
+              <Pill size='sm' color={priorityColor[task.priority] || 'gray'}>
+                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+              </Pill>
+            )}
+            {task.complexity && (
+              <Pill size='sm' color={complexityColor[task.complexity] || 'gray'}>
+                {task.complexity.toUpperCase()}
+              </Pill>
+            )}
           </Group>
         </Stack>
       </Group>

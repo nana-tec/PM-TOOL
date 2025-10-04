@@ -7,6 +7,21 @@ import classes from "../Task/css/TaskRow.module.css";
 import TaskActions from "../TaskActions";
 
 export default function ArchivedTask({ task }) {
+  const priorityColor = {
+    urgent: 'red',
+    high: 'orange',
+    medium: 'blue',
+    low: 'gray',
+  };
+
+  const complexityColor = {
+    xs: 'teal',
+    s: 'cyan',
+    m: 'gray',
+    l: 'violet',
+    xl: 'grape',
+  };
+
   return (
     <Flex className={`${classes.task} ${task.completed_at !== null && classes.completed}`}>
       <Group gap="sm">
@@ -41,6 +56,16 @@ export default function ArchivedTask({ task }) {
           {task.labels.map((label) => (
             <Label key={label.id} name={label.name} color={label.color} />
           ))}
+          {task.priority && (
+            <Pill size='sm' color={priorityColor[task.priority] || 'gray'}>
+              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+            </Pill>
+          )}
+          {task.complexity && (
+            <Pill size='sm' color={complexityColor[task.complexity] || 'gray'}>
+              {task.complexity.toUpperCase()}
+            </Pill>
+          )}
         </Group>
 
         <TaskActions task={task} />
