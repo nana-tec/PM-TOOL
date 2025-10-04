@@ -18,10 +18,10 @@ import {
   rem,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import LabelsDropdown from './LabelsDropdown';
 import classes from './css/TaskDrawer.module.css';
-import { PricingType } from '@/utils/enums';
+import { PricingType, Priority, Complexity } from '@/utils/enums';
 
 export function CreateTaskDrawer() {
   const { create, closeCreateTask } = useTaskDrawerStore();
@@ -31,12 +31,14 @@ export function CreateTaskDrawer() {
     labels,
     project,
     currency,
+    tasksForParentPicker,
     auth: { user },
   } = usePage().props;
 
   const initial = {
     group_id: create.group_id ? create.group_id.toString() : '',
     assigned_to_user_id: '',
+    parent_id: '',
     name: '',
     description: '',
     pricing_type: project?.default_pricing_type || PricingType.HOURLY,
@@ -45,6 +47,8 @@ export function CreateTaskDrawer() {
     due_on: '',
     hidden_from_clients: false,
     billable: true,
+    priority: '',
+    complexity: '',
     subscribed_users: [user.id.toString()],
     labels: [],
     attachments: [],
@@ -87,6 +91,26 @@ export function CreateTaskDrawer() {
     { value: PricingType.HOURLY, label: 'Hourly' },
     { value: PricingType.FIXED, label: 'Fixed' },
   ];
+
+  const priorityOptions = useMemo(() => ([
+    { value: Priority.LOW, label: 'Low' },
+    { value: Priority.MEDIUM, label: 'Medium' },
+    { value: Priority.HIGH, label: 'High' },
+    { value: Priority.CRITICAL, label: 'Critical' },
+  ]), []);
+
+  const complexityOptions = useMemo(() => ([
+    { value: Complexity.TRIVIAL, label: 'Trivial' },
+    { value: Complexity.EASY, label: 'Easy' },
+    { value: Complexity.MEDIUM, label: 'Medium' },
+    { value: Complexity.HARD, label: 'Hard' },
+    { value: Complexity.EXTREME, label: 'Extreme' },
+  ]), []);
+
+  const parentOptions = useMemo(() => (tasksForParentPicker || []).map(t => ({
+    value: t.id.toString(),
+    label: `#${t.number} · ${t.name}`,
+  })), [tasksForParentPicker]);
 
   const isFixedPrice = form.data.pricing_type === PricingType.FIXED;
   const currencySymbol = currency?.symbol || '';
@@ -212,6 +236,18 @@ export function CreateTaskDrawer() {
             error={form.errors.assigned_to_user_id}
           />
 
+          <Select
+            label='Parent task'
+            placeholder='Select parent task'
+            searchable
+            clearable
+            mt='md'
+            value={form.data.parent_id}
+            onChange={value => updateValue('parent_id', value)}
+            data={parentOptions}
+            error={form.errors.parent_id}
+          />
+
           <DateInput
             clearable
             valueFormat='DD MMM YYYY'
@@ -268,6 +304,26 @@ export function CreateTaskDrawer() {
               error={form.errors.fixed_price}
             />
           ) : null}
+
+          <Select
+            label='Priority'
+            placeholder='Select priority'
+            mt='md'
+            value={form.data.priority}
+            onChange={value => updateValue('priority', value)}
+            data={priorityOptions}
+            error={form.errors.priority}
+          />
+
+          <Select
+            label='Complexity'
+            placeholder='Select complexity'
+            mt='md'
+            value={form.data.complexity}
+            onChange={value => updateValue('complexity', value)}
+            data={complexityOptions}
+            error={form.errors.complexity}
+          />
 
           <Checkbox
             label='Billable'

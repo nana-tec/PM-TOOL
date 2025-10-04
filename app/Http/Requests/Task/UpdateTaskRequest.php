@@ -3,6 +3,8 @@
 namespace App\Http\Requests\Task;
 
 use App\Enums\PricingType;
+use App\Enums\Priority;
+use App\Enums\Complexity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,10 +25,22 @@ class UpdateTaskRequest extends FormRequest
      */
     public function rules(): array
     {
+        $project = $this->route('project');
+
         return [
             'name' => ['string:255'],
             'group_id' => ['exists:task_groups,id'],
             'assigned_to_user_id' => ['nullable', 'exists:users,id'],
+            'parent_id' => [
+                'nullable', 'integer',
+                Rule::exists('tasks', 'id')->where(function ($q) use ($project) {
+                    if ($project) {
+                        $q->where('project_id', $project->id);
+                    }
+                }),
+            ],
+            'priority' => ['nullable', 'string', Rule::enum(Priority::class)],
+            'complexity' => ['nullable', 'string', Rule::enum(Complexity::class)],
             'description' => ['nullable'],
             'estimation' => ['nullable'],
             'pricing_type' => ['string', Rule::enum(PricingType::class)],

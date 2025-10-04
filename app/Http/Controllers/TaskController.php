@@ -54,6 +54,11 @@ class TaskController extends Controller
                 ];
             });
 
+        // Provide flat list of tasks for parent picker (exclude archived by default)
+        $tasksForParentPicker = Task::where('project_id', $project->id)
+            ->when($project->isArchived(), fn ($query) => $query->with(['project' => fn ($q) => $q->withArchived()]))
+            ->get(['id', 'name', 'number']);
+
         return Inertia::render('Projects/Tasks/Index', [
             'project' => $project,
             'usersWithAccessToProject' => PermissionService::usersWithAccessToProject($project),
@@ -64,6 +69,7 @@ class TaskController extends Controller
             'currency' => [
                 'symbol' => OwnerCompany::with('currency')->first()->currency->symbol,
             ],
+            'tasksForParentPicker' => $tasksForParentPicker,
         ]);
     }
 
@@ -184,6 +190,9 @@ class TaskController extends Controller
             'billable',
             'group_id',
             'completed_at',
+            'parent_id',
+            'priority',
+            'complexity',
         ];
 
         $data = collect($payload)

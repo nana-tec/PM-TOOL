@@ -17,6 +17,8 @@ const useTaskFiltersStore = create((set, get) => ({
     },
     status: params.status || 0,
     labels: params.labels || [],
+    priority: params.priority || [],
+    complexity: params.complexity || [],
   },
   hasUrlParams: (exclude = []) => {
     const params = omit(currentUrlParams(), exclude);
@@ -30,9 +32,11 @@ const useTaskFiltersStore = create((set, get) => ({
     return keys.some((key) => {
       if (isArray(filters[key])) {
         return filters[key].length > 0;
-      } else {
+      } else if (typeof filters[key] === 'object') {
         const keys = Object.keys(filters[key]);
         return keys.some((k) => !!filters[key][k]);
+      } else {
+        return !!filters[key];
       }
     });
   },
@@ -49,6 +53,8 @@ const useTaskFiltersStore = create((set, get) => ({
         },
         status: 0,
         labels: [],
+        priority: [],
+        complexity: [],
       }
     }));
   },
