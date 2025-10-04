@@ -1,7 +1,7 @@
 import useTaskGroupsStore from "@/hooks/store/useTaskGroupsStore";
 import useTaskFiltersStore from "@/hooks/store/useTaskFiltersStore";
 import { usePage } from "@inertiajs/react";
-import { ColorSwatch, Stack, Text } from "@mantine/core";
+import { ColorSwatch, Group, Stack, Text } from "@mantine/core";
 import FilterButton from "./Filters/FilterButton";
 
 export default function Filters() {
@@ -152,6 +152,84 @@ export default function Filters() {
                 {opt.label}
               </FilterButton>
             ))}
+          </Stack>
+        </div>
+
+        <div>
+          <Text fz="xs" fw={700} tt="uppercase" mb="sm">
+            Sort by
+          </Text>
+          <Stack justify="flex-start" gap={6}>
+            <FilterButton
+              selected={filters.sort === "priority"}
+              onClick={() => toggleValueFilter("sort", "priority")}
+            >
+              Priority (Urgent → Low)
+            </FilterButton>
+            <FilterButton
+              selected={filters.sort === "complexity"}
+              onClick={() => toggleValueFilter("sort", "complexity")}
+            >
+              Complexity (XL → XS)
+            </FilterButton>
+          </Stack>
+        </div>
+
+        <div>
+          <Text fz="xs" fw={700} tt="uppercase" mb="sm">
+            Legend
+          </Text>
+          <Stack gap={8}>
+            <div>
+              <Text size="xs" fw={600} mb={4}>
+                Priority
+              </Text>
+              <Group gap={10}>
+                <Group gap={6}>
+                  <ColorSwatch color="red" size={14} />
+                  <Text size="xs">Urgent</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="orange" size={14} />
+                  <Text size="xs">High</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="blue" size={14} />
+                  <Text size="xs">Medium</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="gray" size={14} />
+                  <Text size="xs">Low</Text>
+                </Group>
+              </Group>
+            </div>
+            <div>
+              <Text size="xs" fw={600} mb={4}>
+                Complexity
+              </Text>
+              <Group gap={10}>
+                <Group gap={6}>
+                  <ColorSwatch color="grape" size={14} />
+                  <Text size="xs">XL</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="violet" size={14} />
+                  <Text size="xs">L</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="gray" size={14} />
+                  <Text size="xs">M</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="cyan" size={14} />
+                  <Text size="xs">S</Text>
+                </Group>
+                <Group gap={6}>
+                  <ColorSwatch color="teal" size={14} />
+                  <Text size="xs">XS</Text>
+                </Group>
+              </Group>
+            </div>
           </Stack>
         </div>
       </Stack>

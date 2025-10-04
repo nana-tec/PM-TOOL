@@ -19,6 +19,7 @@ const useTaskFiltersStore = create((set, get) => ({
     labels: params.labels || [],
     priorities: params.priorities || [],
     complexities: params.complexities || [],
+    sort: params.sort || 0,
   },
   hasUrlParams: (exclude = []) => {
     const params = omit(currentUrlParams(), exclude);
@@ -53,6 +54,7 @@ const useTaskFiltersStore = create((set, get) => ({
         labels: [],
         priorities: [],
         complexities: [],
+        sort: 0,
       }
     }));
   },
@@ -86,12 +88,13 @@ const useTaskFiltersStore = create((set, get) => ({
   toggleValueFilter: (field, value) => {
     return set(
       produce((state) => {
-        if (!state.filters[field]) {
+        const current = state.filters[field];
+        if (current !== value) {
           state.filters[field] = value;
           reloadWithQuery({ [field]: value }, true);
         } else {
           state.filters[field] = 0;
-          reloadWithoutQueryParams({exclude: [field]});
+          reloadWithoutQueryParams({ exclude: [field] });
         }
       }),
     );
