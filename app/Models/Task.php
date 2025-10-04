@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Enums\PricingType;
-use App\Enums\Priority;
-use App\Enums\Complexity;
 use App\Models\Filters\IsNullFilter;
 use App\Models\Filters\TaskCompletedFilter;
 use App\Models\Filters\TaskOverdueFilter;
@@ -35,7 +33,6 @@ class Task extends Model implements AuditableContract, Sortable
         'created_by_user_id',
         'assigned_to_user_id',
         'invoice_id',
-        'parent_id',
         'name',
         'number',
         'description',
@@ -45,8 +42,6 @@ class Task extends Model implements AuditableContract, Sortable
         'fixed_price',
         'hidden_from_clients',
         'billable',
-        'priority',
-        'complexity',
         'order_column',
         'assigned_at',
         'completed_at',
@@ -65,8 +60,6 @@ class Task extends Model implements AuditableContract, Sortable
         'estimation' => 'float',
         'fixed_price' => 'integer',
         'pricing_type' => PricingType::class,
-        'priority' => Priority::class,
-        'complexity' => Complexity::class,
     ];
 
     protected $appends = [
@@ -97,8 +90,6 @@ class Task extends Model implements AuditableContract, Sortable
             (new IsNullFilter('due_on'))->setQueryName('not_set'),
             (new TaskCompletedFilter('completed_at'))->setQueryName('status'),
             (new WhereHasFilter('labels'))->setQueryName('labels'),
-            (new WhereInFilter('priority'))->setQueryName('priority'),
-            (new WhereInFilter('complexity'))->setQueryName('complexity'),
         ];
     }
 
@@ -144,16 +135,6 @@ class Task extends Model implements AuditableContract, Sortable
         return $this->belongsTo(Invoice::class);
     }
 
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(Task::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(Task::class, 'parent_id');
-    }
-
     public function subscribedUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'subscribe_task');
@@ -182,17 +163,6 @@ class Task extends Model implements AuditableContract, Sortable
     public function activities(): MorphMany
     {
         return $this->morphMany(Activity::class, 'activity_capable');
-    }
-
-    // Helpful scopes
-    public function scopeRoots(Builder $query): Builder
-    {
-        return $query->whereNull('parent_id');
-    }
-
-    public function scopeSubtasks(Builder $query): Builder
-    {
-        return $query->whereNotNull('parent_id');
     }
 
     public function isFixedPrice(): bool

@@ -20,14 +20,13 @@ import {
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Comments from './Comments';
 import LabelsDropdown from './LabelsDropdown';
 import Timer from './Timer';
 import classes from './css/TaskDrawer.module.css';
-import { PricingType, Priority, Complexity } from '@/utils/enums';
+import { PricingType } from '@/utils/enums';
 import TaskHistory from './TaskHistory';
-import Subtasks from './Subtasks';
 
 export function EditTaskDrawer() {
   const editorRef = useRef(null);
@@ -41,9 +40,7 @@ export function EditTaskDrawer() {
     labels,
     openedTask,
     currency,
-    tasksForParentPicker,
     auth: { user },
-    project,
   } = usePage().props;
 
   useEffect(() => {
@@ -55,7 +52,6 @@ export function EditTaskDrawer() {
   const [data, setData] = useState({
     group_id: '',
     assigned_to_user_id: '',
-    parent_id: '',
     name: '',
     description: '',
     pricing_type: PricingType.HOURLY,
@@ -66,8 +62,6 @@ export function EditTaskDrawer() {
     billable: true,
     subscribed_users: [],
     labels: [],
-    priority: '',
-    complexity: '',
   });
 
   useEffect(() => {
@@ -81,7 +75,6 @@ export function EditTaskDrawer() {
       setData({
         group_id: task?.group_id || '',
         assigned_to_user_id: task?.assigned_to_user_id || '',
-        parent_id: task?.parent_id || '',
         name: task?.name || '',
         description: task?.description || '',
         pricing_type: task?.pricing_type || PricingType.HOURLY,
@@ -93,8 +86,6 @@ export function EditTaskDrawer() {
         billable: task?.billable !== undefined ? task.billable : true,
         subscribed_users: (task?.subscribed_users || []).map(i => i.id.toString()),
         labels: (task?.labels || []).map(i => i.id),
-        priority: task?.priority || '',
-        complexity: task?.complexity || '',
       });
       setTimeout(() => {
         editorRef.current?.setContent(task?.description || '');
@@ -136,25 +127,6 @@ export function EditTaskDrawer() {
     { value: PricingType.FIXED, label: 'Fixed' },
   ];
 
-  const priorityOptions = useMemo(() => ([
-    { value: Priority.LOW, label: 'Low' },
-    { value: Priority.MEDIUM, label: 'Medium' },
-    { value: Priority.HIGH, label: 'High' },
-    { value: Priority.CRITICAL, label: 'Critical' },
-  ]), []);
-
-  const complexityOptions = useMemo(() => ([
-    { value: Complexity.TRIVIAL, label: 'Trivial' },
-    { value: Complexity.EASY, label: 'Easy' },
-    { value: Complexity.MEDIUM, label: 'Medium' },
-    { value: Complexity.HARD, label: 'Hard' },
-    { value: Complexity.EXTREME, label: 'Extreme' },
-  ]), []);
-
-  const parentOptions = useMemo(() => (tasksForParentPicker || [])
-    .filter(t => t.id !== task?.id)
-    .map(t => ({ value: t.id.toString(), label: `#${t.number} · ${t.name}` })), [tasksForParentPicker, task?.id]);
-
   const isFixedPrice = data.pricing_type === PricingType.FIXED;
   const currencySymbol = currency?.symbol || '';
 
@@ -164,7 +136,6 @@ export function EditTaskDrawer() {
       ...prev,
       group_id: updated?.group_id || '',
       assigned_to_user_id: updated?.assigned_to_user_id || '',
-      parent_id: updated?.parent_id || '',
       name: updated?.name || '',
       description: updated?.description || '',
       pricing_type: updated?.pricing_type || PricingType.HOURLY,
@@ -179,8 +150,6 @@ export function EditTaskDrawer() {
         i => i.id?.toString?.() ?? i?.toString?.() ?? ''
       ),
       labels: (updated?.labels || data.labels || []).map(i => i.id ?? i),
-      priority: updated?.priority || prev.priority,
-      complexity: updated?.complexity || prev.complexity,
     }));
 
     // Sync rich text editor content if available
@@ -277,9 +246,6 @@ export function EditTaskDrawer() {
               )}
 
               {can('view comments') && <Comments task={task} />}
-
-              {/* Subtasks panel */}
-              <Subtasks parent={task} projectId={project.id} />
             </div>
             <div className={classes.sidebar}>
               {/* Also expose history from sidebar top */}
@@ -311,18 +277,6 @@ export function EditTaskDrawer() {
                   value: i.id.toString(),
                   label: i.name,
                 }))}
-                readOnly={!can('edit task')}
-              />
-
-              <Select
-                label='Parent task'
-                placeholder='Select parent task'
-                searchable
-                clearable
-                mt='md'
-                value={data.parent_id?.toString?.() ?? ''}
-                onChange={value => updateValue('parent_id', value)}
-                data={parentOptions}
                 readOnly={!can('edit task')}
               />
 
@@ -391,26 +345,6 @@ export function EditTaskDrawer() {
                   task={task}
                 />
               )}
-
-              <Select
-                label='Priority'
-                placeholder='Select priority'
-                mt='md'
-                value={data.priority || ''}
-                onChange={value => updateValue('priority', value)}
-                data={priorityOptions}
-                readOnly={!can('edit task')}
-              />
-
-              <Select
-                label='Complexity'
-                placeholder='Select complexity'
-                mt='md'
-                value={data.complexity || ''}
-                onChange={value => updateValue('complexity', value)}
-                data={complexityOptions}
-                readOnly={!can('edit task')}
-              />
 
               <Checkbox
                 label='Billable'

@@ -43,7 +43,6 @@ class TaskController extends Controller
                 return [
                     $group->id => Task::where('project_id', $project->id)
                         ->where('group_id', $group->id)
-                        ->roots()
                         ->searchByQueryString()
                         ->filterByQueryString()
                         ->when($request->user()->hasRole('client'), fn ($query) => $query->where('hidden_from_clients', false))
@@ -55,41 +54,24 @@ class TaskController extends Controller
                 ];
             });
 
-        // Provide flat list of tasks for parent picker (exclude archived by default)
-        $tasksForParentPicker = Task::where('project_id', $project->id)
-            ->when($project->isArchived(), fn ($query) => $query->with(['project' => fn ($q) => $q->withArchived()]))
-            ->get(['id', 'name', 'number']);
-
-        $openedTask = null;
-        if ($task) {
-            $openedTask = $task->loadDefault()->load(['children' => function ($q) {
-                $q->orderBy('order_column');
-            }]);
-        }
-
         return Inertia::render('Projects/Tasks/Index', [
             'project' => $project,
             'usersWithAccessToProject' => PermissionService::usersWithAccessToProject($project),
             'labels' => Label::get(['id', 'name', 'color']),
             'taskGroups' => $groups,
             'groupedTasks' => $groupedTasks,
-            'openedTask' => $openedTask,
+            'openedTask' => $task ? $task->loadDefault() : null,
             'currency' => [
                 'symbol' => OwnerCompany::with('currency')->first()->currency->symbol,
             ],
-            'tasksForParentPicker' => $tasksForParentPicker,
         ]);
     }
 
-    public function store(StoreTaskRequest $request, Project $project): RedirectResponse|JsonResponse
+    public function store(StoreTaskRequest $request, Project $project): RedirectResponse
     {
         $this->authorize('create', [Task::class, $project]);
 
-        $task = (new CreateTask)->create($project, $request->validated());
-
-        if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
-            return response()->json(['task' => $task->loadDefault()], 201);
-        }
+        (new CreateTask)->create($project, $request->validated());
 
         return redirect()->route('projects.tasks', $project)->success('Task added', 'A new task was successfully added.');
     }
@@ -202,9 +184,6 @@ class TaskController extends Controller
             'billable',
             'group_id',
             'completed_at',
-            'parent_id',
-            'priority',
-            'complexity',
         ];
 
         $data = collect($payload)
@@ -235,17 +214,5 @@ class TaskController extends Controller
         }
 
         return response()->json(['task' => $task->refresh()->loadDefault()]);
-    }
-
-    public function subtasks(Project $project, Task $task): JsonResponse
-    {
-        $this->authorize('viewAny', [Task::class, $project]);
-
-        $children = $task->children()
-            ->orderBy('order_column')
-            ->withDefault()
-            ->get();
-
-        return response()->json(['subtasks' => $children]);
     }
 }

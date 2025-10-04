@@ -16,8 +16,6 @@ const useTasksStore = create((set, get) => ({
   tasks: {},
   setTasks: (tasks) => set(() => ({ tasks: { ...tasks } })),
   addTask: (task) => {
-    // Skip non-root tasks to avoid showing subtasks in main panels
-    if (task?.parent_id) return;
     return set(produce(state => {
       const index = state.tasks[task.group_id].findIndex((i) => i.id === task.id);
 

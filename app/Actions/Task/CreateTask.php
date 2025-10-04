@@ -29,19 +29,16 @@ class CreateTask
             $task = $project->tasks()->create([
                 'group_id' => $data['group_id'],
                 'created_by_user_id' => auth()->id(),
-                'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
-                'parent_id' => $data['parent_id'] ?? null,
+                'assigned_to_user_id' => $data['assigned_to_user_id'],
                 'name' => $data['name'],
                 'number' => $project->tasks()->withArchived()->count() + 1,
-                'description' => $data['description'] ?? null,
-                'due_on' => $data['due_on'] ?? null,
-                'estimation' => $data['estimation'] ?? null,
-                'pricing_type' => $data['pricing_type'] ?? null,
-                'fixed_price' => $data['fixed_price'] ?? null,
+                'description' => $data['description'],
+                'due_on' => $data['due_on'],
+                'estimation' => $data['estimation'],
+                'pricing_type' => $data['pricing_type'],
+                'fixed_price' => $data['fixed_price'],
                 'hidden_from_clients' => $data['hidden_from_clients'],
                 'billable' => $data['billable'],
-                'priority' => $data['priority'] ?? null,
-                'complexity' => $data['complexity'] ?? null,
                 'completed_at' => null,
             ]);
 
@@ -86,7 +83,7 @@ class CreateTask
             'project_id' => $task->project_id,
             'user_id' => auth()->id(),
             'title' => ($attachments->count() > 1 ? 'Attachments where' : 'Attachment was').' uploaded',
-            'subtitle' => "to \"{$task->name}\" by ".(auth()->user()?->name ?? 'system'),
+            'subtitle' => "to \"{$task->name}\" by ".auth()->user()->name,
         ]);
 
         if ($dispatchEvent) {
