@@ -37,6 +37,8 @@ class CreateTask
                 'estimation' => $data['estimation'],
                 'pricing_type' => $data['pricing_type'],
                 'fixed_price' => $data['fixed_price'],
+                'priority' => $data['priority'] ?? TaskPriority::MEDIUM->value,
+                'complexity' => $data['complexity'] ?? TaskComplexity::M->value,
                 'hidden_from_clients' => $data['hidden_from_clients'],
                 'billable' => $data['billable'],
                 'completed_at' => null,
