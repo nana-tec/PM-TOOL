@@ -25,7 +25,7 @@ import Comments from './Comments';
 import LabelsDropdown from './LabelsDropdown';
 import Timer from './Timer';
 import classes from './css/TaskDrawer.module.css';
-import { PricingType } from '@/utils/enums';
+import { PricingType, TaskPriority, TaskComplexity } from '@/utils/enums';
 import TaskHistory from './TaskHistory';
 
 export function EditTaskDrawer() {
@@ -57,6 +57,8 @@ export function EditTaskDrawer() {
     pricing_type: PricingType.HOURLY,
     estimation: 0,
     fixed_price: 0,
+    priority: TaskPriority.MEDIUM,
+    complexity: TaskComplexity.M,
     due_on: '',
     hidden_from_clients: false,
     billable: true,
@@ -80,6 +82,8 @@ export function EditTaskDrawer() {
         pricing_type: task?.pricing_type || PricingType.HOURLY,
         estimation: task?.estimation || 0,
         fixed_price: task?.fixed_price ? task.fixed_price / 100 : 0,
+        priority: task?.priority || TaskPriority.MEDIUM,
+        complexity: task?.complexity || TaskComplexity.M,
         due_on: task?.due_on ? dayjs(task?.due_on).toDate() : '',
         hidden_from_clients:
           task?.hidden_from_clients !== undefined ? task.hidden_from_clients : false,
@@ -127,6 +131,21 @@ export function EditTaskDrawer() {
     { value: PricingType.FIXED, label: 'Fixed' },
   ];
 
+  const priorityOptions = [
+    { value: TaskPriority.LOW, label: 'Low' },
+    { value: TaskPriority.MEDIUM, label: 'Medium' },
+    { value: TaskPriority.HIGH, label: 'High' },
+    { value: TaskPriority.URGENT, label: 'Urgent' },
+  ];
+
+  const complexityOptions = [
+    { value: TaskComplexity.XS, label: 'XS' },
+    { value: TaskComplexity.S, label: 'S' },
+    { value: TaskComplexity.M, label: 'M' },
+    { value: TaskComplexity.L, label: 'L' },
+    { value: TaskComplexity.XL, label: 'XL' },
+  ];
+
   const isFixedPrice = data.pricing_type === PricingType.FIXED;
   const currencySymbol = currency?.symbol || '';
 
@@ -141,6 +160,8 @@ export function EditTaskDrawer() {
       pricing_type: updated?.pricing_type || PricingType.HOURLY,
       estimation: updated?.estimation || 0,
       fixed_price: updated?.fixed_price ? updated.fixed_price / 100 : 0,
+      priority: updated?.priority || TaskPriority.MEDIUM,
+      complexity: updated?.complexity || TaskComplexity.M,
       due_on: updated?.due_on ? dayjs(updated?.due_on).toDate() : '',
       hidden_from_clients:
         updated?.hidden_from_clients !== undefined ? updated.hidden_from_clients : false,
@@ -345,6 +366,26 @@ export function EditTaskDrawer() {
                   task={task}
                 />
               )}
+
+              <Select
+                label='Priority'
+                placeholder='Select priority'
+                mt='md'
+                value={data.priority}
+                onChange={value => updateValue('priority', value)}
+                data={priorityOptions}
+                readOnly={!can('edit task')}
+              />
+
+              <Select
+                label='Complexity'
+                placeholder='Select complexity'
+                mt='md'
+                value={data.complexity}
+                onChange={value => updateValue('complexity', value)}
+                data={complexityOptions}
+                readOnly={!can('edit task')}
+              />
 
               <Checkbox
                 label='Billable'

@@ -3,6 +3,8 @@
 namespace App\Http\Requests\Task;
 
 use App\Enums\PricingType;
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +33,8 @@ class StoreTaskRequest extends FormRequest
             'estimation' => ['nullable'],
             'pricing_type' => ['required', 'string', Rule::enum(PricingType::class)],
             'fixed_price' => ['nullable', 'numeric', 'min:0', Rule::when($this->pricing_type === PricingType::FIXED->value, 'present')],
+            'priority' => ['nullable', 'string', Rule::enum(TaskPriority::class)],
+            'complexity' => ['nullable', 'string', Rule::enum(TaskComplexity::class)],
             'due_on' => ['nullable'],
             'hidden_from_clients' => ['required', 'boolean'],
             'billable' => ['required', 'boolean'],

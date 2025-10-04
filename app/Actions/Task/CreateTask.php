@@ -3,6 +3,8 @@
 namespace App\Actions\Task;
 
 use App\Enums\PricingType;
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
 use App\Events\Task\AttachmentsUploaded;
 use App\Events\Task\TaskCreated;
 use App\Models\Project;

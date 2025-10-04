@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\PricingType;
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
 use App\Models\Filters\IsNullFilter;
 use App\Models\Filters\TaskCompletedFilter;
 use App\Models\Filters\TaskOverdueFilter;
@@ -40,6 +42,8 @@ class Task extends Model implements AuditableContract, Sortable
         'estimation',
         'pricing_type',
         'fixed_price',
+        'priority',
+        'complexity',
         'hidden_from_clients',
         'billable',
         'order_column',
@@ -60,6 +64,8 @@ class Task extends Model implements AuditableContract, Sortable
         'estimation' => 'float',
         'fixed_price' => 'integer',
         'pricing_type' => PricingType::class,
+        'priority' => TaskPriority::class,
+        'complexity' => TaskComplexity::class,
     ];
 
     protected $appends = [

@@ -21,7 +21,7 @@ import { DateInput } from '@mantine/dates';
 import { useEffect } from 'react';
 import LabelsDropdown from './LabelsDropdown';
 import classes from './css/TaskDrawer.module.css';
-import { PricingType } from '@/utils/enums';
+import { PricingType, TaskPriority, TaskComplexity } from '@/utils/enums';
 
 export function CreateTaskDrawer() {
   const { create, closeCreateTask } = useTaskDrawerStore();
@@ -42,6 +42,8 @@ export function CreateTaskDrawer() {
     pricing_type: project?.default_pricing_type || PricingType.HOURLY,
     estimation: '',
     fixed_price: '',
+    priority: TaskPriority.MEDIUM,
+    complexity: TaskComplexity.M,
     due_on: '',
     hidden_from_clients: false,
     billable: true,
@@ -86,6 +88,21 @@ export function CreateTaskDrawer() {
   const pricingTypes = [
     { value: PricingType.HOURLY, label: 'Hourly' },
     { value: PricingType.FIXED, label: 'Fixed' },
+  ];
+
+  const priorityOptions = [
+    { value: TaskPriority.LOW, label: 'Low' },
+    { value: TaskPriority.MEDIUM, label: 'Medium' },
+    { value: TaskPriority.HIGH, label: 'High' },
+    { value: TaskPriority.URGENT, label: 'Urgent' },
+  ];
+
+  const complexityOptions = [
+    { value: TaskComplexity.XS, label: 'XS' },
+    { value: TaskComplexity.S, label: 'S' },
+    { value: TaskComplexity.M, label: 'M' },
+    { value: TaskComplexity.L, label: 'L' },
+    { value: TaskComplexity.XL, label: 'XL' },
   ];
 
   const isFixedPrice = form.data.pricing_type === PricingType.FIXED;
@@ -268,6 +285,26 @@ export function CreateTaskDrawer() {
               error={form.errors.fixed_price}
             />
           ) : null}
+
+          <Select
+            label='Priority'
+            placeholder='Select priority'
+            mt='md'
+            value={form.data.priority}
+            onChange={value => updateValue('priority', value)}
+            data={priorityOptions}
+            error={form.errors.priority}
+          />
+
+          <Select
+            label='Complexity'
+            placeholder='Select complexity'
+            mt='md'
+            value={form.data.complexity}
+            onChange={value => updateValue('complexity', value)}
+            data={complexityOptions}
+            error={form.errors.complexity}
+          />
 
           <Checkbox
             label='Billable'
