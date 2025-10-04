@@ -96,6 +96,8 @@ class Task extends Model implements AuditableContract, Sortable
             (new IsNullFilter('due_on'))->setQueryName('not_set'),
             (new TaskCompletedFilter('completed_at'))->setQueryName('status'),
             (new WhereHasFilter('labels'))->setQueryName('labels'),
+            (new WhereInFilter('priority'))->setQueryName('priorities'),
+            (new WhereInFilter('complexity'))->setQueryName('complexities'),
         ];
     }
 

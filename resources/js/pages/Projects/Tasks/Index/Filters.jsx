@@ -11,6 +11,21 @@ export default function Filters() {
   const { filters, toggleArrayFilter, toggleObjectFilter, toggleValueFilter } =
     useTaskFiltersStore();
 
+  const priorityOptions = [
+    { value: "urgent", label: "Urgent" },
+    { value: "high", label: "High" },
+    { value: "medium", label: "Medium" },
+    { value: "low", label: "Low" },
+  ];
+
+  const complexityOptions = [
+    { value: "xs", label: "XS" },
+    { value: "s", label: "S" },
+    { value: "m", label: "M" },
+    { value: "l", label: "L" },
+    { value: "xl", label: "XL" },
+  ];
+
   return (
     <>
       <Stack justify="flex-start" gap={24}>
@@ -105,6 +120,40 @@ export default function Filters() {
             </Stack>
           </div>
         )}
+
+        <div>
+          <Text fz="xs" fw={700} tt="uppercase" mb="sm">
+            Priority
+          </Text>
+          <Stack justify="flex-start" gap={6}>
+            {priorityOptions.map((opt) => (
+              <FilterButton
+                key={opt.value}
+                selected={filters.priorities.includes(opt.value)}
+                onClick={() => toggleArrayFilter("priorities", opt.value)}
+              >
+                {opt.label}
+              </FilterButton>
+            ))}
+          </Stack>
+        </div>
+
+        <div>
+          <Text fz="xs" fw={700} tt="uppercase" mb="sm">
+            Complexity
+          </Text>
+          <Stack justify="flex-start" gap={6}>
+            {complexityOptions.map((opt) => (
+              <FilterButton
+                key={opt.value}
+                selected={filters.complexities.includes(opt.value)}
+                onClick={() => toggleArrayFilter("complexities", opt.value)}
+              >
+                {opt.label}
+              </FilterButton>
+            ))}
+          </Stack>
+        </div>
       </Stack>
     </>
   );
