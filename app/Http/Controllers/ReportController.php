@@ -67,14 +67,70 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS assigned')
             ->pluck('assigned', 'user_id');
 
-        $windowWorkload = (clone $tasksBase)
+        // Weighted hours helpers (priority * complexity)
+        $priorityWeight = "CASE tasks.priority WHEN 'urgent' THEN 1.5 WHEN 'high' THEN 1.3 WHEN 'medium' THEN 1.0 WHEN 'low' THEN 0.7 ELSE 1.0 END";
+        $complexityWeight = "CASE tasks.complexity WHEN 'xl' THEN 2.0 WHEN 'l' THEN 1.5 WHEN 'm' THEN 1.0 WHEN 's' THEN 0.75 WHEN 'xs' THEN 0.5 ELSE 1.0 END";
+        $weightedExpr = "COALESCE(tasks.estimation,0) * ($priorityWeight) * ($complexityWeight)";
+
+        // Task weighted open workload (not completed)
+        $taskOpenWeighted = (clone $tasksBase)
+            ->whereNull('tasks.completed_at')
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw("assigned_to_user_id AS user_id, COALESCE(SUM($weightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
+        // Task weighted workload due within window
+        $taskWindowWeighted = (clone $tasksBase)
             ->whereNull('tasks.completed_at')
             ->whereNotNull('tasks.due_on')
             ->whereBetween('tasks.due_on', [$start->toDateString(), $end->toDateString()])
-            ->selectRaw('assigned_to_user_id AS user_id, COALESCE(SUM(COALESCE(tasks.estimation, 0)), 0) AS hours')
             ->groupBy('assigned_to_user_id')
+            ->selectRaw("assigned_to_user_id AS user_id, COALESCE(SUM($weightedExpr), 0) AS hours")
             ->pluck('hours', 'user_id');
 
+        // Task overdue weighted hours (due_on < today, not completed)
+        $taskOverdueWeighted = (clone $tasksBase)
+            ->whereNull('tasks.completed_at')
+            ->whereNotNull('tasks.due_on')
+            ->whereDate('tasks.due_on', '<', now()->toDateString())
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw("assigned_to_user_id AS user_id, COALESCE(SUM($weightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
+        // Subtask weighted hours: join parent task for weights, group by subtask assignee
+        $subPriorityWeight = $priorityWeight; // uses parent task priority
+        $subComplexityWeight = $complexityWeight; // uses parent task complexity
+        $subWeightedExpr = "COALESCE(st.estimation,0) * ($subPriorityWeight) * ($subComplexityWeight)";
+
+        $subOpenWeighted = DB::table('sub_tasks AS st')
+            ->join('tasks', 'tasks.id', '=', 'st.task_id')
+            ->whereIn('st.assigned_to_user_id', $userIds)
+            ->whereNull('st.completed_at')
+            ->groupBy('st.assigned_to_user_id')
+            ->selectRaw("st.assigned_to_user_id AS user_id, COALESCE(SUM($subWeightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
+        $subWindowWeighted = DB::table('sub_tasks AS st')
+            ->join('tasks', 'tasks.id', '=', 'st.task_id')
+            ->whereIn('st.assigned_to_user_id', $userIds)
+            ->whereNull('st.completed_at')
+            ->whereNotNull('st.due_on')
+            ->whereBetween('st.due_on', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('st.assigned_to_user_id')
+            ->selectRaw("st.assigned_to_user_id AS user_id, COALESCE(SUM($subWeightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
+        $subOverdueWeighted = DB::table('sub_tasks AS st')
+            ->join('tasks', 'tasks.id', '=', 'st.task_id')
+            ->whereIn('st.assigned_to_user_id', $userIds)
+            ->whereNull('st.completed_at')
+            ->whereNotNull('st.due_on')
+            ->whereDate('st.due_on', '<', now()->toDateString())
+            ->groupBy('st.assigned_to_user_id')
+            ->selectRaw("st.assigned_to_user_id AS user_id, COALESCE(SUM($subWeightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
+        // Projects counts (unchanged)
         $projectsCounts = DB::table('tasks')
             ->whereIn('assigned_to_user_id', $userIds)
             ->where(function ($q) use ($start, $end) {
@@ -85,6 +141,7 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(DISTINCT project_id) AS projects')
             ->pluck('projects', 'user_id');
 
+        // Time logged
         $timeLogged = DB::table('time_logs')
             ->join('tasks', 'tasks.id', '=', 'time_logs.task_id')
             ->whereIn('time_logs.user_id', $userIds)
@@ -113,13 +170,22 @@ class ReportController extends Controller
             ->groupBy('assigned_to_user_id')
             ->pluck('latency_hours', 'user_id');
 
-        $items = $users->map(function ($user) use ($capacityHours, $weeks, $pendingCounts, $overdueCounts, $completedCounts, $assignedCounts, $windowWorkload, $projectsCounts, $activeDays, $loggedHours, $latencyRows, $days) {
+        $items = $users->map(function ($user) use (
+            $capacityHours, $weeks, $pendingCounts, $overdueCounts, $completedCounts, $assignedCounts,
+            $taskOpenWeighted, $taskWindowWeighted, $taskOverdueWeighted, $subOpenWeighted, $subWindowWeighted, $subOverdueWeighted,
+            $projectsCounts, $activeDays, $loggedHours, $latencyRows, $days
+        ) {
             $pending = (int) ($pendingCounts[$user->id] ?? 0);
             $overdue = (int) ($overdueCounts[$user->id] ?? 0);
             $completed = (int) ($completedCounts[$user->id] ?? 0);
             $assigned = (int) ($assignedCounts[$user->id] ?? 0);
             $projects = (int) ($projectsCounts[$user->id] ?? 0);
-            $windowHours = (float) ($windowWorkload[$user->id] ?? 0.0);
+
+            // Weighted planned hours
+            $openHours = (float) ($taskOpenWeighted[$user->id] ?? 0) + (float) ($subOpenWeighted[$user->id] ?? 0);
+            $windowHours = (float) ($taskWindowWeighted[$user->id] ?? 0) + (float) ($subWindowWeighted[$user->id] ?? 0);
+            $overdueWeighted = (float) ($taskOverdueWeighted[$user->id] ?? 0) + (float) ($subOverdueWeighted[$user->id] ?? 0);
+
             $hoursLogged = (float) ($loggedHours[$user->id] ?? 0.0);
             $actDays = (int) ($activeDays[$user->id] ?? 0);
             $idleDays = round(max(0, $days - $actDays), 1);
@@ -131,8 +197,11 @@ class ReportController extends Controller
             $availabilityHours = max(0.0, round($capacityHours - $windowHours, 2));
             $latency = isset($latencyRows[$user->id]) ? round(max(0, (float) $latencyRows[$user->id]), 2) : null; // hours
 
+            // Risk: base + weighted overdue hours influence
             $risk = 0.0;
             $risk += min(40, $overdue * 2.5);
+            // Add weighted overdue hours influence (up to 30)
+            $risk += min(30, $overdueWeighted * 2.0);
             if (($plannedUtil ?? 0) >= 100) {
                 $risk += 20;
             } elseif (($plannedUtil ?? 0) >= 90) {
@@ -171,6 +240,9 @@ class ReportController extends Controller
                 'throughput_per_week' => $throughput,
                 'completion_rate' => $completionRate,
                 'risk_score' => $riskScore,
+                'open_weighted_hours' => round($openHours, 2),
+                'window_weighted_hours' => round($windowHours, 2),
+                'overdue_weighted_hours' => round($overdueWeighted, 2),
             ];
         });
 
@@ -348,28 +420,23 @@ class ReportController extends Controller
         $capacityHours = $weeklyCapacity * $weeks;
         $rankBy = in_array($request->get('rank_by'), ['performance', 'planned', 'actual']) ? $request->get('rank_by') : 'performance';
 
-        // Users to include (exclude clients by default)
         $usersQuery = User::query()->withoutRole('client');
         if ($request->users) {
             $usersQuery->whereIn('id', $request->users);
         }
         $users = $usersQuery->get(['id', 'name', 'avatar']);
-
         $userIds = $users->pluck('id');
 
-        // Aggregate task metrics
         $tasksBase = DB::table('tasks')
             ->whereIn('assigned_to_user_id', $userIds)
             ->whereNull('tasks.archived_at');
 
-        // Pending (open) tasks count per user
         $pendingCounts = (clone $tasksBase)
             ->whereNull('tasks.completed_at')
             ->groupBy('assigned_to_user_id')
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS pending')
             ->pluck('pending', 'user_id');
 
-        // Overdue (open and due_on < today)
         $overdueCounts = (clone $tasksBase)
             ->whereNull('tasks.completed_at')
             ->whereNotNull('tasks.due_on')
@@ -378,7 +445,6 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS overdue')
             ->pluck('overdue', 'user_id');
 
-        // Completed in range
         $completedCounts = (clone $tasksBase)
             ->whereNotNull('tasks.completed_at')
             ->whereBetween('tasks.completed_at', [$start, $end])
@@ -386,7 +452,6 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS completed')
             ->pluck('completed', 'user_id');
 
-        // Assigned in range (prefer assigned_at, fallback to created_at)
         $assignedCounts = (clone $tasksBase)
             ->where(function ($q) use ($start, $end) {
                 $q->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end]);
@@ -395,34 +460,45 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS assigned')
             ->pluck('assigned', 'user_id');
 
-        // Open workload (sum estimation hours of open tasks)
-        $openWorkload = (clone $tasksBase)
+        // Weighted planned workload
+        $priorityWeight = "CASE tasks.priority WHEN 'urgent' THEN 1.5 WHEN 'high' THEN 1.3 WHEN 'medium' THEN 1.0 WHEN 'low' THEN 0.7 ELSE 1.0 END";
+        $complexityWeight = "CASE tasks.complexity WHEN 'xl' THEN 2.0 WHEN 'l' THEN 1.5 WHEN 'm' THEN 1.0 WHEN 's' THEN 0.75 WHEN 'xs' THEN 0.5 ELSE 1.0 END";
+        $weightedExpr = "COALESCE(tasks.estimation,0) * ($priorityWeight) * ($complexityWeight)";
+
+        $taskOpenWeighted = (clone $tasksBase)
             ->whereNull('tasks.completed_at')
-            ->selectRaw('assigned_to_user_id AS user_id, COALESCE(SUM(COALESCE(tasks.estimation, 0)), 0) AS hours')
             ->groupBy('assigned_to_user_id')
+            ->selectRaw("assigned_to_user_id AS user_id, COALESCE(SUM($weightedExpr), 0) AS hours")
             ->pluck('hours', 'user_id');
 
-        // Workload due within window (open tasks due in range)
-        $windowWorkload = (clone $tasksBase)
+        $taskWindowWeighted = (clone $tasksBase)
             ->whereNull('tasks.completed_at')
             ->whereNotNull('tasks.due_on')
             ->whereBetween('tasks.due_on', [$start->toDateString(), $end->toDateString()])
-            ->selectRaw('assigned_to_user_id AS user_id, COALESCE(SUM(COALESCE(tasks.estimation, 0)), 0) AS hours')
             ->groupBy('assigned_to_user_id')
+            ->selectRaw("assigned_to_user_id AS user_id, COALESCE(SUM($weightedExpr), 0) AS hours")
             ->pluck('hours', 'user_id');
 
-        // Distinct projects worked on (in range: via completed or assigned)
-        $projectsCounts = DB::table('tasks')
-            ->whereIn('assigned_to_user_id', $userIds)
-            ->where(function ($q) use ($start, $end) {
-                $q->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
-                    ->orWhereBetween('tasks.completed_at', [$start, $end]);
-            })
-            ->groupBy('assigned_to_user_id')
-            ->selectRaw('assigned_to_user_id AS user_id, COUNT(DISTINCT project_id) AS projects')
-            ->pluck('projects', 'user_id');
+        $subWeightedExpr = "COALESCE(st.estimation,0) * ($priorityWeight) * ($complexityWeight)";
 
-        // Time logged in window (actual utilization)
+        $subOpenWeighted = DB::table('sub_tasks AS st')
+            ->join('tasks', 'tasks.id', '=', 'st.task_id')
+            ->whereIn('st.assigned_to_user_id', $userIds)
+            ->whereNull('st.completed_at')
+            ->groupBy('st.assigned_to_user_id')
+            ->selectRaw("st.assigned_to_user_id AS user_id, COALESCE(SUM($subWeightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
+        $subWindowWeighted = DB::table('sub_tasks AS st')
+            ->join('tasks', 'tasks.id', '=', 'st.task_id')
+            ->whereIn('st.assigned_to_user_id', $userIds)
+            ->whereNull('st.completed_at')
+            ->whereNotNull('st.due_on')
+            ->whereBetween('st.due_on', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('st.assigned_to_user_id')
+            ->selectRaw("st.assigned_to_user_id AS user_id, COALESCE(SUM($subWeightedExpr), 0) AS hours")
+            ->pluck('hours', 'user_id');
+
         $timeLogged = DB::table('time_logs')
             ->join('tasks', 'tasks.id', '=', 'time_logs.task_id')
             ->whereIn('time_logs.user_id', $userIds)
@@ -431,26 +507,22 @@ class ReportController extends Controller
             ->selectRaw('time_logs.user_id AS user_id, SUM(time_logs.minutes)/60 AS hours')
             ->pluck('hours', 'user_id');
 
-        // Build items
         $items = $users->map(function ($user) use (
-            $capacityHours, $weeks, $pendingCounts, $overdueCounts, $completedCounts, $assignedCounts, $openWorkload, $windowWorkload, $projectsCounts, $timeLogged
+            $capacityHours, $weeks, $pendingCounts, $overdueCounts, $completedCounts, $assignedCounts, $taskOpenWeighted, $taskWindowWeighted, $subOpenWeighted, $subWindowWeighted, $timeLogged
         ) {
             $pending = (int) ($pendingCounts[$user->id] ?? 0);
             $overdue = (int) ($overdueCounts[$user->id] ?? 0);
             $completed = (int) ($completedCounts[$user->id] ?? 0);
             $assigned = (int) ($assignedCounts[$user->id] ?? 0);
-            $projects = (int) ($projectsCounts[$user->id] ?? 0);
-            $openHours = (float) ($openWorkload[$user->id] ?? 0.0);
-            $windowHours = (float) ($windowWorkload[$user->id] ?? 0.0);
+
+            $openHours = (float) ($taskOpenWeighted[$user->id] ?? 0) + (float) ($subOpenWeighted[$user->id] ?? 0);
+            $windowHours = (float) ($taskWindowWeighted[$user->id] ?? 0) + (float) ($subWindowWeighted[$user->id] ?? 0);
             $loggedHours = (float) ($timeLogged[$user->id] ?? 0.0);
 
             $completionRate = $assigned > 0 ? round(($completed / $assigned) * 100, 1) : null;
-            $throughput = $weeks > 0 ? round($completed / $weeks, 2) : $completed; // tasks per week
-
-            // Utilization: prefer planned hours in window; fall back to actual logged hours
+            $throughput = $weeks > 0 ? round($completed / $weeks, 2) : $completed;
             $plannedUtil = $capacityHours > 0 ? round(min(100, ($windowHours / $capacityHours) * 100), 1) : null;
             $actualUtil = $capacityHours > 0 ? round(min(100, ($loggedHours / $capacityHours) * 100), 1) : null;
-
             $availabilityHours = max(0.0, round($capacityHours - $windowHours, 2));
 
             return [
@@ -463,9 +535,8 @@ class ReportController extends Controller
                 'overdue' => $overdue,
                 'completed' => $completed,
                 'assigned' => $assigned,
-                'projects' => $projects,
-                'open_estimation_hours' => round($openHours, 2),
-                'window_estimation_hours' => round($windowHours, 2),
+                'open_weighted_hours' => round($openHours, 2),
+                'window_weighted_hours' => round($windowHours, 2),
                 'time_logged_hours' => round($loggedHours, 2),
                 'planned_utilization' => $plannedUtil,
                 'actual_utilization' => $actualUtil,
@@ -475,12 +546,11 @@ class ReportController extends Controller
             ];
         });
 
-        // Ranking
         if ($rankBy === 'planned') {
             $ranked = $items->sortByDesc(fn ($i) => $i['planned_utilization'] ?? -1)->values();
         } elseif ($rankBy === 'actual') {
             $ranked = $items->sortByDesc(fn ($i) => $i['actual_utilization'] ?? -1)->values();
-        } else { // performance (default)
+        } else {
             $ranked = $items->sortByDesc(function ($i) {
                 return [
                     $i['completion_rate'] ?? -1,
@@ -489,7 +559,6 @@ class ReportController extends Controller
             })->values();
         }
 
-        // Attach rank
         $ranked = $ranked->map(function ($i, $idx) {
             $i['rank'] = $idx + 1;
 
