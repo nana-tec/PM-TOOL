@@ -44,7 +44,7 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, BarElement, LineElement, ChartTooltip, Legend);
 
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import axios from 'axios';
 
 const headers = [
@@ -194,14 +194,13 @@ export default function TeamMetrics() {
   const [activeTab, setActiveTab] = useState('pending');
   const [tasks, setTasks] = useState({ pending: [], overdue: [], completed: [] });
   const [loadingTasks, setLoadingTasks] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [projectsDropdown, setProjectsDropdown] = useState([]);
-  const [suggestProject, setSuggestProject] = useState('');
   const [exporting, setExporting] = useState(false);
   const [chartsMode, setChartsMode] = useState('capacity'); // capacity|risk|util|complexity
   const [showComplexityMix, setShowComplexityMix] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
+  const [complexityWeighted, setComplexityWeighted] = useState(false);
+  const capChartRef = useRef(null);
+  const complexityChartRef = useRef(null);
 
   const openUserDrawer = (row, tab = 'pending') => {
     setActiveUser(row);
@@ -234,17 +233,6 @@ export default function TeamMetrics() {
     if (drawerOpen) fetchTasks(activeTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerOpen, activeTab]);
-
-  // Load projects for suggestion filter
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await axios.get(route('dropdown.values'), { params: { projects: true } });
-        const dd = (data?.projects || []).map(p => ({ value: String(p.value || p.id), label: p.label || p.name }));
-        setProjectsDropdown(dd);
-      } catch (_) { /* ignore */ }
-    })();
-  }, []);
 
   // Saved views (localStorage)
   const saveCurrentView = () => {
@@ -330,16 +318,6 @@ export default function TeamMetrics() {
     } finally { setExporting(false); }
   };
 
-  // Suggestions
-  const fetchSuggestions = async () => {
-    setSuggesting(true);
-    try {
-      const params = { limit: 5 };
-      if (suggestProject) params.project_id = suggestProject;
-      const { data } = await axios.get(route('reports.team-metrics.suggest'), { params });
-      setSuggestions(data.candidates || []);
-    } finally { setSuggesting(false); }
-  };
 
   // Charts data
   const charts = useMemo(() => {
@@ -351,6 +329,7 @@ export default function TeamMetrics() {
         { label: 'Actual %', data: items.slice(0, 12).map(i => i.actual_utilization ?? 0), backgroundColor: 'rgba(255, 159, 64, 0.6)' },
       ],
     };
+    const capSubset = items.slice(0, 12);
     const riskLine = {
       labels: items.slice(0, 20).map(i => `#${i.rank}`),
       datasets: [ { label: 'Risk score', data: items.slice(0, 20).map(i => i.risk_score ?? 0), borderColor: 'rgba(255,99,132,1)', backgroundColor: 'rgba(255,99,132,0.2)', tension: 0.2 } ],
@@ -375,14 +354,14 @@ export default function TeamMetrics() {
       labels: subset.map(i => i.user.name.split(' ')[0]),
       datasets: complexities.map(k => ({
         label: k.toUpperCase(),
-        data: subset.map(i => (i.complex_open?.[k] ?? 0)),
+        data: subset.map(i => (complexityWeighted ? (i.complex_open_weighted?.[k] ?? 0) : (i.complex_open?.[k] ?? 0))),
         backgroundColor: colors[k],
         stack: 'complexity',
       })),
     };
 
-    return { capVsActual, riskLine, utilHist, complexityStack };
-  }, [items]);
+    return { capVsActual, riskLine, utilHist, complexityStack, complexitySubset: subset, capSubset };
+  }, [items, complexityWeighted]);
 
   // Sorted items for the table view
   const sorted = useMemo(() => {
@@ -566,8 +545,24 @@ export default function TeamMetrics() {
             {label:'Complexity mix', value:'complexity'},
           ]} />
         </Group>
+        {chartsMode === 'complexity' && (
+          <Group justify="flex-end" mb="xs">
+            <Switch size="xs" checked={complexityWeighted} onChange={(e)=> setComplexityWeighted(e.currentTarget.checked)} label="Weighted hours" />
+          </Group>
+        )}
         {chartsMode === 'capacity' && (
-          <Bar data={charts.capVsActual} options={{ responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ y:{ beginAtZero:true, max:100 } } }} />
+          <Bar ref={capChartRef} data={charts.capVsActual} options={{
+            responsive:true,
+            plugins:{ legend:{ position:'bottom' } },
+            scales:{ y:{ beginAtZero:true, max:100 } },
+            onClick: (evt, elements, chart) => {
+              const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+              if (!els.length) return;
+              const idx = els[0].index;
+              const member = charts.capSubset[idx];
+              if (member) openUserDrawer(member);
+            },
+          }} />
         )}
         {chartsMode === 'risk' && (
           <Line data={charts.riskLine} options={{ responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ y:{ beginAtZero:true, max:100 } } }} />
@@ -576,11 +571,28 @@ export default function TeamMetrics() {
           <Bar data={charts.utilHist} options={{ responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ y:{ beginAtZero:true, ticks:{ stepSize:1 } } } }} />
         )}
         {chartsMode === 'complexity' && (
-          <Bar data={charts.complexityStack} options={{
-            responsive:true,
-            plugins:{ legend:{ position:'bottom' } },
-            scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{ stepSize:1 } } }
-          }} />
+          <Bar ref={complexityChartRef} data={charts.complexityStack} options={{
+             responsive:true,
+             plugins:{
+               legend:{ position:'bottom' },
+               tooltip: {
+                 callbacks: {
+                   label: (ctx) => {
+                     const v = ctx.raw ?? 0;
+                     return `${ctx.dataset.label}: ${v}${complexityWeighted ? 'h' : ''}`;
+                   },
+                 },
+               },
+             },
+             scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{ stepSize:1 } } },
+             onClick: (evt, elements, chart) => {
+               const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+               if (!els.length) return;
+               const idx = els[0].index;
+               const member = charts.complexitySubset[idx];
+               if (member) openUserDrawer(member);
+             },
+           }} />
         )}
       </ContainerBox>
 

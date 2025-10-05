@@ -62,7 +62,9 @@ class ReportController extends Controller
             ->pluck('completed', 'user_id');
 
         $assignedCounts = (clone $tasksBase)
-            ->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
+            ->where(function ($q) use ($start, $end) {
+                $q->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end]);
+            })
             ->groupBy('assigned_to_user_id')
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS assigned')
             ->pluck('assigned', 'user_id');
@@ -218,6 +220,31 @@ class ReportController extends Controller
             $uid = $r->user_id; $k = $r->k; $complexOpenMap[$uid][$k] = ($complexOpenMap[$uid][$k] ?? 0) + (int) $r->c;
         }
 
+        // Per-complexity weighted open hours
+        $complexOpenWeightedTasksRows = (clone $tasksBase)
+            ->whereNull('tasks.completed_at')
+            ->whereIn('tasks.complexity', ['xl', 'l', 'm', 's', 'xs'])
+            ->groupBy('assigned_to_user_id', 'tasks.complexity')
+            ->selectRaw("assigned_to_user_id AS user_id, tasks.complexity AS k, COALESCE(SUM($weightedExpr), 0) AS hours")
+            ->get();
+
+        $complexOpenWeightedSubsRows = DB::table('sub_tasks AS st')
+            ->join('tasks', 'tasks.id', '=', 'st.task_id')
+            ->whereIn('st.assigned_to_user_id', $userIds)
+            ->whereNull('st.completed_at')
+            ->whereIn('tasks.complexity', ['xl', 'l', 'm', 's', 'xs'])
+            ->groupBy('st.assigned_to_user_id', 'tasks.complexity')
+            ->selectRaw("st.assigned_to_user_id AS user_id, tasks.complexity AS k, COALESCE(SUM($subWeightedExpr), 0) AS hours")
+            ->get();
+
+        $complexOpenWeightedMap = [];
+        foreach ($complexOpenWeightedTasksRows as $r) {
+            $uid = $r->user_id; $k = $r->k; $complexOpenWeightedMap[$uid][$k] = ($complexOpenWeightedMap[$uid][$k] ?? 0.0) + (float) $r->hours;
+        }
+        foreach ($complexOpenWeightedSubsRows as $r) {
+            $uid = $r->user_id; $k = $r->k; $complexOpenWeightedMap[$uid][$k] = ($complexOpenWeightedMap[$uid][$k] ?? 0.0) + (float) $r->hours;
+        }
+
         // Projects counts (unchanged)
         $projectsCounts = DB::table('tasks')
             ->whereIn('assigned_to_user_id', $userIds)
@@ -263,7 +290,7 @@ class ReportController extends Controller
             $taskOpenWeighted, $taskWindowWeighted, $taskOverdueWeighted, $subOpenWeighted, $subWindowWeighted, $subOverdueWeighted,
             $projectsCounts, $activeDays, $loggedHours, $latencyRows, $days,
             $taskCompletedWeighted, $taskAssignedWeighted, $subCompletedCount, $subAssignedCount, $subCompletedWeighted, $subAssignedWeighted,
-            $highPriorityOpenTasks, $highPriorityOpenSubs, $complexOpenMap
+            $highPriorityOpenTasks, $highPriorityOpenSubs, $complexOpenMap, $complexOpenWeightedMap
         ) {
             $pending = (int) ($pendingCounts[$user->id] ?? 0);
             $overdue = (int) ($overdueCounts[$user->id] ?? 0);
@@ -302,6 +329,8 @@ class ReportController extends Controller
             $highPriOpen = (int) ($highPriorityOpenTasks[$user->id] ?? 0) + (int) ($highPriorityOpenSubs[$user->id] ?? 0);
             $complexOpen = $complexOpenMap[$user->id] ?? [];
             $complexOpen = array_merge(['xl' => 0, 'l' => 0, 'm' => 0, 's' => 0, 'xs' => 0], $complexOpen);
+            $complexOpenWeighted = $complexOpenWeightedMap[$user->id] ?? [];
+            $complexOpenWeighted = array_merge(['xl' => 0.0, 'l' => 0.0, 'm' => 0.0, 's' => 0.0, 'xs' => 0.0], $complexOpenWeighted);
 
             // Risk: base + weighted overdue hours influence
             $risk = 0.0;
@@ -361,6 +390,7 @@ class ReportController extends Controller
                 'weighted_completion_rate' => $wCompletionRate,
                 'high_priority_open' => $highPriOpen,
                 'complex_open' => $complexOpen,
+                'complex_open_weighted' => array_map(fn($v) => round((float)$v, 2), $complexOpenWeighted),
             ];
         });
 
