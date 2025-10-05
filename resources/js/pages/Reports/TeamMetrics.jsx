@@ -25,6 +25,8 @@ import {
   Tooltip,
   ThemeIcon,
   rem,
+  Switch,
+  Modal,
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import { IconUser, IconClock, IconTrendingUp } from '@tabler/icons-react';
@@ -49,17 +51,17 @@ const headers = [
   { key: 'rank', label: '#', help: 'Ranking based on selected mode' },
   { key: 'user', label: 'Member' },
   { key: 'availability_hours', label: 'Free (h)', help: 'Remaining hours = capacity - planned hours (due this period)' },
-  { key: 'planned_utilization', label: 'Planned %', help: 'Hours due this period vs capacity (weighted by priority & complexity)' },
-  { key: 'actual_utilization', label: 'Actual %', help: 'Time logged this period vs capacity' },
+  { key: 'planned_utilization', label: 'Planned %', help: 'Sum(estimation × priority_weight × complexity_weight) due within range ÷ capacity × 100' },
+  { key: 'actual_utilization', label: 'Actual %', help: 'Time logged this period ÷ capacity × 100' },
   { key: 'active_days', label: 'Active days', help: 'Days with time activity' },
   { key: 'idle_days', label: 'Idle days', help: 'Days without time activity' },
   { key: 'avg_daily_hours', label: 'Avg h/day', help: 'Average logged hours per active day' },
   { key: 'start_latency_hours', label: 'Start latency', help: 'Avg hours from assignment to first log' },
-  { key: 'completion_rate', label: 'Completion', help: 'Completed / Assigned (tasks only, in period)' },
-  { key: 'weighted_completion_rate', label: 'W-Completion', help: 'Weighted by task priority and complexity (tasks + subtasks)' },
-  { key: 'units_completion_rate', label: 'Units %', help: 'Tasks + Subtasks completion rate' },
+  { key: 'completion_rate', label: 'Completion', help: 'Completed tasks ÷ Assigned tasks × 100 (in period)' },
+  { key: 'weighted_completion_rate', label: 'W-Completion', help: 'Sum(weighted hours completed) ÷ Sum(weighted hours assigned) × 100 (tasks + subtasks)' },
+  { key: 'units_completion_rate', label: 'Units %', help: '(Tasks + Subtasks) completed ÷ assigned × 100' },
   { key: 'throughput_per_week', label: 'Throughput', help: 'Completed tasks per week' },
-  { key: 'weighted_throughput_per_week', label: 'W-Throughput', help: 'Weighted completed hours per week (priority x complexity)' },
+  { key: 'weighted_throughput_per_week', label: 'W-Throughput', help: 'Weighted completed hours per week (estimation × priority × complexity)' },
   { key: 'risk_score', label: 'Risk', help: 'Composite risk: overdue, utilization, idle, completion' },
   { key: 'high_priority_open', label: 'High Pri', help: 'Open urgent/high items (tasks + subtasks)' },
   { key: 'pending', label: 'Pending' },
@@ -90,7 +92,7 @@ function UtilCell({ value, showProgress = true }) {
   );
 }
 
-function MetricCard({ member, onClick }) {
+function MetricCard({ member, onClick, showComplexityMix = false }) {
   const statusColor = (member.planned_utilization ?? 0) >= 100 ? 'red' : (member.availability_hours ?? 0) <= 8 ? 'orange' : 'green';
   const compColor = (pct) => (pct >= 80 ? 'green' : pct >= 60 ? 'orange' : 'red');
   const cx = member.complex_open || {};
@@ -155,16 +157,18 @@ function MetricCard({ member, onClick }) {
         </Group>
       </Group>
 
-      {/* Complexity mix badges */}
-      <Group gap={6}>
-        {['xl','l','m','s','xs'].map(k => (
-          (cx?.[k] ?? 0) > 0 ? (
-            <Badge key={k} size="xs" variant="outline" color="gray" title={`Open ${k.toUpperCase()} complexity`}>
-              {k.toUpperCase()} {cx[k]}
-            </Badge>
-          ) : null
-        ))}
-      </Group>
+      {/* Complexity mix badges (toggle) */}
+      {showComplexityMix && (
+        <Group gap={6}>
+          {['xl','l','m','s','xs'].map(k => (
+            (cx?.[k] ?? 0) > 0 ? (
+              <Badge key={k} size="xs" variant="outline" color="gray" title={`Open ${k.toUpperCase()} complexity`}>
+                {k.toUpperCase()} {cx[k]}
+              </Badge>
+            ) : null
+          ))}
+        </Group>
+      )}
     </Card>
   );
 }
@@ -195,7 +199,9 @@ export default function TeamMetrics() {
   const [projectsDropdown, setProjectsDropdown] = useState([]);
   const [suggestProject, setSuggestProject] = useState('');
   const [exporting, setExporting] = useState(false);
-  const [chartsMode, setChartsMode] = useState('capacity'); // capacity|risk|util
+  const [chartsMode, setChartsMode] = useState('capacity'); // capacity|risk|util|complexity
+  const [showComplexityMix, setShowComplexityMix] = useState(false);
+  const [weightsOpen, setWeightsOpen] = useState(false);
 
   const openUserDrawer = (row, tab = 'pending') => {
     setActiveUser(row);
@@ -354,7 +360,28 @@ export default function TeamMetrics() {
     const counts = new Array(buckets.length).fill(0);
     items.forEach(i => { const v = Math.min(100, Math.max(0, Math.round(i.planned_utilization ?? 0))); const idx = Math.min(buckets.length-1, Math.floor(v/10)); counts[idx]++; });
     const utilHist = { labels: buckets.map(b => `${b}-${b+9}%`).slice(0,10).concat(['100%']), datasets: [ { label: 'Members', data: counts, backgroundColor: 'rgba(75,192,192,0.6)' } ] };
-    return { capVsActual, riskLine, utilHist };
+
+    // Complexity stacked (counts of open items per member)
+    const complexities = ['xl','l','m','s','xs'];
+    const colors = {
+      xl: 'rgba(123, 31, 162, 0.7)',
+      l: 'rgba(103, 58, 183, 0.7)',
+      m: 'rgba(33, 150, 243, 0.7)',
+      s: 'rgba(76, 175, 80, 0.7)',
+      xs: 'rgba(255, 193, 7, 0.85)',
+    };
+    const subset = items.slice(0, 12);
+    const complexityStack = {
+      labels: subset.map(i => i.user.name.split(' ')[0]),
+      datasets: complexities.map(k => ({
+        label: k.toUpperCase(),
+        data: subset.map(i => (i.complex_open?.[k] ?? 0)),
+        backgroundColor: colors[k],
+        stack: 'complexity',
+      })),
+    };
+
+    return { capVsActual, riskLine, utilHist, complexityStack };
   }, [items]);
 
   // Sorted items for the table view
@@ -474,7 +501,7 @@ export default function TeamMetrics() {
     <ContainerBox px="md" py="md" mt={24}>
       <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
         {items.map((m) => (
-          <MetricCard key={m.user.id} member={m} onClick={openUserDrawer} />
+          <MetricCard key={m.user.id} member={m} onClick={openUserDrawer} showComplexityMix={showComplexityMix} />
         ))}
       </SimpleGrid>
       {items.length === 0 && (
@@ -517,6 +544,8 @@ export default function TeamMetrics() {
               { label: 'Cards', value: 'cards' },
               { label: 'Table', value: 'table' },
             ]} value={form.data.view} onChange={(v) => updateValue('view', v)} />
+            <Switch size="sm" checked={showComplexityMix} onChange={(e) => setShowComplexityMix(e.currentTarget.checked)} label="Show complexity mix (cards)" />
+            <Button size="xs" variant="subtle" onClick={() => setWeightsOpen(true)}>Weights</Button>
             <Button variant="subtle" onClick={saveCurrentView}>Save view</Button>
             <Button variant="subtle" onClick={loadSavedView}>Load view</Button>
             <Button variant="subtle" color="red" onClick={deleteSavedView}>Delete view</Button>
@@ -530,7 +559,12 @@ export default function TeamMetrics() {
       <ContainerBox px="md" py="md" mt={12}>
         <Group justify="space-between" align="center" mb="sm">
           <Title order={5}>Trends</Title>
-          <SegmentedControl size="xs" value={chartsMode} onChange={setChartsMode} data={[{label:'Capacity vs Actual', value:'capacity'}, {label:'Risk trend', value:'risk'}, {label:'Utilization hist', value:'util'}]} />
+          <SegmentedControl size="xs" value={chartsMode} onChange={setChartsMode} data={[
+            {label:'Capacity vs Actual', value:'capacity'},
+            {label:'Risk trend', value:'risk'},
+            {label:'Utilization hist', value:'util'},
+            {label:'Complexity mix', value:'complexity'},
+          ]} />
         </Group>
         {chartsMode === 'capacity' && (
           <Bar data={charts.capVsActual} options={{ responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ y:{ beginAtZero:true, max:100 } } }} />
@@ -541,38 +575,26 @@ export default function TeamMetrics() {
         {chartsMode === 'util' && (
           <Bar data={charts.utilHist} options={{ responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ y:{ beginAtZero:true, ticks:{ stepSize:1 } } } }} />
         )}
+        {chartsMode === 'complexity' && (
+          <Bar data={charts.complexityStack} options={{
+            responsive:true,
+            plugins:{ legend:{ position:'bottom' } },
+            scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{ stepSize:1 } } }
+          }} />
+        )}
       </ContainerBox>
 
-      {/* Suggest assignments */}
-      <ContainerBox px="md" py="md" mt={12}>
-        <Group justify="space-between" align="center" mb="sm">
-          <Title order={5}>Suggest assignments</Title>
-          <Group>
-            <MultiSelect data={projectsDropdown} value={suggestProject ? [String(suggestProject)] : []} onChange={(vals)=> setSuggestProject(vals[0] || '')} searchable clearable placeholder="Filter by project (optional)" maw={360} nothingFound="No projects" />
-            <Button onClick={fetchSuggestions} loading={suggesting}>Find candidates</Button>
-          </Group>
-        </Group>
-        <SimpleGrid cols={{ base:1, md:2, lg:3 }}>
-          {suggestions.map(c => (
-            <Card key={c.user.id} withBorder radius="md" p="md">
-              <Group justify="space-between">
-                <Stack gap={2}>
-                  <Text fw={600}>{c.user.name}</Text>
-                  <Text size="xs" c="dimmed">Free {c.availability_hours?.toFixed(1)}h · Planned {c.planned_utilization ?? 0}% · Actual {c.actual_utilization ?? 0}%</Text>
-                  {(c.pending > 0 || c.overdue > 0) && (
-                    <Group gap={6}>
-                      {c.pending > 0 && <Badge variant="light">{c.pending} pending</Badge>}
-                      {c.overdue > 0 && <Badge color="red" variant="light">{c.overdue} overdue</Badge>}
-                    </Group>
-                  )}
-                </Stack>
-                <Button size="xs" variant="light" onClick={() => redirectTo('users.index')}>View</Button>
-              </Group>
-            </Card>
-          ))}
-        </SimpleGrid>
-        {suggestions.length === 0 && <Text c="dimmed" size="sm">No suggestions loaded. Pick a project and click &quot;Find candidates&quot;.</Text>}
-      </ContainerBox>
+      {/* Weights modal */}
+      <Modal opened={weightsOpen} onClose={() => setWeightsOpen(false)} title="Weighting formulas" centered>
+        <Stack gap="xs">
+          <Text size="sm">Weighted estimation = estimation × priority_weight × complexity_weight</Text>
+          <Text size="sm" fw={600}>Priority weights</Text>
+          <Text size="sm">urgent = 1.5, high = 1.3, medium = 1.0, low = 0.7, default = 1.0</Text>
+          <Text size="sm" fw={600}>Complexity weights</Text>
+          <Text size="sm">XL = 2.0, L = 1.5, M = 1.0, S = 0.75, XS = 0.5, default = 1.0</Text>
+          <Text size="sm" c="dimmed">Used for: Planned %, Weighted completion, Weighted throughput, and weighted workload signals.</Text>
+        </Stack>
+      </Modal>
 
       {form.data.view === 'table' ? TableView : CardsView}
 
