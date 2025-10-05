@@ -10,7 +10,6 @@ import {
   Button,
   Card,
   Center,
-  Divider,
   Drawer,
   Group,
   MultiSelect,
@@ -28,7 +27,7 @@ import {
   rem,
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
-import { IconUser, IconClock, IconTrendingUp, IconAlertTriangle } from '@tabler/icons-react';
+import { IconUser, IconClock, IconTrendingUp } from '@tabler/icons-react';
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -50,18 +49,24 @@ const headers = [
   { key: 'rank', label: '#', help: 'Ranking based on selected mode' },
   { key: 'user', label: 'Member' },
   { key: 'availability_hours', label: 'Free (h)', help: 'Remaining hours = capacity - planned hours (due this period)' },
-  { key: 'planned_utilization', label: 'Planned %', help: 'Hours due this period vs capacity' },
+  { key: 'planned_utilization', label: 'Planned %', help: 'Hours due this period vs capacity (weighted by priority & complexity)' },
   { key: 'actual_utilization', label: 'Actual %', help: 'Time logged this period vs capacity' },
   { key: 'active_days', label: 'Active days', help: 'Days with time activity' },
   { key: 'idle_days', label: 'Idle days', help: 'Days without time activity' },
   { key: 'avg_daily_hours', label: 'Avg h/day', help: 'Average logged hours per active day' },
   { key: 'start_latency_hours', label: 'Start latency', help: 'Avg hours from assignment to first log' },
-  { key: 'completion_rate', label: 'Completion', help: 'Completed / Assigned (in period)' },
+  { key: 'completion_rate', label: 'Completion', help: 'Completed / Assigned (tasks only, in period)' },
+  { key: 'weighted_completion_rate', label: 'W-Completion', help: 'Weighted by task priority and complexity (tasks + subtasks)' },
+  { key: 'units_completion_rate', label: 'Units %', help: 'Tasks + Subtasks completion rate' },
   { key: 'throughput_per_week', label: 'Throughput', help: 'Completed tasks per week' },
+  { key: 'weighted_throughput_per_week', label: 'W-Throughput', help: 'Weighted completed hours per week (priority x complexity)' },
   { key: 'risk_score', label: 'Risk', help: 'Composite risk: overdue, utilization, idle, completion' },
+  { key: 'high_priority_open', label: 'High Pri', help: 'Open urgent/high items (tasks + subtasks)' },
   { key: 'pending', label: 'Pending' },
   { key: 'overdue', label: 'Overdue' },
   { key: 'completed', label: 'Done' },
+  { key: 'completed_subtasks', label: 'Subtasks Done', help: 'Completed subtasks in period' },
+  { key: 'completed_units', label: 'Units Done', help: 'Tasks + Subtasks completed in period' },
   { key: 'projects', label: 'Projects' },
 ];
 
@@ -87,6 +92,8 @@ function UtilCell({ value, showProgress = true }) {
 
 function MetricCard({ member, onClick }) {
   const statusColor = (member.planned_utilization ?? 0) >= 100 ? 'red' : (member.availability_hours ?? 0) <= 8 ? 'orange' : 'green';
+  const compColor = (pct) => (pct >= 80 ? 'green' : pct >= 60 ? 'orange' : 'red');
+  const cx = member.complex_open || {};
   return (
     <Card withBorder padding="lg" radius="md" style={{ cursor: 'pointer' }} onClick={() => onClick(member)}>
       <Group justify="space-between" mb="md">
@@ -125,19 +132,38 @@ function MetricCard({ member, onClick }) {
         </Stack>
       </SimpleGrid>
 
-      <Group justify="space-between" gap="xs">
+      <Group justify="space-between" gap="xs" mb="xs">
         <Group gap={8}>
           <Badge variant="light">{member.active_days} active</Badge>
           <Badge color="gray" variant="light">{member.idle_days} idle</Badge>
           {member.start_latency_hours !== null && <Badge color="orange" variant="light">Latency {member.start_latency_hours?.toFixed(1)}h</Badge>}
           <Badge color="blue" variant="light">{member.throughput_per_week}/wk</Badge>
-          {member.completion_rate !== null && <Badge color={member.completion_rate >= 80 ? 'green' : member.completion_rate >= 60 ? 'orange' : 'red'} variant="light">{member.completion_rate}%</Badge>}
+          {member.completion_rate !== null && (
+            <Badge color={compColor(member.completion_rate)} variant="light">{member.completion_rate}%</Badge>
+          )}
+          {member.weighted_completion_rate !== null && (
+            <Badge color={compColor(member.weighted_completion_rate)} variant="light" title="Weighted by priority & complexity">W {member.weighted_completion_rate}%</Badge>
+          )}
+          {member.units_completion_rate !== null && (
+            <Badge color={compColor(member.units_completion_rate)} variant="light" title="Tasks + Subtasks">Units {member.units_completion_rate}%</Badge>
+          )}
         </Group>
         <Group gap={8}>
           <Badge variant="light" onClick={(e) => { e.stopPropagation(); onClick(member, 'pending'); }} style={{ cursor: 'pointer' }}>{member.pending} Pending</Badge>
           {member.overdue > 0 && <Badge color="red" variant="light" onClick={(e) => { e.stopPropagation(); onClick(member, 'overdue'); }} style={{ cursor: 'pointer' }}>{member.overdue} Overdue</Badge>}
           <Badge color="green" variant="light" onClick={(e) => { e.stopPropagation(); onClick(member, 'completed'); }} style={{ cursor: 'pointer' }}>{member.completed} Done</Badge>
         </Group>
+      </Group>
+
+      {/* Complexity mix badges */}
+      <Group gap={6}>
+        {['xl','l','m','s','xs'].map(k => (
+          (cx?.[k] ?? 0) > 0 ? (
+            <Badge key={k} size="xs" variant="outline" color="gray" title={`Open ${k.toUpperCase()} complexity`}>
+              {k.toUpperCase()} {cx[k]}
+            </Badge>
+          ) : null
+        ))}
       </Group>
     </Card>
   );
@@ -263,10 +289,33 @@ export default function TeamMetrics() {
   const exportCSV = () => {
     try {
       setExporting(true);
-      const cols = ['rank','user.name','availability_hours','planned_utilization','actual_utilization','active_days','idle_days','avg_daily_hours','start_latency_hours','completion_rate','throughput_per_week','risk_score','pending','overdue','completed','projects'];
+      const cols = ['rank','user.name','availability_hours','planned_utilization','actual_utilization','active_days','idle_days','avg_daily_hours','start_latency_hours','completion_rate','weighted_completion_rate','units_completion_rate','throughput_per_week','weighted_throughput_per_week','risk_score','high_priority_open','pending','overdue','completed','completed_subtasks','completed_units','projects'];
       const rows = [cols.join(',')];
       items.forEach(i => {
-        const r = [i.rank, i.user?.name, i.availability_hours, i.planned_utilization, i.actual_utilization, i.active_days, i.idle_days, i.avg_daily_hours, i.start_latency_hours, i.completion_rate, i.throughput_per_week, i.risk_score, i.pending, i.overdue, i.completed, i.projects];
+        const r = [
+          i.rank,
+          i.user?.name,
+          i.availability_hours,
+          i.planned_utilization,
+          i.actual_utilization,
+          i.active_days,
+          i.idle_days,
+          i.avg_daily_hours,
+          i.start_latency_hours,
+          i.completion_rate,
+          i.weighted_completion_rate,
+          i.units_completion_rate,
+          i.throughput_per_week,
+          i.weighted_throughput_per_week,
+          i.risk_score,
+          i.high_priority_open,
+          i.pending,
+          i.overdue,
+          i.completed,
+          i.completed_subtasks,
+          i.completed_units,
+          i.projects,
+        ];
         rows.push(r.map(v => (v === null || v === undefined) ? '' : String(v)).join(','));
       });
       const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -338,7 +387,7 @@ export default function TeamMetrics() {
 
   const TableView = (
     <ContainerBox px="md" py="md" mt={24}>
-      <Table.ScrollContainer minWidth={1400}>
+      <Table.ScrollContainer minWidth={1600}>
         <Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
           <Table.Thead>
             <Table.Tr>
@@ -364,11 +413,37 @@ export default function TeamMetrics() {
                 <Table.Td><Text fw={500}>{row.active_days}</Text></Table.Td>
                 <Table.Td><Text fw={500}>{row.idle_days}</Text></Table.Td>
                 <Table.Td><Text fw={500}>{row.avg_daily_hours?.toFixed(2)}</Text></Table.Td>
-                <Table.Td><Text fw={500}>{row.start_latency_hours !== null ? `${row.start_latency_hours?.toFixed(1)}h` : '—'}</Text></Table.Td>
-                <Table.Td><Text fw={500} c={row.completion_rate >= 80 ? 'green' : row.completion_rate >= 60 ? 'orange' : 'red'}>{row.completion_rate !== null ? `${row.completion_rate}%` : '—'}</Text></Table.Td>
-                <Table.Td><Group gap="xs"><IconTrendingUp size={16} /><Text fw={500}>{row.throughput_per_week}/wk</Text></Group></Table.Td>
+                <Table.Td>
+                  <Text fw={500}>{row.start_latency_hours !== null ? `${row.start_latency_hours?.toFixed(1)}h` : '—'}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text fw={500} c={row.completion_rate >= 80 ? 'green' : row.completion_rate >= 60 ? 'orange' : 'red'}>
+                    {row.completion_rate !== null ? `${row.completion_rate}%` : '—'}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text fw={500} c={row.weighted_completion_rate >= 80 ? 'green' : row.weighted_completion_rate >= 60 ? 'orange' : 'red'}>
+                    {row.weighted_completion_rate !== null ? `${row.weighted_completion_rate}%` : '—'}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text fw={500} c={row.units_completion_rate >= 80 ? 'green' : row.units_completion_rate >= 60 ? 'orange' : 'red'}>
+                    {row.units_completion_rate !== null ? `${row.units_completion_rate}%` : '—'}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap="xs"><IconTrendingUp size={16} /><Text fw={500}>{row.throughput_per_week}/wk</Text></Group>
+                </Table.Td>
+                <Table.Td>
+                  <Text fw={500}>{row.weighted_throughput_per_week}</Text>
+                </Table.Td>
                 <Table.Td>
                   <Badge color={row.risk_score >= 70 ? 'red' : row.risk_score >= 40 ? 'orange' : 'green'} variant="light">{row.risk_score?.toFixed(1)}</Badge>
+                </Table.Td>
+                <Table.Td>
+                  {row.high_priority_open > 0 ? (
+                    <Badge color="red" variant="light" onClick={(e) => { e.stopPropagation(); openUserDrawer(row, 'pending'); }} style={{ cursor: 'pointer' }} size="md">{row.high_priority_open}</Badge>
+                  ) : (<Text c="dimmed">0</Text>)}
                 </Table.Td>
                 <Table.Td>
                   <Badge onClick={(e) => { e.stopPropagation(); openUserDrawer(row, 'pending'); }} variant="light" style={{ cursor: 'pointer' }} size="md">{row.pending}</Badge>
@@ -381,6 +456,8 @@ export default function TeamMetrics() {
                 <Table.Td>
                   <Badge color="green" variant="light" onClick={(e) => { e.stopPropagation(); openUserDrawer(row, 'completed'); }} style={{ cursor: 'pointer' }} size="md">{row.completed}</Badge>
                 </Table.Td>
+                <Table.Td><Text fw={500}>{row.completed_subtasks}</Text></Table.Td>
+                <Table.Td><Text fw={500}>{row.completed_units}</Text></Table.Td>
                 <Table.Td><Text fw={500}>{row.projects}</Text></Table.Td>
               </Table.Tr>
             ))}
@@ -494,7 +571,7 @@ export default function TeamMetrics() {
             </Card>
           ))}
         </SimpleGrid>
-        {suggestions.length === 0 && <Text c="dimmed" size="sm">No suggestions loaded. Pick a project and click "Find candidates".</Text>}
+        {suggestions.length === 0 && <Text c="dimmed" size="sm">No suggestions loaded. Pick a project and click &quot;Find candidates&quot;.</Text>}
       </ContainerBox>
 
       {form.data.view === 'table' ? TableView : CardsView}
