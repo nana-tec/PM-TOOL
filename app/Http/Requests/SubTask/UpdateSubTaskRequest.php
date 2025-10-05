@@ -11,6 +11,7 @@ class UpdateSubTaskRequest extends FormRequest
     {
         $task = $this->route('task');
         $project = $this->route('project');
+
         return $this->user()?->can('update', [$task, $project]) ?? false;
     }
 
@@ -33,4 +34,3 @@ class UpdateSubTaskRequest extends FormRequest
         ];
     }
 }
-

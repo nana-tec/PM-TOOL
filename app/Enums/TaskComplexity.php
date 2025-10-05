@@ -10,4 +10,3 @@ enum TaskComplexity: string
     case L = 'l';
     case XL = 'xl';
 }
-
