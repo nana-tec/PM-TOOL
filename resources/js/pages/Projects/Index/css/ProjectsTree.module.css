@@ -1,0 +1,20 @@
+/* filepath: resources/js/pages/Projects/Index/css/ProjectsTree.module.css */
+.treeNode {
+  margin-left: 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--mantine-color-gray-4);
+}
+.childLink {
+  display: inline-block;
+  color: var(--mantine-color-blue-6);
+  text-decoration: none;
+  font-weight: 600;
+  margin: 4px 0;
+}
+.childLink:hover {
+  text-decoration: underline;
+}
+.childrenWrapper {
+  margin-top: 6px;
+}
+
