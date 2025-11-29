@@ -26,6 +26,7 @@ class Project extends Model implements AuditableContract
         'default_pricing_type',
         'rate',
         'client_company_id',
+        'parent_id',
     ];
 
     protected $searchable = [
@@ -88,11 +89,50 @@ class Project extends Model implements AuditableContract
         return $this->hasOne(ProjectVcsIntegration::class);
     }
 
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(Project::class, 'parent_id');
+    }
+
     public static function dropdownValues(): array
     {
         return self::orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($i) => ['value' => (string) $i->id, 'label' => $i->name])
             ->toArray();
+    }
+
+    public function scopeTopLevel($query)
+    {
+        return $query->whereNull('parent_id');
+    }
+
+    /**
+     * Get all descendant project IDs (children, grandchildren, ...).
+     * @return array<int>
+     */
+    public function allDescendantIds(): array
+    {
+        $ids = [];
+        $queue = [$this->id];
+
+        while (!empty($queue)) {
+            $currentId = array_pop($queue);
+            $children = self::where('parent_id', $currentId)->pluck('id');
+            foreach ($children as $cid) {
+                if (!in_array($cid, $ids, true)) {
+                    $ids[] = $cid;
+                    $queue[] = $cid;
+                }
+            }
+        }
+
+        // remove self id if present
+        return array_values(array_filter($ids, fn ($i) => $i !== $this->id));
     }
 }
