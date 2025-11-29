@@ -30,6 +30,12 @@ class TaskController extends Controller
     {
         $this->authorize('viewAny', [Task::class, $project]);
 
+        $includeSubtree = filter_var($request->get('includeSubtree'), FILTER_VALIDATE_BOOLEAN);
+        $projectIds = [$project->id];
+        if ($includeSubtree) {
+            $projectIds = array_merge($projectIds, $project->allDescendantIds());
+        }
+
         $groups = $project
             ->taskGroups()
             ->when($request->has('archived'), fn ($query) => $query->onlyArchived())
@@ -39,9 +45,9 @@ class TaskController extends Controller
             ->taskGroups()
             ->with(['project' => fn ($query) => $query->withArchived()])
             ->get()
-            ->mapWithKeys(function (TaskGroup $group) use ($request, $project) {
+            ->mapWithKeys(function (TaskGroup $group) use ($request, $projectIds, $project) {
                 return [
-                    $group->id => Task::where('project_id', $project->id)
+                    $group->id => Task::whereIn('project_id', $projectIds)
                         ->where('group_id', $group->id)
                         ->searchByQueryString()
                         ->filterByQueryString()
@@ -76,6 +82,7 @@ class TaskController extends Controller
             'currency' => [
                 'symbol' => OwnerCompany::with('currency')->first()->currency->symbol,
             ],
+            'includeSubtree' => $includeSubtree,
         ]);
     }
 
