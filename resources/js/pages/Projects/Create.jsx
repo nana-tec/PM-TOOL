@@ -19,8 +19,12 @@ import {
 import { useEffect, useState } from 'react';
 import { PricingType } from '@/utils/enums';
 
-const ProjectCreate = ({ dropdowns: { companies, users, currencies } }) => {
+const getQueryParam = (param) => new URLSearchParams(window.location.search).get(param);
+
+const ProjectCreate = ({ dropdowns: { companies, users, currencies, projects } }) => {
   const [currencySymbol, setCurrencySymbol] = useState();
+
+  const initialParentId = getQueryParam('parent_id');
 
   const [form, submit, updateValue] = useForm('post', route('projects.store'), {
     name: '',
@@ -29,6 +33,7 @@ const ProjectCreate = ({ dropdowns: { companies, users, currencies } }) => {
     rate: 0,
     client_company_id: '',
     users: [],
+    parent_id: initialParentId,
   });
 
   const pricingTypes = [
@@ -141,6 +146,17 @@ const ProjectCreate = ({ dropdowns: { companies, users, currencies } }) => {
             value={form.data.rate}
             onChange={value => updateValue('rate', value)}
             error={form.errors.rate}
+          />
+
+          <Select
+            label='Parent project (optional)'
+            placeholder='Select parent project'
+            mt='md'
+            clearable
+            value={form.data.parent_id}
+            onChange={value => updateValue('parent_id', value)}
+            data={projects}
+            error={form.errors.parent_id}
           />
 
           <Group
