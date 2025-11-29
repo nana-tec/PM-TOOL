@@ -23,21 +23,35 @@ class DashboardController extends Controller
             $capacityData = $this->getCapacitySummary();
         }
 
+        $metricMode = request()->get('metrics', 'aggregated'); // 'parent' or 'aggregated'
+
+        $projects = Project::whereIn('id', $projectIds)
+            ->topLevel()
+            ->with([
+                'clientCompany:id,name',
+            ])
+            ->withExists('favoritedByAuthUser AS favorite')
+            ->withExists('vcsIntegration AS has_vcs')
+            ->orderBy('favorite', 'desc')
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name']);
+
+        $projects->each(function (Project $p) {
+            // parent-only counts
+            $p->parent_only_all_tasks_count = Task::where('project_id', $p->id)->count();
+            $p->parent_only_completed_tasks_count = Task::where('project_id', $p->id)->whereNotNull('completed_at')->count();
+            $p->parent_only_overdue_tasks_count = Task::where('project_id', $p->id)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+            // aggregated counts including descendants
+            $descIds = $p->allDescendantIds();
+            $allIds = array_merge([$p->id], $descIds);
+            $p->all_tasks_count = Task::whereIn('project_id', $allIds)->count();
+            $p->completed_tasks_count = Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
+            $p->overdue_tasks_count = Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+        });
+
         return Inertia::render('Dashboard/Index', [
-            'projects' => Project::whereIn('id', $projectIds)
-                ->with([
-                    'clientCompany:id,name',
-                ])
-                ->withCount([
-                    'tasks AS all_tasks_count',
-                    'tasks AS completed_tasks_count' => fn ($query) => $query->whereNotNull('completed_at'),
-                    'tasks AS overdue_tasks_count' => fn ($query) => $query->whereNull('completed_at')->whereDate('due_on', '<', now()),
-                ])
-                ->withExists('favoritedByAuthUser AS favorite')
-                ->withExists('vcsIntegration AS has_vcs')
-                ->orderBy('favorite', 'desc')
-                ->orderBy('name', 'asc')
-                ->get(['id', 'name']),
+            'projects' => $projects,
+            'metricMode' => $metricMode,
             'overdueTasks' => Task::whereIn('project_id', $projectIds)
                 ->whereNull('completed_at')
                 ->whereDate('due_on', '<', now())
