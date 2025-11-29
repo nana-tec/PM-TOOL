@@ -2,7 +2,7 @@ import { openConfirmModal } from "@/components/ConfirmModal";
 import useForm from "@/hooks/useForm";
 import { router } from "@inertiajs/react";
 import { ActionIcon, Menu, rem } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconDots, IconPencil, IconUsers, IconTable } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconDots, IconPencil, IconUsers, IconTable, IconFolders, IconListDetails } from "@tabler/icons-react";
 import UserAccessModal from "./Modals/UserAccessModal.jsx";
 
 export default function ProjectCardActions({ item }) {
@@ -31,6 +31,8 @@ export default function ProjectCardActions({ item }) {
 
   const openUserAccess = () => UserAccessModal(item);
   const openGantt = () => router.visit(route("projects.tasks", item.id) + "?view=gantt");
+  const openTasks = () => router.visit(route("projects.tasks", item.id));
+  const openSubprojects = () => router.visit(route("projects.open", item.id));
 
   return (
     <>
@@ -52,6 +54,20 @@ export default function ProjectCardActions({ item }) {
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
+            <Menu.Item
+              leftSection={<IconListDetails style={{ width: rem(16), height: rem(16) }} stroke={1.5} data-ignore-link />}
+              onClick={openTasks}
+              data-ignore-link
+            >
+              View tasks
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<IconFolders style={{ width: rem(16), height: rem(16) }} stroke={1.5} data-ignore-link />}
+              onClick={openSubprojects}
+              data-ignore-link
+            >
+              Open subprojects
+            </Menu.Item>
             <Menu.Item
               leftSection={<IconTable style={{ width: rem(16), height: rem(16) }} stroke={1.5} data-ignore-link />}
               onClick={openGantt}
