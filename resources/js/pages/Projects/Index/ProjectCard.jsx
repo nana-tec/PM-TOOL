@@ -1,18 +1,27 @@
 import { stopOnIgnoreLink } from "@/utils/domEvents";
 import { getInitials } from "@/utils/user";
 import { Link } from "@inertiajs/react";
-import { Avatar, Card, Group, Progress, Text, Tooltip } from "@mantine/core";
+import { Avatar, Card, Group, Progress, Text, Tooltip, Badge } from "@mantine/core";
 import ToggleFavorite from "./FavoriteToggle";
 import ProjectCardActions from "./ProjectCardActions";
 import classes from "./css/ProjectCard.module.css";
 
-export default function ProjectCard({ item }) {
+export default function ProjectCard({ item, linkTo = "auto" }) {
   const completedPercent = (item.completed_tasks_count / item.all_tasks_count) * 100;
   const overduePercent = (item.overdue_tasks_count / item.all_tasks_count) * 100;
 
+  const href =
+    linkTo === "tasks"
+      ? route("projects.tasks", item.id)
+      : linkTo === "open"
+      ? route("projects.open", item.id)
+      : route("projects.open", item.id);
+
+  const showsSubtree = Array.isArray(item.children) && item.children.length > 0;
+
   return (
     <Link
-      href={route("projects.tasks", item.id)}
+      href={href}
       className={classes.link}
       onClick={stopOnIgnoreLink}
     >
@@ -21,7 +30,10 @@ export default function ProjectCard({ item }) {
           <Text fz={23} fw={700} className={classes.title}>
             {item.name}
           </Text>
-          <ToggleFavorite item={item} />
+          <Group gap={8}>
+            {showsSubtree && <Badge size="xs" variant="light">Subtree</Badge>}
+            <ToggleFavorite item={item} />
+          </Group>
         </Group>
 
         <Text fz="sm" fw={500}>
