@@ -22,29 +22,38 @@ class ProjectController extends Controller
 
     public function index(Request $request)
     {
+        $items = Project::searchByQueryString()
+            ->topLevel()
+            ->when($request->user()->isNotAdmin(), function ($query) {
+                $query->whereHas('clientCompany.clients', fn ($query) => $query->where('users.id', auth()->id()))
+                    ->orWhereHas('users', fn ($query) => $query->where('id', auth()->id()));
+            })
+            ->when($request->has('archived'), fn ($query) => $query->onlyArchived())
+            ->with([
+                'clientCompany:id,name',
+                'clientCompany.clients:id,name,avatar',
+                'users:id,name,avatar',
+                'children:id,name,parent_id',
+                'children.children:id,name,parent_id',
+                'children.children.children:id,name,parent_id',
+                'children.children.children.children:id,name,parent_id',
+            ])
+            ->withExists('favoritedByAuthUser AS favorite')
+            ->orderBy('favorite', 'desc')
+            ->orderBy('name', 'asc')
+            ->get();
+
+        // Post-process to aggregate descendant task counts
+        $items->each(function (Project $p) {
+            $descIds = $p->allDescendantIds();
+            $allIds = array_merge([$p->id], $descIds);
+            $p->all_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->count();
+            $p->completed_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
+            $p->overdue_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+        });
+
         return Inertia::render('Projects/Index', [
-            'items' => ProjectResource::collection(
-                Project::searchByQueryString()
-                    ->when($request->user()->isNotAdmin(), function ($query) {
-                        $query->whereHas('clientCompany.clients', fn ($query) => $query->where('users.id', auth()->id()))
-                            ->orWhereHas('users', fn ($query) => $query->where('id', auth()->id()));
-                    })
-                    ->when($request->has('archived'), fn ($query) => $query->onlyArchived())
-                    ->with([
-                        'clientCompany:id,name',
-                        'clientCompany.clients:id,name,avatar',
-                        'users:id,name,avatar',
-                    ])
-                    ->withCount([
-                        'tasks AS all_tasks_count',
-                        'tasks AS completed_tasks_count' => fn ($query) => $query->whereNotNull('completed_at'),
-                        'tasks AS overdue_tasks_count' => fn ($query) => $query->whereNull('completed_at')->whereDate('due_on', '<', now()),
-                    ])
-                    ->withExists('favoritedByAuthUser AS favorite')
-                    ->orderBy('favorite', 'desc')
-                    ->orderBy('name', 'asc')
-                    ->get()
-            ),
+            'items' => ProjectResource::collection($items),
         ]);
     }
 
@@ -55,6 +64,8 @@ class ProjectController extends Controller
                 'companies' => ClientCompany::dropdownValues(),
                 'users' => User::userDropdownValues(),
                 'currencies' => Currency::dropdownValues(['with' => ['clientCompanies:id,currency_id']]),
+                // add projects to choose a parent
+                'projects' => Project::dropdownValues(),
             ],
         ]);
     }
@@ -84,11 +95,18 @@ class ProjectController extends Controller
     public function edit(Project $project)
     {
         return Inertia::render('Projects/Edit', [
-            'item' => $project,
+            'item' => $project->load([
+                'parent:id,name',
+                'children:id,name,parent_id',
+                'children.children:id,name,parent_id',
+                'children.children.children:id,name,parent_id',
+                'children.children.children.children:id,name,parent_id',
+            ]),
             'dropdowns' => [
                 'companies' => ClientCompany::dropdownValues(),
                 'users' => User::userDropdownValues(),
                 'currencies' => Currency::dropdownValues(['with' => ['clientCompanies:id,currency_id']]),
+                'projects' => Project::dropdownValues(),
             ],
         ]);
     }
@@ -143,5 +161,52 @@ class ProjectController extends Controller
         (new ProjectService($project))->updateUserAccess($userIds);
 
         return redirect()->back();
+    }
+
+    public function open(Project $project)
+    {
+        $project->load([
+            'clientCompany:id,name',
+            'clientCompany.clients:id,name,avatar',
+            'users:id,name,avatar',
+            'children:id,name,parent_id',
+            'children.children:id,name,parent_id',
+            'children.children.children:id,name,parent_id',
+            'children.children.children.children:id,name,parent_id',
+        ]);
+
+        $project->loadExists('favoritedByAuthUser as favorite');
+
+        // Aggregate counts for parent including descendants
+        $descIds = $project->allDescendantIds();
+        $allIds = array_merge([$project->id], $descIds);
+        $project->all_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->count();
+        $project->completed_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
+        $project->overdue_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+
+        if ($project->children->isEmpty()) {
+            return redirect()->route('projects.tasks', $project->id);
+        }
+
+        // Load immediate children with full details for card rendering (individual stats only for each child)
+        $children = Project::where('parent_id', $project->id)
+            ->with([
+                'clientCompany:id,name',
+                'clientCompany.clients:id,name,avatar',
+                'users:id,name,avatar',
+            ])
+            ->withCount([
+                'tasks AS all_tasks_count',
+                'tasks AS completed_tasks_count' => fn ($q) => $q->whereNotNull('completed_at'),
+                'tasks AS overdue_tasks_count' => fn ($q) => $q->whereNull('completed_at')->whereDate('due_on', '<', now()),
+            ])
+            ->withExists('favoritedByAuthUser AS favorite')
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Projects/Open', [
+            'item' => new ProjectResource($project),
+            'children' => ProjectResource::collection($children),
+        ]);
     }
 }
