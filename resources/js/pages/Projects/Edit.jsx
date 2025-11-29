@@ -22,9 +22,23 @@ import { PricingType } from '@/utils/enums';
 import NotesPanel from '@/pages/Projects/Notes/Panel';
 import VcsPanel from '@/pages/Projects/Vcs/Panel';
 
-const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
+const ProjectEdit = ({ dropdowns: { companies, users, currencies, projects } }) => {
   const { item } = usePage().props;
   const [currencySymbol, setCurrencySymbol] = useState();
+
+  // build a set of descendant ids from loaded children
+  const getDescendantIds = (node) => {
+    if (!node || !node.children) return [];
+    const ids = [];
+    for (const child of node.children) {
+      ids.push(child.id);
+      ids.push(...getDescendantIds(child));
+    }
+    return ids;
+  };
+
+  const descendantIds = getDescendantIds(item);
+  const filteredProjects = projects.filter(p => ![item.id, ...descendantIds].includes(Number(p.value)));
 
   const [form, submit, updateValue] = useForm('post', route('projects.update', item.id), {
     _method: 'put',
@@ -34,6 +48,7 @@ const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
     client_company_id: item.client_company_id || '',
     rate: item.rate / 100 || 0,
     users: item.users.map(i => i.id.toString()),
+    parent_id: item.parent_id ?? null,
   });
 
   useEffect(() => {
@@ -146,6 +161,17 @@ const ProjectEdit = ({ dropdowns: { companies, users, currencies } }) => {
             value={form.data.rate}
             onChange={value => updateValue('rate', value)}
             error={form.errors.rate}
+          />
+
+          <Select
+            label='Parent project (optional)'
+            placeholder='Select parent project'
+            mt='md'
+            clearable
+            value={form.data.parent_id?.toString()}
+            onChange={value => updateValue('parent_id', value)}
+            data={filteredProjects}
+            error={form.errors.parent_id}
           />
 
           <Group
