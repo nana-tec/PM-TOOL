@@ -23,12 +23,12 @@ import TaskGroup from "./Index/TaskGroup";
 import classes from "./css/Index.module.css";
 import NotesPanel from "@/pages/Projects/Notes/Panel";
 import GanttChart from "@/components/GanttChart";
-import { redirectTo } from "@/utils/route";
+import { redirectTo, reloadWithQuery } from "@/utils/route";
 
 let currentProject = null;
 
 const TasksIndex = () => {
-  const { project, taskGroups, groupedTasks, openedTask } = usePage().props;
+  const { project, taskGroups, groupedTasks, openedTask, includeSubtree } = usePage().props;
   currentProject = project;
 
   const { groups, setGroups, reorderGroup } = useTaskGroupsStore();
@@ -94,6 +94,15 @@ const TasksIndex = () => {
   return (
     <>
       <Header />
+
+      <Group mt="md" gap="md">
+        <Switch
+          size="sm"
+          checked={includeSubtree}
+          onChange={(e) => reloadWithQuery({ includeSubtree: e.currentTarget.checked })}
+          label="Include subprojects"
+        />
+      </Group>
 
       {can("create task") && <CreateTaskDrawer />}
       <EditTaskDrawer />
