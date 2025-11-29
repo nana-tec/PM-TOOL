@@ -40,6 +40,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::put('{project}/favorite/toggle', [ProjectController::class, 'favoriteToggle'])->name('favorite.toggle');
         Route::post('{project}/user-access', [ProjectController::class, 'userAccess'])->name('user_access');
 
+        // Open project: show subprojects or redirect to tasks
+        Route::get('{project}/open', [ProjectController::class, 'open'])->name('open')->scopeBindings();
+
         // PROJECT NOTES
         Route::get('{project}/notes', [NoteController::class, 'index'])->name('notes');
         Route::post('{project}/notes', [NoteController::class, 'store'])->name('notes.store');
