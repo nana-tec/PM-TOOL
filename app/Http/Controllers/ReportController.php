@@ -214,10 +214,14 @@ class ReportController extends Controller
 
         $complexOpenMap = [];
         foreach ($complexOpenTasksRows as $r) {
-            $uid = $r->user_id; $k = $r->k; $complexOpenMap[$uid][$k] = ($complexOpenMap[$uid][$k] ?? 0) + (int) $r->c;
+            $uid = $r->user_id;
+            $k = $r->k;
+            $complexOpenMap[$uid][$k] = ($complexOpenMap[$uid][$k] ?? 0) + (int) $r->c;
         }
         foreach ($complexOpenSubsRows as $r) {
-            $uid = $r->user_id; $k = $r->k; $complexOpenMap[$uid][$k] = ($complexOpenMap[$uid][$k] ?? 0) + (int) $r->c;
+            $uid = $r->user_id;
+            $k = $r->k;
+            $complexOpenMap[$uid][$k] = ($complexOpenMap[$uid][$k] ?? 0) + (int) $r->c;
         }
 
         // Per-complexity weighted open hours
@@ -239,10 +243,14 @@ class ReportController extends Controller
 
         $complexOpenWeightedMap = [];
         foreach ($complexOpenWeightedTasksRows as $r) {
-            $uid = $r->user_id; $k = $r->k; $complexOpenWeightedMap[$uid][$k] = ($complexOpenWeightedMap[$uid][$k] ?? 0.0) + (float) $r->hours;
+            $uid = $r->user_id;
+            $k = $r->k;
+            $complexOpenWeightedMap[$uid][$k] = ($complexOpenWeightedMap[$uid][$k] ?? 0.0) + (float) $r->hours;
         }
         foreach ($complexOpenWeightedSubsRows as $r) {
-            $uid = $r->user_id; $k = $r->k; $complexOpenWeightedMap[$uid][$k] = ($complexOpenWeightedMap[$uid][$k] ?? 0.0) + (float) $r->hours;
+            $uid = $r->user_id;
+            $k = $r->k;
+            $complexOpenWeightedMap[$uid][$k] = ($complexOpenWeightedMap[$uid][$k] ?? 0.0) + (float) $r->hours;
         }
 
         // Projects counts (unchanged)
@@ -390,7 +398,7 @@ class ReportController extends Controller
                 'weighted_completion_rate' => $wCompletionRate,
                 'high_priority_open' => $highPriOpen,
                 'complex_open' => $complexOpen,
-                'complex_open_weighted' => array_map(fn($v) => round((float)$v, 2), $complexOpenWeighted),
+                'complex_open_weighted' => array_map(fn ($v) => round((float) $v, 2), $complexOpenWeighted),
             ];
         });
 
