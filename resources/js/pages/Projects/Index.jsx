@@ -8,6 +8,7 @@ import { usePage } from "@inertiajs/react";
 import { Button, Center, Flex, Grid, Group, SegmentedControl } from "@mantine/core";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { useState } from "react";
+import ProjectsTree from "./Index/ProjectsTree";
 import ProjectCard from "./Index/ProjectCard";
 import ProjectsSummary from "./Summary";
 
@@ -54,11 +55,7 @@ const ProjectsIndex = () => {
         view === 'summary' ? (
           <ProjectsSummary items={items} />
         ) : (
-          <Flex mt="xl" gap="lg" justify="flex-start" align="flex-start" direction="row" wrap="wrap">
-            {items.map((item) => (
-              <ProjectCard item={item} key={item.id} />
-            ))}
-          </Flex>
+          <ProjectsTree items={items} />
         )
       ) : (
         <Center mih={400}>
