@@ -114,6 +114,7 @@ class Project extends Model implements AuditableContract
 
     /**
      * Get all descendant project IDs (children, grandchildren, ...).
+     *
      * @return array<int>
      */
     public function allDescendantIds(): array
@@ -121,11 +122,11 @@ class Project extends Model implements AuditableContract
         $ids = [];
         $queue = [$this->id];
 
-        while (!empty($queue)) {
+        while (! empty($queue)) {
             $currentId = array_pop($queue);
             $children = self::where('parent_id', $currentId)->pluck('id');
             foreach ($children as $cid) {
-                if (!in_array($cid, $ids, true)) {
+                if (! in_array($cid, $ids, true)) {
                     $ids[] = $cid;
                     $queue[] = $cid;
                 }
