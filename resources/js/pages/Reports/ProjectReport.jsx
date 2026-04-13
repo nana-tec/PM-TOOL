@@ -13,7 +13,9 @@ import {
   Center,
   Group,
   MultiSelect,
+  Pagination,
   Progress,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Table,
@@ -21,6 +23,7 @@ import {
   Title,
   Tooltip,
   AvatarGroup,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import {
@@ -40,9 +43,15 @@ function StatusBadge({ completed_at }) {
   );
 }
 
+const ITEMS_PER_PAGE = 10;
+const PROJECTS_PER_PAGE = 15;
+
 const ProjectReport = () => {
   const { projects, dropdowns } = usePage().props;
   const params = currentUrlParams();
+  const computedColorScheme = useComputedColorScheme();
+  const isDark = computedColorScheme === 'dark';
+  const expandedBg = isDark ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-gray-0)';
 
   const [form, submit, updateValue] = useForm('get', route('reports.project-report'), {
     projects: params.projects?.map(String) || [],
@@ -56,6 +65,9 @@ const ProjectReport = () => {
   const toggleExpand = (projectId) => setExpanded((prev) => ({ ...prev, [projectId]: !prev[projectId] }));
 
   const [taskFilter, setTaskFilter] = useState('all');
+  const [taskPages, setTaskPages] = useState({});
+  const [subPages, setSubPages] = useState({});
+  const [projectPage, setProjectPage] = useState(1);
 
   const filteredTasks = (proj) => {
     const tasks = proj.tasks || [];
@@ -152,19 +164,18 @@ const ProjectReport = () => {
 
       {/* Task filter */}
       {projects.length > 0 && (
-        <Group mb={12} gap="sm">
-          <Text size="sm" fw={500}>Task list filter:</Text>
-          {['all', 'pending', 'completed'].map((f) => (
-            <Badge
-              key={f}
-              variant={taskFilter === f ? 'filled' : 'light'}
-              style={{ cursor: 'pointer' }}
-              onClick={() => setTaskFilter(f)}
-              tt="capitalize"
-            >
-              {f}
-            </Badge>
-          ))}
+        <Group mb={12} gap="md">
+          <Text size="sm" fw={500}>Filter tasks:</Text>
+          <SegmentedControl
+            size="xs"
+            value={taskFilter}
+            onChange={setTaskFilter}
+            data={[
+              { label: 'All', value: 'all' },
+              { label: 'Pending', value: 'pending' },
+              { label: 'Completed', value: 'completed' },
+            ]}
+          />
         </Group>
       )}
 
@@ -179,6 +190,7 @@ const ProjectReport = () => {
             />
           </Center>
         ) : (
+          <>
           <Table.ScrollContainer minWidth={1200}>
             <Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
               <Table.Thead>
@@ -196,7 +208,7 @@ const ProjectReport = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {projects.map((proj) => {
+                {projects.slice((projectPage - 1) * PROJECTS_PER_PAGE, projectPage * PROJECTS_PER_PAGE).map((proj) => {
                   const isOpen = expanded[proj.project.id];
                   const tasks = filteredTasks(proj);
                   const subtasks = filteredSubtasks(proj);
@@ -207,7 +219,14 @@ const ProjectReport = () => {
                           <Group gap="sm" wrap="nowrap">
                             <IconFolder size={20} />
                             <Stack gap={2}>
-                              <Text fw={600}>{proj.project.name}</Text>
+                              <Group gap="xs">
+                                <Text fw={600}>{proj.project.name}</Text>
+                                {proj.sub_projects && proj.sub_projects.length > 0 && (
+                                  <Tooltip label={`Includes ${proj.sub_projects.length} sub-project${proj.sub_projects.length > 1 ? 's' : ''}: ${proj.sub_projects.map(sp => sp.name).join(', ')}`}>
+                                    <Badge size="xs" variant="light" color="grape">{proj.sub_projects.length} sub</Badge>
+                                  </Tooltip>
+                                )}
+                              </Group>
                               <Text size="xs" c="dimmed">{proj.total_items} total items</Text>
                             </Stack>
                           </Group>
@@ -266,48 +285,67 @@ const ProjectReport = () => {
 
                       {/* Expanded rows: tasks + subtasks */}
                       <Table.Tr key={`${proj.project.id}-detail`} style={{ display: isOpen ? undefined : 'none' }}>
-                        <Table.Td colSpan={10} style={{ background: 'var(--mantine-color-gray-0)', padding: '16px 24px' }}>
+                        <Table.Td colSpan={10} style={{ background: expandedBg, padding: '16px 24px' }}>
+                          {/* Sub-projects */}
+                          {proj.sub_projects && proj.sub_projects.length > 0 && (
+                            <Group gap="xs" mb="sm">
+                              <Text size="xs" fw={600} c="dimmed">Sub-projects:</Text>
+                              {proj.sub_projects.map((sp) => (
+                                <Badge key={sp.id} size="xs" variant="light" color="grape">{sp.name}</Badge>
+                              ))}
+                            </Group>
+                          )}
+
                           <Text fw={600} mb="xs" size="sm">Tasks ({tasks.length})</Text>
                           {tasks.length === 0 ? (
                             <Text c="dimmed" size="sm">No tasks match filter.</Text>
                           ) : (
-                            <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
-                              <Table.Thead>
-                                <Table.Tr>
-                                  <Table.Th>Task</Table.Th>
-                                  <Table.Th>Assignee</Table.Th>
-                                  <Table.Th>Priority</Table.Th>
-                                  <Table.Th>Due date</Table.Th>
-                                  <Table.Th>Status</Table.Th>
-                                </Table.Tr>
-                              </Table.Thead>
-                              <Table.Tbody>
-                                {tasks.slice(0, 50).map((t) => (
-                                  <Table.Tr key={t.id}>
-                                    <Table.Td><Text size="sm">{t.name}</Text></Table.Td>
-                                    <Table.Td>
-                                      {t.assignee_name ? (
-                                        <Group gap="xs" wrap="nowrap">
-                                          <Avatar src={t.assignee_avatar} size={24} radius="xl" />
-                                          <Text size="sm">{t.assignee_name}</Text>
-                                        </Group>
-                                      ) : (
-                                        <Text c="dimmed" size="sm">Unassigned</Text>
-                                      )}
-                                    </Table.Td>
-                                    <Table.Td>
-                                      <Badge size="xs" variant="outline" color={t.priority === 'urgent' ? 'red' : t.priority === 'high' ? 'orange' : 'gray'}>
-                                        {t.priority || '—'}
-                                      </Badge>
-                                    </Table.Td>
-                                    <Table.Td><Text size="sm">{t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
-                                    <Table.Td><StatusBadge completed_at={t.completed_at} /></Table.Td>
+                            <>
+                              <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
+                                <Table.Thead>
+                                  <Table.Tr>
+                                    <Table.Th>Task</Table.Th>
+                                    <Table.Th>Assignee</Table.Th>
+                                    <Table.Th>Project</Table.Th>
+                                    <Table.Th>Priority</Table.Th>
+                                    <Table.Th>Due date</Table.Th>
+                                    <Table.Th>Status</Table.Th>
                                   </Table.Tr>
-                                ))}
-                              </Table.Tbody>
-                            </Table>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                  {tasks.slice(((taskPages[proj.project.id] || 1) - 1) * ITEMS_PER_PAGE, (taskPages[proj.project.id] || 1) * ITEMS_PER_PAGE).map((t) => (
+                                    <Table.Tr key={t.id}>
+                                      <Table.Td><Text size="sm">{t.name}</Text></Table.Td>
+                                      <Table.Td>
+                                        {t.assignee_name ? (
+                                          <Group gap="xs" wrap="nowrap">
+                                            <Avatar src={t.assignee_avatar} size={24} radius="xl" />
+                                            <Text size="sm">{t.assignee_name}</Text>
+                                          </Group>
+                                        ) : (
+                                          <Text c="dimmed" size="sm">Unassigned</Text>
+                                        )}
+                                      </Table.Td>
+                                      <Table.Td><Text size="xs" c="dimmed">{t.project_name}</Text></Table.Td>
+                                      <Table.Td>
+                                        <Badge size="xs" variant="outline" color={t.priority === 'urgent' ? 'red' : t.priority === 'high' ? 'orange' : 'gray'}>
+                                          {t.priority || '—'}
+                                        </Badge>
+                                      </Table.Td>
+                                      <Table.Td><Text size="sm">{t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
+                                      <Table.Td><StatusBadge completed_at={t.completed_at} /></Table.Td>
+                                    </Table.Tr>
+                                  ))}
+                                </Table.Tbody>
+                              </Table>
+                              {tasks.length > ITEMS_PER_PAGE && (
+                                <Group justify="space-between" mt="xs">
+                                  <Text size="xs" c="dimmed">Showing {Math.min(tasks.length, ITEMS_PER_PAGE)} of {tasks.length}</Text>
+                                  <Pagination size="xs" total={Math.ceil(tasks.length / ITEMS_PER_PAGE)} value={taskPages[proj.project.id] || 1} onChange={(p) => setTaskPages((prev) => ({ ...prev, [proj.project.id]: p }))} />
+                                </Group>
+                              )}
+                            </>
                           )}
-                          {tasks.length > 50 && <Text size="xs" c="dimmed" mt="xs">Showing 50 of {tasks.length} tasks</Text>}
 
                           <Text fw={600} mt="md" mb="xs" size="sm">
                             <Group gap={4}><IconSubtask size={16} /> Subtasks ({subtasks.length})</Group>
@@ -315,36 +353,45 @@ const ProjectReport = () => {
                           {subtasks.length === 0 ? (
                             <Text c="dimmed" size="sm">No subtasks match filter.</Text>
                           ) : (
-                            <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
-                              <Table.Thead>
-                                <Table.Tr>
-                                  <Table.Th>Subtask</Table.Th>
-                                  <Table.Th>Parent task</Table.Th>
-                                  <Table.Th>Assignee</Table.Th>
-                                  <Table.Th>Due date</Table.Th>
-                                  <Table.Th>Status</Table.Th>
-                                </Table.Tr>
-                              </Table.Thead>
-                              <Table.Tbody>
-                                {subtasks.slice(0, 50).map((s) => (
-                                  <Table.Tr key={s.id}>
-                                    <Table.Td><Text size="sm">{s.name}</Text></Table.Td>
-                                    <Table.Td><Text size="sm" c="dimmed">{s.parent_task_name}</Text></Table.Td>
-                                    <Table.Td>
-                                      {s.assignee_name ? (
-                                        <Text size="sm">{s.assignee_name}</Text>
-                                      ) : (
-                                        <Text c="dimmed" size="sm">Unassigned</Text>
-                                      )}
-                                    </Table.Td>
-                                    <Table.Td><Text size="sm">{s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
-                                    <Table.Td><StatusBadge completed_at={s.completed_at} /></Table.Td>
+                            <>
+                              <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
+                                <Table.Thead>
+                                  <Table.Tr>
+                                    <Table.Th>Subtask</Table.Th>
+                                    <Table.Th>Parent task</Table.Th>
+                                    <Table.Th>Assignee</Table.Th>
+                                    <Table.Th>Project</Table.Th>
+                                    <Table.Th>Due date</Table.Th>
+                                    <Table.Th>Status</Table.Th>
                                   </Table.Tr>
-                                ))}
-                              </Table.Tbody>
-                            </Table>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                  {subtasks.slice(((subPages[proj.project.id] || 1) - 1) * ITEMS_PER_PAGE, (subPages[proj.project.id] || 1) * ITEMS_PER_PAGE).map((s) => (
+                                    <Table.Tr key={s.id}>
+                                      <Table.Td><Text size="sm">{s.name}</Text></Table.Td>
+                                      <Table.Td><Text size="sm" c="dimmed">{s.parent_task_name}</Text></Table.Td>
+                                      <Table.Td>
+                                        {s.assignee_name ? (
+                                          <Text size="sm">{s.assignee_name}</Text>
+                                        ) : (
+                                          <Text c="dimmed" size="sm">Unassigned</Text>
+                                        )}
+                                      </Table.Td>
+                                      <Table.Td><Text size="xs" c="dimmed">{s.project_name}</Text></Table.Td>
+                                      <Table.Td><Text size="sm">{s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
+                                      <Table.Td><StatusBadge completed_at={s.completed_at} /></Table.Td>
+                                    </Table.Tr>
+                                  ))}
+                                </Table.Tbody>
+                              </Table>
+                              {subtasks.length > ITEMS_PER_PAGE && (
+                                <Group justify="space-between" mt="xs">
+                                  <Text size="xs" c="dimmed">Showing {Math.min(subtasks.length, ITEMS_PER_PAGE)} of {subtasks.length}</Text>
+                                  <Pagination size="xs" total={Math.ceil(subtasks.length / ITEMS_PER_PAGE)} value={subPages[proj.project.id] || 1} onChange={(p) => setSubPages((prev) => ({ ...prev, [proj.project.id]: p }))} />
+                                </Group>
+                              )}
+                            </>
                           )}
-                          {subtasks.length > 50 && <Text size="xs" c="dimmed" mt="xs">Showing 50 of {subtasks.length} subtasks</Text>}
                         </Table.Td>
                       </Table.Tr>
                     </>
@@ -353,6 +400,17 @@ const ProjectReport = () => {
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
+
+          {/* Project-level pagination */}
+          {projects.length > PROJECTS_PER_PAGE && (
+            <Group justify="space-between" mt="md" px="md">
+              <Text size="sm" c="dimmed">
+                Showing {((projectPage - 1) * PROJECTS_PER_PAGE) + 1}–{Math.min(projectPage * PROJECTS_PER_PAGE, projects.length)} of {projects.length} projects
+              </Text>
+              <Pagination size="sm" total={Math.ceil(projects.length / PROJECTS_PER_PAGE)} value={projectPage} onChange={setProjectPage} />
+            </Group>
+          )}
+          </>
         )}
       </ContainerBox>
     </>
