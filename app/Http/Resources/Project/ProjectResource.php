@@ -32,7 +32,7 @@ class ProjectResource extends JsonResource
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, \App\Models\Project> $children
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Project>  $children
      * @return array<int, array<string, mixed>>
      */
     protected function serializeChildren($children): array
