@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Group, ScrollArea, Stack, Text, Badge, Paper, Tooltip, useMantineTheme } from "@mantine/core";
+import { Group, ScrollArea, Text, Badge, Paper, Tooltip, useMantineTheme, useComputedColorScheme } from "@mantine/core";
 import dayjs from "dayjs";
 import minMax from "dayjs/plugin/minMax";
 dayjs.extend(minMax);
@@ -99,7 +99,7 @@ function getContrastColor(bgColor) {
  */
 export default function GanttChart({ tasks, onBarClick, zoom = 'month', groupByProject = true, maxDays = 180 }) {
   const theme = useMantineTheme();
-  const scheme = theme.colorScheme || (document?.documentElement?.dataset?.mantineColorScheme ?? 'light');
+  const scheme = useComputedColorScheme('light');
 
   const zoomConfig = useMemo(() => {
     switch (zoom) {
@@ -271,7 +271,7 @@ export default function GanttChart({ tasks, onBarClick, zoom = 'month', groupByP
     <Paper className={classes.root} style={{ ['--gantt-day-width']: `${dayWidth}px` }}>
       <div className={classes.header}>
         <div className={classes.headerLeft}>
-          <Text fw={600} c="gray.7" size="sm">
+          <Text fw={600} c="dimmed" size="sm">
             Tasks
           </Text>
         </div>
@@ -290,7 +290,7 @@ export default function GanttChart({ tasks, onBarClick, zoom = 'month', groupByP
                     className={`${classes.headerCell} ${isToday ? classes.today : ''} ${isWeekend ? classes.weekend : ''}`}
                     style={{ width: dayWidth }}
                   >
-                    <Text size="xs" fw={500} c={isToday ? "blue.6" : "gray.6"}>
+                    <Text size="xs" fw={500} c={isToday ? "blue.6" : "dimmed"}>
                       {headerFormat(d)}
                     </Text>
                   </div>
@@ -311,7 +311,7 @@ export default function GanttChart({ tasks, onBarClick, zoom = 'month', groupByP
                     className={`${classes.subHeaderCell} ${isToday ? classes.today : ''} ${isWeekend ? classes.weekend : ''}`}
                     style={{ width: dayWidth }}
                   >
-                    <Text size="xs" c={isToday ? "blue.5" : "gray.6"}>
+                    <Text size="xs" c={isToday ? "blue.5" : "dimmed"}>
                       {subHeaderFormat(d)}
                     </Text>
                   </div>
@@ -368,7 +368,7 @@ export default function GanttChart({ tasks, onBarClick, zoom = 'month', groupByP
                               </Text>
                               <Group gap={6} mt={2}>
                                 {task.raw.assigned_to_user && (
-                                  <Text size="xs" c="gray.6">
+                                  <Text size="xs" c="dimmed">
                                     {task.raw.assigned_to_user.name}
                                   </Text>
                                 )}
@@ -494,7 +494,7 @@ export default function GanttChart({ tasks, onBarClick, zoom = 'month', groupByP
 
           {rowsFlat.length === 0 && (
             <div className={classes.emptyState}>
-              <Text size="sm" c="gray.6">No tasks to display</Text>
+              <Text size="sm" c="dimmed">No tasks to display</Text>
             </div>
           )}
         </div>
