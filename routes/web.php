@@ -179,11 +179,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::get('logged-time/sum', [ReportController::class, 'loggedTimeSum'])->name('logged-time.sum');
         Route::get('logged-time/daily', [ReportController::class, 'dailyLoggedTime'])->name('logged-time.daily');
         Route::get('fixed-price/sum', [ReportController::class, 'fixedPriceSum'])->name('fixed-price.sum');
-        Route::get('team-capacity', [ReportController::class, 'teamCapacity'])->name('team-capacity');
-        Route::get('team-capacity/user-tasks', [ReportController::class, 'userTasks'])->name('team-capacity.user-tasks');
-        Route::get('team-metrics', [ReportController::class, 'teamMetrics'])->name('team-metrics');
-        Route::get('team-metrics/json', [ReportController::class, 'teamMetricsJson'])->name('team-metrics.json');
-        Route::get('team-metrics/suggest', [ReportController::class, 'suggestAssignees'])->name('team-metrics.suggest');
+        Route::get('member-report', [ReportController::class, 'memberReport'])->name('member-report');
+        Route::get('project-report', [ReportController::class, 'projectReport'])->name('project-report');
+        Route::get('workload-report', [ReportController::class, 'workloadReport'])->name('workload-report');
     });
 
     // Settings
