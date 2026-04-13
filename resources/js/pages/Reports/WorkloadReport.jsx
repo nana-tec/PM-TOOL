@@ -13,6 +13,7 @@ import {
   Center,
   Group,
   MultiSelect,
+  Pagination,
   Progress,
   SimpleGrid,
   Stack,
@@ -20,6 +21,7 @@ import {
   Text,
   Title,
   Tooltip,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import {
@@ -45,9 +47,14 @@ function WorkloadBar({ value, max, color = 'blue' }) {
   );
 }
 
+const MEMBERS_PER_PAGE = 15;
+
 const WorkloadReport = () => {
   const { members, dropdowns } = usePage().props;
   const params = currentUrlParams();
+  const computedColorScheme = useComputedColorScheme();
+  const isDark = computedColorScheme === 'dark';
+  const expandedBg = isDark ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-gray-0)';
 
   const [form, submit, updateValue] = useForm('get', route('reports.workload-report'), {
     users: params.users?.map(String) || [],
@@ -60,6 +67,7 @@ const WorkloadReport = () => {
 
   const [expanded, setExpanded] = useState({});
   const toggleExpand = (userId) => setExpanded((prev) => ({ ...prev, [userId]: !prev[userId] }));
+  const [memberPage, setMemberPage] = useState(1);
 
   const maxOpen = useMemo(() => Math.max(1, ...members.map((m) => m.total_open)), [members]);
 
@@ -173,6 +181,7 @@ const WorkloadReport = () => {
             />
           </Center>
         ) : (
+          <>
           <Table.ScrollContainer minWidth={1300}>
             <Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
               <Table.Thead>
@@ -192,7 +201,7 @@ const WorkloadReport = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {members.map((member) => {
+                {members.slice((memberPage - 1) * MEMBERS_PER_PAGE, memberPage * MEMBERS_PER_PAGE).map((member) => {
                   const isOpen = expanded[member.user.id];
                   const wColor = getWorkloadColor(member);
                   return (
@@ -251,7 +260,7 @@ const WorkloadReport = () => {
 
                       {/* Expanded: per-project breakdown */}
                       <Table.Tr key={`${member.user.id}-detail`} style={{ display: isOpen ? undefined : 'none' }}>
-                        <Table.Td colSpan={12} style={{ background: 'var(--mantine-color-gray-0)', padding: '16px 24px' }}>
+                        <Table.Td colSpan={12} style={{ background: expandedBg, padding: '16px 24px' }}>
                           <Text fw={600} mb="xs" size="sm">
                             <Group gap={4}><IconFolder size={16} /> Project breakdown</Group>
                           </Text>
@@ -292,6 +301,17 @@ const WorkloadReport = () => {
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
+
+          {/* Member-level pagination */}
+          {members.length > MEMBERS_PER_PAGE && (
+            <Group justify="space-between" mt="md" px="md">
+              <Text size="sm" c="dimmed">
+                Showing {((memberPage - 1) * MEMBERS_PER_PAGE) + 1}–{Math.min(memberPage * MEMBERS_PER_PAGE, members.length)} of {members.length} members
+              </Text>
+              <Pagination size="sm" total={Math.ceil(members.length / MEMBERS_PER_PAGE)} value={memberPage} onChange={setMemberPage} />
+            </Group>
+          )}
+          </>
         )}
       </ContainerBox>
     </>
