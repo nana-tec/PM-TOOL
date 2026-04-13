@@ -337,8 +337,11 @@ class ReportController extends Controller
         $projectsQuery = Project::query()->orderBy('name');
         if ($request->projects && count($request->projects)) {
             $projectsQuery->whereIn('id', $request->projects);
+        } else {
+            // Default: show top-level projects only (sub-projects are aggregated in)
+            $projectsQuery->whereNull('parent_id');
         }
-        $projects = $projectsQuery->get(['id', 'name', 'description']);
+        $projects = $projectsQuery->get(['id', 'name', 'description', 'parent_id']);
 
         if ($projects->isEmpty()) {
             return Inertia::render('Reports/ProjectReport', [
@@ -350,10 +353,29 @@ class ReportController extends Controller
             ]);
         }
 
-        $projectIds = $projects->pluck('id');
+        // Build a mapping: parent project ID => all IDs (self + descendants)
+        $projectScopeMap = [];
+        $subProjectsMap = [];
+        foreach ($projects as $project) {
+            $descIds = $project->allDescendantIds();
+            $projectScopeMap[$project->id] = array_merge([$project->id], $descIds);
+            // Get direct children info for display
+            $subProjectsMap[$project->id] = Project::where('parent_id', $project->id)
+                ->get(['id', 'name'])
+                ->map(fn ($sp) => ['id' => $sp->id, 'name' => $sp->name])
+                ->toArray();
+        }
+
+        // Flatten all project IDs we need to query
+        $allProjectIds = collect($projectScopeMap)->flatten()->unique()->values()->all();
+
+        // All name lookups
+        $projectNames = DB::table('projects')
+            ->whereIn('id', $allProjectIds)
+            ->pluck('name', 'id');
 
         $completedQ = DB::table('tasks')
-            ->whereIn('project_id', $projectIds)
+            ->whereIn('project_id', $allProjectIds)
             ->whereNull('archived_at')
             ->whereNotNull('completed_at');
         if ($start && $end) {
@@ -364,7 +386,7 @@ class ReportController extends Controller
             ->pluck('cnt', 'project_id');
 
         $pendingCounts = DB::table('tasks')
-            ->whereIn('project_id', $projectIds)
+            ->whereIn('project_id', $allProjectIds)
             ->whereNull('archived_at')
             ->whereNull('completed_at')
             ->groupBy('project_id')
@@ -372,14 +394,14 @@ class ReportController extends Controller
             ->pluck('cnt', 'project_id');
 
         $totalCounts = DB::table('tasks')
-            ->whereIn('project_id', $projectIds)
+            ->whereIn('project_id', $allProjectIds)
             ->whereNull('archived_at')
             ->groupBy('project_id')
             ->selectRaw('project_id, COUNT(*) AS cnt')
             ->pluck('cnt', 'project_id');
 
         $overdueCounts = DB::table('tasks')
-            ->whereIn('project_id', $projectIds)
+            ->whereIn('project_id', $allProjectIds)
             ->whereNull('archived_at')
             ->whereNull('completed_at')
             ->whereNotNull('due_on')
@@ -391,7 +413,7 @@ class ReportController extends Controller
         // Subtask counts per project
         $subCompletedQ = DB::table('sub_tasks AS st')
             ->join('tasks', 'tasks.id', '=', 'st.task_id')
-            ->whereIn('tasks.project_id', $projectIds)
+            ->whereIn('tasks.project_id', $allProjectIds)
             ->whereNull('tasks.archived_at')
             ->whereNotNull('st.completed_at');
         if ($start && $end) {
@@ -403,7 +425,7 @@ class ReportController extends Controller
 
         $subPending = DB::table('sub_tasks AS st')
             ->join('tasks', 'tasks.id', '=', 'st.task_id')
-            ->whereIn('tasks.project_id', $projectIds)
+            ->whereIn('tasks.project_id', $allProjectIds)
             ->whereNull('tasks.archived_at')
             ->whereNull('st.completed_at')
             ->groupBy('tasks.project_id')
@@ -412,14 +434,14 @@ class ReportController extends Controller
 
         $subTotal = DB::table('sub_tasks AS st')
             ->join('tasks', 'tasks.id', '=', 'st.task_id')
-            ->whereIn('tasks.project_id', $projectIds)
+            ->whereIn('tasks.project_id', $allProjectIds)
             ->whereNull('tasks.archived_at')
             ->groupBy('tasks.project_id')
             ->selectRaw('tasks.project_id AS project_id, COUNT(*) AS cnt')
             ->pluck('cnt', 'project_id');
 
-        $nearestDue = DB::table('tasks')
-            ->whereIn('project_id', $projectIds)
+        $nearestDueAll = DB::table('tasks')
+            ->whereIn('project_id', $allProjectIds)
             ->whereNull('archived_at')
             ->whereNull('completed_at')
             ->whereNotNull('due_on')
@@ -429,20 +451,22 @@ class ReportController extends Controller
 
         $membersPerProject = DB::table('project_user_access')
             ->join('users', 'users.id', '=', 'project_user_access.user_id')
-            ->whereIn('project_user_access.project_id', $projectIds)
+            ->whereIn('project_user_access.project_id', $allProjectIds)
             ->select(['project_user_access.project_id', 'users.id', 'users.name', 'users.avatar'])
             ->get()
             ->groupBy('project_id');
 
-        // Task list per project
+        // Task list per project (include project_name for sub-project identification)
         $taskRows = DB::table('tasks')
             ->leftJoin('users', 'users.id', '=', 'tasks.assigned_to_user_id')
-            ->whereIn('tasks.project_id', $projectIds)
+            ->leftJoin('projects', 'projects.id', '=', 'tasks.project_id')
+            ->whereIn('tasks.project_id', $allProjectIds)
             ->whereNull('tasks.archived_at')
             ->select([
                 'tasks.id', 'tasks.name', 'tasks.due_on', 'tasks.estimation',
                 'tasks.completed_at', 'tasks.project_id', 'tasks.priority', 'tasks.complexity',
                 'users.id as assignee_id', 'users.name as assignee_name', 'users.avatar as assignee_avatar',
+                'projects.name as project_name',
             ])
             ->orderByDesc('tasks.created_at')
             ->limit(3000)
@@ -453,44 +477,77 @@ class ReportController extends Controller
         $subTaskRows = DB::table('sub_tasks AS st')
             ->join('tasks', 'tasks.id', '=', 'st.task_id')
             ->leftJoin('users', 'users.id', '=', 'st.assigned_to_user_id')
-            ->whereIn('tasks.project_id', $projectIds)
+            ->leftJoin('projects', 'projects.id', '=', 'tasks.project_id')
+            ->whereIn('tasks.project_id', $allProjectIds)
             ->whereNull('tasks.archived_at')
             ->select([
                 'st.id', 'st.name', 'st.due_on', 'st.estimation',
                 'st.completed_at', 'st.task_id', 'tasks.project_id',
                 'tasks.name as parent_task_name',
                 'users.id as assignee_id', 'users.name as assignee_name',
+                'projects.name as project_name',
             ])
             ->orderByDesc('st.created_at')
             ->limit(3000)
             ->get()
             ->groupBy('project_id');
 
+        // Helper to aggregate counts across a set of project IDs
+        $sumForIds = fn ($collection, $ids) => collect($ids)->sum(fn ($id) => (int) ($collection[$id] ?? 0));
+
         $result = $projects->map(function ($project) use (
+            $projectScopeMap, $subProjectsMap, $projectNames,
             $completedCounts, $pendingCounts, $totalCounts, $overdueCounts,
-            $subCompleted, $subPending, $subTotal, $nearestDue,
-            $membersPerProject, $taskRows, $subTaskRows
+            $subCompleted, $subPending, $subTotal, $nearestDueAll,
+            $membersPerProject, $taskRows, $subTaskRows, $sumForIds
         ) {
-            $tasksCompleted = (int) ($completedCounts[$project->id] ?? 0);
-            $tasksPending = (int) ($pendingCounts[$project->id] ?? 0);
-            $tasksTotal = (int) ($totalCounts[$project->id] ?? 0);
-            $tasksOverdue = (int) ($overdueCounts[$project->id] ?? 0);
-            $subDone = (int) ($subCompleted[$project->id] ?? 0);
-            $subPend = (int) ($subPending[$project->id] ?? 0);
-            $subTot = (int) ($subTotal[$project->id] ?? 0);
+            $scopeIds = $projectScopeMap[$project->id];
+
+            $tasksCompleted = $sumForIds($completedCounts, $scopeIds);
+            $tasksPending = $sumForIds($pendingCounts, $scopeIds);
+            $tasksTotal = $sumForIds($totalCounts, $scopeIds);
+            $tasksOverdue = $sumForIds($overdueCounts, $scopeIds);
+            $subDone = $sumForIds($subCompleted, $scopeIds);
+            $subPend = $sumForIds($subPending, $scopeIds);
+            $subTot = $sumForIds($subTotal, $scopeIds);
 
             $totalAll = $tasksTotal + $subTot;
             $completedAll = $tasksCompleted + $subDone;
             $progress = $totalAll > 0 ? round(($completedAll / $totalAll) * 100, 1) : 0;
 
-            $members = ($membersPerProject[$project->id] ?? collect())->map(fn ($m) => [
-                'id' => $m->id,
-                'name' => $m->name,
-                'avatar' => $m->avatar,
-            ])->values()->toArray();
+            // Aggregate members across all scope projects (deduplicated)
+            $members = collect($scopeIds)
+                ->flatMap(fn ($id) => $membersPerProject[$id] ?? collect())
+                ->unique('id')
+                ->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->name,
+                    'avatar' => $m->avatar,
+                ])
+                ->values()
+                ->toArray();
+
+            // Aggregate nearest due
+            $nearestDue = collect($scopeIds)
+                ->map(fn ($id) => $nearestDueAll[$id] ?? null)
+                ->filter()
+                ->sort()
+                ->first();
+
+            // Aggregate task rows from all scope projects
+            $allTasks = collect($scopeIds)
+                ->flatMap(fn ($id) => $taskRows[$id] ?? collect())
+                ->values()
+                ->toArray();
+
+            $allSubtasks = collect($scopeIds)
+                ->flatMap(fn ($id) => $subTaskRows[$id] ?? collect())
+                ->values()
+                ->toArray();
 
             return [
                 'project' => ['id' => $project->id, 'name' => $project->name],
+                'sub_projects' => $subProjectsMap[$project->id] ?? [],
                 'members' => $members,
                 'members_count' => count($members),
                 'tasks_completed' => $tasksCompleted,
@@ -503,9 +560,9 @@ class ReportController extends Controller
                 'total_items' => $totalAll,
                 'total_completed' => $completedAll,
                 'progress' => $progress,
-                'nearest_due' => $nearestDue[$project->id] ?? null,
-                'tasks' => ($taskRows[$project->id] ?? collect())->values()->toArray(),
-                'subtasks' => ($subTaskRows[$project->id] ?? collect())->values()->toArray(),
+                'nearest_due' => $nearestDue,
+                'tasks' => $allTasks,
+                'subtasks' => $allSubtasks,
             ];
         });
 
