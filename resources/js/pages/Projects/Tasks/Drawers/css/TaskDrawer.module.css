@@ -2,6 +2,7 @@
     padding: 0 rem(20);
     display: flex;
     column-gap: rem(30);
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
 }
 
 .content {
@@ -18,6 +19,9 @@
     padding: rem(5);
     width: 30%;
     flex-grow: 1;
+    background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7));
+    border-radius: var(--mantine-radius-md);
+    padding: rem(12);
 
     @media (max-width: $mantine-breakpoint-md) {
         width: 100%;
