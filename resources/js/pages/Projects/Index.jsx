@@ -5,11 +5,10 @@ import useAuthorization from "@/hooks/useAuthorization";
 import Layout from "@/layouts/MainLayout";
 import { redirectTo, reloadWithQuery } from "@/utils/route";
 import { usePage } from "@inertiajs/react";
-import { Button, Center, Flex, Grid, Group, SegmentedControl } from "@mantine/core";
+import { Button, Center, Grid, Group, SegmentedControl } from "@mantine/core";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { useState } from "react";
 import ProjectsTree from "./Index/ProjectsTree";
-import ProjectCard from "./Index/ProjectCard";
 import ProjectsSummary from "./Summary";
 
 const ProjectsIndex = () => {
@@ -22,7 +21,7 @@ const ProjectsIndex = () => {
 
   return (
     <>
-      <Grid justify="space-between" align="center">
+      <Grid justify="space-between" align="center" mb="md">
         <Grid.Col span="content">
           <Group>
             <SearchInput placeholder="Search projects" search={search} />
@@ -39,7 +38,7 @@ const ProjectsIndex = () => {
           </Group>
         </Grid.Col>
         <Grid.Col span="content">
-          {can("create project") && (
+          {isAdmin() && (
             <Button
               leftSection={<IconPlus size={14} />}
               radius="xl"
