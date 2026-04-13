@@ -59,7 +59,7 @@ export default function TeamCapacityCard({ capacityData }) {
           <Stack gap={2} ta="center">
             <Text size="xs" c="dimmed">At/Over Capacity</Text>
             <Group gap="xs" justify="center">
-              <IconAlertTriangle size={16} color="orange" />
+              <IconAlertTriangle size={16} color="var(--mantine-color-orange-5)" />
               <Text fw={600} c="orange">{summary.at_capacity + summary.over_capacity}</Text>
             </Group>
           </Stack>
@@ -69,7 +69,7 @@ export default function TeamCapacityCard({ capacityData }) {
           <Stack gap={2} ta="center">
             <Text size="xs" c="dimmed">Available</Text>
             <Group gap="xs" justify="center">
-              <IconClock size={16} color="green" />
+              <IconClock size={16} color="var(--mantine-color-green-5)" />
               <Text fw={600} c="green">{summary.available}</Text>
             </Group>
           </Stack>
@@ -79,7 +79,7 @@ export default function TeamCapacityCard({ capacityData }) {
           <Stack gap={2} ta="center">
             <Text size="xs" c="dimmed">Avg Completion</Text>
             <Group gap="xs" justify="center">
-              <IconTrendingUp size={16} color="blue" />
+              <IconTrendingUp size={16} color="var(--mantine-color-blue-5)" />
               <Text fw={600} c="blue">{summary.avg_completion?.toFixed(0)}%</Text>
             </Group>
           </Stack>
