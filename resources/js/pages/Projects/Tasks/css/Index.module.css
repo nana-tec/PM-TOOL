@@ -14,3 +14,15 @@
     margin-right: -4rem;
     margin-bottom: -4rem;
 }
+
+:global(.gantt-view) {
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+}
+
+:global(.list-view) {
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+}
+
+:global(.vcs-view) {
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+}
