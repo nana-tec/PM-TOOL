@@ -221,6 +221,11 @@ export function EditTaskDrawer() {
         duration: 400,
         timingFunction: 'ease',
       }}
+      styles={{
+        body: { backgroundColor: 'var(--mantine-color-body)' },
+        header: { backgroundColor: 'var(--mantine-color-body)' },
+        content: { backgroundColor: 'var(--mantine-color-body)' },
+      }}
     >
       {task ? (
         <>
