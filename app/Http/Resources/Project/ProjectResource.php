@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources\Project;
 
+use App\Models\Project;
 use App\Services\PermissionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 
 class ProjectResource extends JsonResource
 {
@@ -32,7 +34,7 @@ class ProjectResource extends JsonResource
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, \App\Models\Project>  $children
+     * @param  Collection<int, Project>  $children
      * @return array<int, array<string, mixed>>
      */
     protected function serializeChildren($children): array

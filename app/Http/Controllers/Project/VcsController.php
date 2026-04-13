@@ -7,7 +7,9 @@ use App\Models\Project;
 use App\Models\ProjectVcsIntegration;
 use App\Models\ProjectVcsUserToken;
 use App\Services\Vcs\VcsClientFactory;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 class VcsController extends Controller
@@ -46,7 +48,7 @@ class VcsController extends Controller
         return Cache::remember($key, $this->cacheTtl(), $callback);
     }
 
-    public function showIntegration(Project $project): \Illuminate\Http\JsonResponse
+    public function showIntegration(Project $project): JsonResponse
     {
         $this->authorize('view', $project);
         $integration = $project->vcsIntegration;
@@ -71,7 +73,7 @@ class VcsController extends Controller
         ]);
     }
 
-    public function upsertIntegration(Request $request, Project $project): \Illuminate\Http\JsonResponse
+    public function upsertIntegration(Request $request, Project $project): JsonResponse
     {
         $this->authorize('update', $project);
         $data = $request->validate([
@@ -99,7 +101,7 @@ class VcsController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
-    public function destroyIntegration(Project $project): \Illuminate\Http\JsonResponse
+    public function destroyIntegration(Project $project): JsonResponse
     {
         $this->authorize('update', $project);
         if ($project->vcsIntegration) {
@@ -688,7 +690,7 @@ class VcsController extends Controller
                             if (empty($c['date'])) {
                                 continue;
                             }
-                            $dt = \Illuminate\Support\Carbon::parse($c['date']);
+                            $dt = Carbon::parse($c['date']);
                             if ($dt->lt($start)) {
                                 continue;
                             }
@@ -755,14 +757,14 @@ class VcsController extends Controller
                             $created = $pr['created_at'] ?? null;
                             $mergedAt = $pr['merged_at'] ?? ($pr['closed_at'] ?? null);
                             if ($created) {
-                                $d = \Illuminate\Support\Carbon::parse($created)->toDateString();
-                                $w = \Illuminate\Support\Carbon::parse($created)->isoFormat('GGGG-[W]WW');
+                                $d = Carbon::parse($created)->toDateString();
+                                $w = Carbon::parse($created)->isoFormat('GGGG-[W]WW');
                                 $byDay[$d]['opened'] = ($byDay[$d]['opened'] ?? 0) + 1;
                                 $byWeek[$w]['opened'] = ($byWeek[$w]['opened'] ?? 0) + 1;
                             }
                             if (($rp['state'] ?? null) === 'merged' && $mergedAt) {
-                                $d = \Illuminate\Support\Carbon::parse($mergedAt)->toDateString();
-                                $w = \Illuminate\Support\Carbon::parse($mergedAt)->isoFormat('GGGG-[W]WW');
+                                $d = Carbon::parse($mergedAt)->toDateString();
+                                $w = Carbon::parse($mergedAt)->isoFormat('GGGG-[W]WW');
                                 $byDay[$d]['merged'] = ($byDay[$d]['merged'] ?? 0) + 1;
                                 $byWeek[$w]['merged'] = ($byWeek[$w]['merged'] ?? 0) + 1;
                             }

@@ -313,6 +313,7 @@ class ReportController extends Controller
             return [$m['completion_rate'], $m['total_completed']];
         })->values()->map(function ($m, $idx) {
             $m['rank'] = $idx + 1;
+
             return $m;
         });
 
@@ -496,7 +497,7 @@ class ReportController extends Controller
         $sumForIds = fn ($collection, $ids) => collect($ids)->sum(fn ($id) => (int) ($collection[$id] ?? 0));
 
         $result = $projects->map(function ($project) use (
-            $projectScopeMap, $subProjectsMap, $projectNames,
+            $projectScopeMap, $subProjectsMap,
             $completedCounts, $pendingCounts, $totalCounts, $overdueCounts,
             $subCompleted, $subPending, $subTotal, $nearestDueAll,
             $membersPerProject, $taskRows, $subTaskRows, $sumForIds

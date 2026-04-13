@@ -17,6 +17,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Settings\LabelController;
 use App\Http\Controllers\Settings\OwnerCompanyController;
 use App\Http\Controllers\Settings\RoleController;
+use App\Http\Controllers\SubTaskController;
 use App\Http\Controllers\Task\AttachmentController;
 use App\Http\Controllers\Task\CommentController;
 use App\Http\Controllers\Task\GroupController;
@@ -137,11 +138,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
         // SUBTASKS
         Route::group(['prefix' => '{project}/tasks/{task}', 'as' => 'tasks.'], function () {
-            Route::get('subtasks', [\App\Http\Controllers\SubTaskController::class, 'index'])->name('subtasks.index');
-            Route::post('subtasks', [\App\Http\Controllers\SubTaskController::class, 'store'])->name('subtasks.store');
-            Route::put('subtasks/{subtask}', [\App\Http\Controllers\SubTaskController::class, 'update'])->name('subtasks.update');
-            Route::post('subtasks/reorder', [\App\Http\Controllers\SubTaskController::class, 'reorder'])->name('subtasks.reorder');
-            Route::delete('subtasks/{subtask}', [\App\Http\Controllers\SubTaskController::class, 'destroy'])->name('subtasks.destroy');
+            Route::get('subtasks', [SubTaskController::class, 'index'])->name('subtasks.index');
+            Route::post('subtasks', [SubTaskController::class, 'store'])->name('subtasks.store');
+            Route::put('subtasks/{subtask}', [SubTaskController::class, 'update'])->name('subtasks.update');
+            Route::post('subtasks/reorder', [SubTaskController::class, 'reorder'])->name('subtasks.reorder');
+            Route::delete('subtasks/{subtask}', [SubTaskController::class, 'destroy'])->name('subtasks.destroy');
         })->scopeBindings();
     });
 

@@ -8,6 +8,7 @@ use App\Http\Resources\Project\ProjectResource;
 use App\Models\ClientCompany;
 use App\Models\Currency;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\ProjectService;
 use Illuminate\Http\Request;
@@ -47,9 +48,9 @@ class ProjectController extends Controller
         $items->each(function (Project $p) {
             $descIds = $p->allDescendantIds();
             $allIds = array_merge([$p->id], $descIds);
-            $p->all_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->count();
-            $p->completed_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
-            $p->overdue_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+            $p->all_tasks_count = Task::whereIn('project_id', $allIds)->count();
+            $p->completed_tasks_count = Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
+            $p->overdue_tasks_count = Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
         });
 
         return Inertia::render('Projects/Index', [
@@ -180,9 +181,9 @@ class ProjectController extends Controller
         // Aggregate counts for parent including descendants
         $descIds = $project->allDescendantIds();
         $allIds = array_merge([$project->id], $descIds);
-        $project->all_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->count();
-        $project->completed_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
-        $project->overdue_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+        $project->all_tasks_count = Task::whereIn('project_id', $allIds)->count();
+        $project->completed_tasks_count = Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
+        $project->overdue_tasks_count = Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
 
         // Load immediate children with full details for card rendering (individual stats only for each child)
         $children = Project::where('parent_id', $project->id)
