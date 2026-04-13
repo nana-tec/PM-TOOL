@@ -1,12 +1,10 @@
-import Card from "@/components/Card";
-import { redirectTo, reloadWithQuery } from "@/utils/route";
-import { Badge, Group, RingProgress, Stack, Text, Title, Tooltip, rem } from "@mantine/core";
+import { redirectTo } from "@/utils/route";
+import { Card, Group, RingProgress, Stack, Text, Badge, Progress, rem } from "@mantine/core";
 import { IconStarFilled } from "@tabler/icons-react";
 import round from "lodash/round";
-import classes from "./css/ProjectCard.module.css";
 import { usePage } from "@inertiajs/react";
 
-export function ProjectCard({ project }) {
+export function ProjectCard({ project, compact = false }) {
   const { metricMode } = usePage().props;
   const counts = metricMode === 'parent'
     ? {
@@ -28,63 +26,86 @@ export function ProjectCard({ project }) {
     overduePercent = (counts.overdue / counts.all) * 100;
   }
 
-  const toggleMode = () => reloadWithQuery({ metrics: metricMode === 'parent' ? 'aggregated' : 'parent' }, true);
+  if (compact) {
+    return (
+      <Card
+        withBorder
+        radius="md"
+        p="sm"
+        style={{ cursor: 'pointer' }}
+        onClick={() => redirectTo("projects.tasks", project.id)}
+      >
+        <Group justify="space-between" wrap="nowrap">
+          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+            <Group gap={4} wrap="nowrap">
+              {project.favorite && (
+                <IconStarFilled style={{ color: "var(--mantine-color-yellow-4)", width: rem(12), height: rem(12) }} />
+              )}
+              <Text size="sm" fw={600} lineClamp={1}>{project.name}</Text>
+            </Group>
+            <Text size="xs" c="dimmed">{project.client_company?.name}</Text>
+          </Stack>
+          <Badge size="sm" variant="light" color={completedPercent >= 80 ? 'green' : completedPercent >= 40 ? 'blue' : 'gray'}>
+            {round(completedPercent)}%
+          </Badge>
+        </Group>
+        <Progress.Root mt={6} size="xs" radius="xl">
+          <Progress.Section value={completedPercent} color="blue" />
+          <Progress.Section value={overduePercent} color="red" />
+        </Progress.Root>
+      </Card>
+    );
+  }
 
   return (
-    <Card bg="none">
+    <Card
+      withBorder
+      radius="md"
+      p="lg"
+      style={{ cursor: 'pointer' }}
+      onClick={() => redirectTo("projects.tasks", project.id)}
+    >
       <Group justify="space-between" wrap="nowrap">
-        <Stack gap={6}>
-          <Group justify="space-between">
-            <Title
-              fz={24}
-              onClick={() => redirectTo("projects.tasks", project.id)}
-              className={classes.link}
-            >
-              {project.favorite && (
-                <IconStarFilled
-                  style={{
-                    color: "var(--mantine-color-yellow-4)",
-                    width: rem(15),
-                    height: rem(15),
-                    marginRight: 10,
-                  }}
-                />
-              )}
-              {project.name}
-            </Title>
-            <Badge size="xs" variant="light" onClick={toggleMode} style={{ cursor: 'pointer' }}>
-              {metricMode === 'parent' ? 'Parent-only' : 'Subtree'}
-            </Badge>
+        <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
+          <Group gap={6} wrap="nowrap">
+            {project.favorite && (
+              <IconStarFilled style={{ color: "var(--mantine-color-yellow-4)", width: rem(15), height: rem(15) }} />
+            )}
+            <Text fz={20} fw={700} lineClamp={1}>{project.name}</Text>
           </Group>
-          <Text fz="xs" fw={700} c="dimmed" mb={4}>
-            {project.client_company.name}
-          </Text>
-          <div>
-            <Tooltip label="Completed tasks" openDelay={500} withArrow>
-              <Text fz="lg" fw={500} inline span>
-                Tasks: {counts.completed} / {counts.all}
-              </Text>
-            </Tooltip>
-          </div>
+          <Text fz="xs" fw={500} c="dimmed">{project.client_company?.name}</Text>
+
+          <Group gap="lg" mt={6}>
+            <Stack gap={2}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Completed</Text>
+              <Text fw={700} c="green">{counts.completed}</Text>
+            </Stack>
+            <Stack gap={2}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Pending</Text>
+              <Text fw={700} c="orange">{Math.max(0, counts.all - counts.completed)}</Text>
+            </Stack>
+            {counts.overdue > 0 && (
+              <Stack gap={2}>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Overdue</Text>
+                <Text fw={700} c="red">{counts.overdue}</Text>
+              </Stack>
+            )}
+            <Stack gap={2}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Total</Text>
+              <Text fw={700}>{counts.all}</Text>
+            </Stack>
+          </Group>
         </Stack>
         <RingProgress
-          size={100}
-          thickness={10}
+          size={90}
+          thickness={8}
           sections={[
             { value: 100 - (completedPercent + overduePercent), color: "gray" },
-            {
-              value: overduePercent,
-              color: "red",
-              tooltip: `Overdue: ${counts.overdue}`,
-            },
-            {
-              value: completedPercent,
-              color: "blue",
-              tooltip: `Completed: ${counts.completed}`,
-            },
+            { value: overduePercent, color: "red", tooltip: `Overdue: ${counts.overdue}` },
+            { value: completedPercent, color: "blue", tooltip: `Completed: ${counts.completed}` },
           ]}
           label={
-            <Text fz={15} fw={700} ta="center">
+            <Text fz={14} fw={700} ta="center">
               {round(completedPercent)}%
             </Text>
           }
