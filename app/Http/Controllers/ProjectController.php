@@ -184,10 +184,6 @@ class ProjectController extends Controller
         $project->completed_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
         $project->overdue_tasks_count = \App\Models\Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
 
-        if ($project->children->isEmpty()) {
-            return redirect()->route('projects.tasks', $project->id);
-        }
-
         // Load immediate children with full details for card rendering (individual stats only for each child)
         $children = Project::where('parent_id', $project->id)
             ->with([
@@ -204,6 +200,7 @@ class ProjectController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Always render Open page (even if no children, show project details)
         return Inertia::render('Projects/Open', [
             'item' => new ProjectResource($project),
             'children' => ProjectResource::collection($children),
