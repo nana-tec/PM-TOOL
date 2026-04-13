@@ -7,7 +7,7 @@ export default function TeamCapacityCard({ capacityData }) {
     return null;
   }
 
-  const { summary, overCapacityMembers, availableMembers } = capacityData;
+  const { summary, overCapacityMembers} = capacityData;
 
   const getUtilColor = (util) => {
     if (util >= 100) return 'red';
@@ -17,7 +17,7 @@ export default function TeamCapacityCard({ capacityData }) {
   };
 
   return (
-    <Card withBorder padding="lg" radius="md" style={{ cursor: 'pointer' }} onClick={() => redirectTo('reports.team-capacity')}>
+    <Card withBorder padding="lg" radius="md" style={{ cursor: 'pointer' }} onClick={() => redirectTo('reports.member-report')}>
       <Group justify="space-between" mb="md">
         <Stack gap={4}>
           <Text fw={600} size="lg">Team Capacity</Text>
