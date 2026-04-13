@@ -7,15 +7,23 @@ import ProjectCardActions from "./ProjectCardActions";
 import classes from "./css/ProjectCard.module.css";
 
 export default function ProjectCard({ item, linkTo = "auto" }) {
-  const completedPercent = (item.completed_tasks_count / item.all_tasks_count) * 100;
-  const overduePercent = (item.overdue_tasks_count / item.all_tasks_count) * 100;
+  const completedPercent = item.all_tasks_count > 0
+    ? (item.completed_tasks_count / item.all_tasks_count) * 100
+    : 0;
+  const overduePercent = item.all_tasks_count > 0
+    ? (item.overdue_tasks_count / item.all_tasks_count) * 100
+    : 0;
+
+  const hasChildren = Array.isArray(item.children) && item.children.length > 0;
 
   const href =
     linkTo === "tasks"
       ? route("projects.tasks", item.id)
       : linkTo === "open"
       ? route("projects.open", item.id)
-      : route("projects.open", item.id);
+      : hasChildren
+      ? route("projects.open", item.id)
+      : route("projects.tasks", item.id);
 
   const showsSubtree = Array.isArray(item.children) && item.children.length > 0;
 
