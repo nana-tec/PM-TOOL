@@ -13,7 +13,9 @@ import {
   Center,
   Group,
   MultiSelect,
+  Pagination,
   Progress,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Table,
@@ -21,6 +23,7 @@ import {
   Title,
   Tooltip,
   ThemeIcon,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import {
@@ -28,6 +31,8 @@ import {
   IconChevronRight,
   IconSubtask,
   IconUsers,
+  IconTrophy,
+  IconMedal,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
@@ -41,17 +46,29 @@ function StatusBadge({ completed_at }) {
 }
 
 function RankBadge({ rank }) {
-  const color = rank === 1 ? 'yellow' : rank === 2 ? 'gray' : rank === 3 ? 'orange' : 'blue';
+  const colorMap = { 1: 'yellow', 2: 'gray', 3: 'orange' };
+  const color = colorMap[rank] || 'blue';
+  const iconMap = { 1: IconTrophy, 2: IconMedal, 3: IconMedal };
+  const Icon = iconMap[rank] || null;
+
   return (
-    <ThemeIcon size="lg" radius="xl" color={color} variant="light">
-      <Text fw={700} size="sm">#{rank}</Text>
-    </ThemeIcon>
+    <Tooltip label={`Rank #${rank} by completion rate`}>
+      <ThemeIcon size="lg" radius="xl" color={color} variant="light">
+        {Icon ? <Icon size={16} /> : <Text fw={700} size="sm">#{rank}</Text>}
+      </ThemeIcon>
+    </Tooltip>
   );
 }
+
+const ITEMS_PER_PAGE = 10;
+const MEMBERS_PER_PAGE = 15;
 
 const MemberReport = () => {
   const { members, dropdowns } = usePage().props;
   const params = currentUrlParams();
+  const computedColorScheme = useComputedColorScheme();
+  const isDark = computedColorScheme === 'dark';
+  const expandedBg = isDark ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-gray-0)';
 
   const [form, submit, updateValue] = useForm('get', route('reports.member-report'), {
     users: params.users?.map(String) || [],
@@ -65,7 +82,10 @@ const MemberReport = () => {
   const [expanded, setExpanded] = useState({});
   const toggleExpand = (userId) => setExpanded((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
-  const [taskFilter, setTaskFilter] = useState('all'); // all | pending | completed
+  const [taskFilter, setTaskFilter] = useState('all');
+  const [taskPages, setTaskPages] = useState({});
+  const [subPages, setSubPages] = useState({});
+  const [memberPage, setMemberPage] = useState(1);
 
   const filteredTasksFor = (member) => {
     const tasks = member.tasks || [];
@@ -87,8 +107,19 @@ const MemberReport = () => {
     const totalPending = members.reduce((s, m) => s + m.total_pending, 0);
     const totalOverdue = members.reduce((s, m) => s + m.tasks_overdue, 0);
     const totalMembers = members.length;
-    return { totalCompleted, totalPending, totalOverdue, totalMembers };
+    const avgCompletion = totalMembers > 0
+      ? Math.round(members.reduce((s, m) => s + m.completion_rate, 0) / totalMembers)
+      : 0;
+    return { totalCompleted, totalPending, totalOverdue, totalMembers, avgCompletion };
   }, [members]);
+
+  // Paginated members
+  const paginatedMembers = useMemo(() => {
+    const start = (memberPage - 1) * MEMBERS_PER_PAGE;
+    return members.slice(start, start + MEMBERS_PER_PAGE);
+  }, [members, memberPage]);
+
+  const totalMemberPages = Math.ceil(members.length / MEMBERS_PER_PAGE);
 
   return (
     <>
@@ -144,7 +175,7 @@ const MemberReport = () => {
 
       {/* Summary cards */}
       {members.length > 0 && (
-        <SimpleGrid cols={{ base: 2, md: 4 }} spacing="md" mb={20}>
+        <SimpleGrid cols={{ base: 2, md: 5 }} spacing="md" mb={20}>
           <Card withBorder p="md" radius="md">
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Team members</Text>
             <Group gap="xs" mt={4}><IconUsers size={20} /><Text fw={700} size="xl">{summary.totalMembers}</Text></Group>
@@ -161,24 +192,31 @@ const MemberReport = () => {
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Overdue tasks</Text>
             <Text fw={700} size="xl" c="red">{summary.totalOverdue}</Text>
           </Card>
+          <Card withBorder p="md" radius="md">
+            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Avg completion</Text>
+            <Group gap="xs" mt={4}>
+              <Text fw={700} size="xl">{summary.avgCompletion}%</Text>
+              <Progress value={summary.avgCompletion} size="sm" radius="xl" style={{ flex: 1 }}
+                color={summary.avgCompletion >= 80 ? 'green' : summary.avgCompletion >= 50 ? 'blue' : 'orange'} />
+            </Group>
+          </Card>
         </SimpleGrid>
       )}
 
       {/* Task filter toggle */}
       {members.length > 0 && (
-        <Group mb={12} gap="sm">
-          <Text size="sm" fw={500}>Task list filter:</Text>
-          {['all', 'pending', 'completed'].map((f) => (
-            <Badge
-              key={f}
-              variant={taskFilter === f ? 'filled' : 'light'}
-              style={{ cursor: 'pointer' }}
-              onClick={() => setTaskFilter(f)}
-              tt="capitalize"
-            >
-              {f}
-            </Badge>
-          ))}
+        <Group mb={12} gap="md">
+          <Text size="sm" fw={500}>Filter tasks:</Text>
+          <SegmentedControl
+            size="xs"
+            value={taskFilter}
+            onChange={setTaskFilter}
+            data={[
+              { label: 'All', value: 'all' },
+              { label: 'Pending', value: 'pending' },
+              { label: 'Completed', value: 'completed' },
+            ]}
+          />
         </Group>
       )}
 
@@ -193,151 +231,177 @@ const MemberReport = () => {
             />
           </Center>
         ) : (
-          <Table.ScrollContainer minWidth={1100}>
-            <Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Rank</Table.Th>
-                  <Table.Th>Member</Table.Th>
-                  <Table.Th>Tasks completed</Table.Th>
-                  <Table.Th>Tasks pending</Table.Th>
-                  <Table.Th>Subtasks done</Table.Th>
-                  <Table.Th>Subtasks pending</Table.Th>
-                  <Table.Th>Completion %</Table.Th>
-                  <Table.Th>Overdue</Table.Th>
-                  <Table.Th>Nearest due</Table.Th>
-                  <Table.Th>Projects</Table.Th>
-                  <Table.Th></Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {members.map((member) => {
-                  const isOpen = expanded[member.user.id];
-                  const tasks = filteredTasksFor(member);
-                  const subtasks = filteredSubtasksFor(member);
-                  return (
-                    <>
-                      <Table.Tr key={member.user.id} style={{ cursor: 'pointer' }} onClick={() => toggleExpand(member.user.id)}>
-                        <Table.Td><RankBadge rank={member.rank} /></Table.Td>
-                        <Table.Td>
-                          <Group gap="md" wrap="nowrap">
-                            <Avatar src={member.user.avatar} size={40} radius="xl" />
-                            <Stack gap={2}>
-                              <Text fw={600}>{member.user.name}</Text>
-                              <Text size="xs" c="dimmed">{member.projects_count} project{member.projects_count !== 1 ? 's' : ''}</Text>
+          <>
+            <Table.ScrollContainer minWidth={1100}>
+              <Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Rank</Table.Th>
+                    <Table.Th>Member</Table.Th>
+                    <Table.Th>Tasks completed</Table.Th>
+                    <Table.Th>Tasks pending</Table.Th>
+                    <Table.Th>Subtasks done</Table.Th>
+                    <Table.Th>Subtasks pending</Table.Th>
+                    <Table.Th>Completion %</Table.Th>
+                    <Table.Th>Overdue</Table.Th>
+                    <Table.Th>Nearest due</Table.Th>
+                    <Table.Th>Projects</Table.Th>
+                    <Table.Th></Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {paginatedMembers.map((member) => {
+                    const isOpen = expanded[member.user.id];
+                    const tasks = filteredTasksFor(member);
+                    const subtasks = filteredSubtasksFor(member);
+                    return (
+                      <>
+                        <Table.Tr key={member.user.id} style={{ cursor: 'pointer' }} onClick={() => toggleExpand(member.user.id)}>
+                          <Table.Td><RankBadge rank={member.rank} /></Table.Td>
+                          <Table.Td>
+                            <Group gap="md" wrap="nowrap">
+                              <Avatar src={member.user.avatar} size={40} radius="xl" />
+                              <Stack gap={2}>
+                                <Text fw={600}>{member.user.name}</Text>
+                                <Text size="xs" c="dimmed">{member.projects_count} project{member.projects_count !== 1 ? 's' : ''}</Text>
+                              </Stack>
+                            </Group>
+                          </Table.Td>
+                          <Table.Td><Badge color="green" variant="light" size="lg">{member.tasks_completed}</Badge></Table.Td>
+                          <Table.Td><Badge color="orange" variant="light" size="lg">{member.tasks_pending}</Badge></Table.Td>
+                          <Table.Td><Badge color="teal" variant="light" size="lg">{member.subtasks_completed}</Badge></Table.Td>
+                          <Table.Td><Badge color="yellow" variant="light" size="lg">{member.subtasks_pending}</Badge></Table.Td>
+                          <Table.Td>
+                            <Stack gap={4} style={{ minWidth: 100 }}>
+                              <Text size="sm" fw={600} c={member.completion_rate >= 80 ? 'green' : member.completion_rate >= 50 ? 'orange' : 'red'}>
+                                {member.completion_rate}%
+                              </Text>
+                              <Progress value={member.completion_rate} color={member.completion_rate >= 80 ? 'green' : member.completion_rate >= 50 ? 'orange' : 'red'} size="sm" radius="xl" />
                             </Stack>
-                          </Group>
-                        </Table.Td>
-                        <Table.Td><Badge color="green" variant="light" size="lg">{member.tasks_completed}</Badge></Table.Td>
-                        <Table.Td><Badge color="orange" variant="light" size="lg">{member.tasks_pending}</Badge></Table.Td>
-                        <Table.Td><Badge color="teal" variant="light" size="lg">{member.subtasks_completed}</Badge></Table.Td>
-                        <Table.Td><Badge color="yellow" variant="light" size="lg">{member.subtasks_pending}</Badge></Table.Td>
-                        <Table.Td>
-                          <Stack gap={4} style={{ minWidth: 100 }}>
-                            <Text size="sm" fw={600} c={member.completion_rate >= 80 ? 'green' : member.completion_rate >= 50 ? 'orange' : 'red'}>
-                              {member.completion_rate}%
+                          </Table.Td>
+                          <Table.Td>
+                            {member.tasks_overdue > 0 ? (
+                              <Badge color="red" variant="light" size="lg">{member.tasks_overdue}</Badge>
+                            ) : (
+                              <Text c="dimmed" size="sm">0</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            {member.nearest_due ? (
+                              <Tooltip label="Nearest due date">
+                                <Badge variant="light" color={dayjs(member.nearest_due).isBefore(dayjs()) ? 'red' : 'blue'}>
+                                  {dayjs(member.nearest_due).format('MMM D, YYYY')}
+                                </Badge>
+                              </Tooltip>
+                            ) : (
+                              <Text c="dimmed" size="sm">—</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td><Text fw={500}>{member.projects_count}</Text></Table.Td>
+                          <Table.Td>
+                            {isOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
+                          </Table.Td>
+                        </Table.Tr>
+
+                        {/* Expanded: task + subtask list */}
+                        <Table.Tr key={`${member.user.id}-detail`} style={{ display: isOpen ? undefined : 'none' }}>
+                          <Table.Td colSpan={11} style={{ background: expandedBg, padding: '16px 24px' }}>
+                            <Text fw={600} mb="xs" size="sm">Tasks ({tasks.length})</Text>
+                            {tasks.length === 0 ? (
+                              <Text c="dimmed" size="sm">No tasks match filter.</Text>
+                            ) : (
+                              <>
+                                <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
+                                  <Table.Thead>
+                                    <Table.Tr>
+                                      <Table.Th>Task</Table.Th>
+                                      <Table.Th>Project</Table.Th>
+                                      <Table.Th>Priority</Table.Th>
+                                      <Table.Th>Due date</Table.Th>
+                                      <Table.Th>Status</Table.Th>
+                                    </Table.Tr>
+                                  </Table.Thead>
+                                  <Table.Tbody>
+                                    {tasks.slice(((taskPages[member.user.id] || 1) - 1) * ITEMS_PER_PAGE, (taskPages[member.user.id] || 1) * ITEMS_PER_PAGE).map((t) => (
+                                      <Table.Tr key={t.id}>
+                                        <Table.Td><Text size="sm">{t.name}</Text></Table.Td>
+                                        <Table.Td><Text size="sm" c="dimmed">{t.project_name}</Text></Table.Td>
+                                        <Table.Td>
+                                          <Badge size="xs" variant="outline" color={t.priority === 'urgent' ? 'red' : t.priority === 'high' ? 'orange' : 'gray'}>
+                                            {t.priority || '—'}
+                                          </Badge>
+                                        </Table.Td>
+                                        <Table.Td><Text size="sm">{t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
+                                        <Table.Td><StatusBadge completed_at={t.completed_at} /></Table.Td>
+                                      </Table.Tr>
+                                    ))}
+                                  </Table.Tbody>
+                                </Table>
+                                {tasks.length > ITEMS_PER_PAGE && (
+                                  <Group justify="space-between" mt="xs">
+                                    <Text size="xs" c="dimmed">Showing {Math.min(tasks.length, ITEMS_PER_PAGE)} of {tasks.length}</Text>
+                                    <Pagination size="xs" total={Math.ceil(tasks.length / ITEMS_PER_PAGE)} value={taskPages[member.user.id] || 1} onChange={(p) => setTaskPages((prev) => ({ ...prev, [member.user.id]: p }))} />
+                                  </Group>
+                                )}
+                              </>
+                            )}
+
+                            <Text fw={600} mt="md" mb="xs" size="sm">
+                              <Group gap={4}><IconSubtask size={16} /> Subtasks ({subtasks.length})</Group>
                             </Text>
-                            <Progress value={member.completion_rate} color={member.completion_rate >= 80 ? 'green' : member.completion_rate >= 50 ? 'orange' : 'red'} size="sm" radius="xl" />
-                          </Stack>
-                        </Table.Td>
-                        <Table.Td>
-                          {member.tasks_overdue > 0 ? (
-                            <Badge color="red" variant="light" size="lg">{member.tasks_overdue}</Badge>
-                          ) : (
-                            <Text c="dimmed" size="sm">0</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          {member.nearest_due ? (
-                            <Tooltip label="Nearest due date">
-                              <Badge variant="light" color={dayjs(member.nearest_due).isBefore(dayjs()) ? 'red' : 'blue'}>
-                                {dayjs(member.nearest_due).format('MMM D, YYYY')}
-                              </Badge>
-                            </Tooltip>
-                          ) : (
-                            <Text c="dimmed" size="sm">—</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td><Text fw={500}>{member.projects_count}</Text></Table.Td>
-                        <Table.Td>
-                          {isOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
-                        </Table.Td>
-                      </Table.Tr>
+                            {subtasks.length === 0 ? (
+                              <Text c="dimmed" size="sm">No subtasks match filter.</Text>
+                            ) : (
+                              <>
+                                <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
+                                  <Table.Thead>
+                                    <Table.Tr>
+                                      <Table.Th>Subtask</Table.Th>
+                                      <Table.Th>Parent task</Table.Th>
+                                      <Table.Th>Project</Table.Th>
+                                      <Table.Th>Due date</Table.Th>
+                                      <Table.Th>Status</Table.Th>
+                                    </Table.Tr>
+                                  </Table.Thead>
+                                  <Table.Tbody>
+                                    {subtasks.slice(((subPages[member.user.id] || 1) - 1) * ITEMS_PER_PAGE, (subPages[member.user.id] || 1) * ITEMS_PER_PAGE).map((s) => (
+                                      <Table.Tr key={s.id}>
+                                        <Table.Td><Text size="sm">{s.name}</Text></Table.Td>
+                                        <Table.Td><Text size="sm" c="dimmed">{s.parent_task_name}</Text></Table.Td>
+                                        <Table.Td><Text size="sm" c="dimmed">{s.project_name}</Text></Table.Td>
+                                        <Table.Td><Text size="sm">{s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
+                                        <Table.Td><StatusBadge completed_at={s.completed_at} /></Table.Td>
+                                      </Table.Tr>
+                                    ))}
+                                  </Table.Tbody>
+                                </Table>
+                                {subtasks.length > ITEMS_PER_PAGE && (
+                                  <Group justify="space-between" mt="xs">
+                                    <Text size="xs" c="dimmed">Showing {Math.min(subtasks.length, ITEMS_PER_PAGE)} of {subtasks.length}</Text>
+                                    <Pagination size="xs" total={Math.ceil(subtasks.length / ITEMS_PER_PAGE)} value={subPages[member.user.id] || 1} onChange={(p) => setSubPages((prev) => ({ ...prev, [member.user.id]: p }))} />
+                                  </Group>
+                                )}
+                              </>
+                            )}
+                          </Table.Td>
+                        </Table.Tr>
+                      </>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
 
-                      {/* Expanded: task + subtask list */}
-                      <Table.Tr key={`${member.user.id}-detail`} style={{ display: isOpen ? undefined : 'none' }}>
-                        <Table.Td colSpan={11} style={{ background: 'var(--mantine-color-gray-0)', padding: '16px 24px' }}>
-                          <Text fw={600} mb="xs" size="sm">Tasks ({tasks.length})</Text>
-                          {tasks.length === 0 ? (
-                            <Text c="dimmed" size="sm">No tasks match filter.</Text>
-                          ) : (
-                            <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
-                              <Table.Thead>
-                                <Table.Tr>
-                                  <Table.Th>Task</Table.Th>
-                                  <Table.Th>Project</Table.Th>
-                                  <Table.Th>Priority</Table.Th>
-                                  <Table.Th>Due date</Table.Th>
-                                  <Table.Th>Status</Table.Th>
-                                </Table.Tr>
-                              </Table.Thead>
-                              <Table.Tbody>
-                                {tasks.slice(0, 50).map((t) => (
-                                  <Table.Tr key={t.id}>
-                                    <Table.Td><Text size="sm">{t.name}</Text></Table.Td>
-                                    <Table.Td><Text size="sm" c="dimmed">{t.project_name}</Text></Table.Td>
-                                    <Table.Td>
-                                      <Badge size="xs" variant="outline" color={t.priority === 'urgent' ? 'red' : t.priority === 'high' ? 'orange' : 'gray'}>
-                                        {t.priority || '—'}
-                                      </Badge>
-                                    </Table.Td>
-                                    <Table.Td><Text size="sm">{t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
-                                    <Table.Td><StatusBadge completed_at={t.completed_at} /></Table.Td>
-                                  </Table.Tr>
-                                ))}
-                              </Table.Tbody>
-                            </Table>
-                          )}
-                          {tasks.length > 50 && <Text size="xs" c="dimmed" mt="xs">Showing 50 of {tasks.length} tasks</Text>}
-
-                          <Text fw={600} mt="md" mb="xs" size="sm">
-                            <Group gap={4}><IconSubtask size={16} /> Subtasks ({subtasks.length})</Group>
-                          </Text>
-                          {subtasks.length === 0 ? (
-                            <Text c="dimmed" size="sm">No subtasks match filter.</Text>
-                          ) : (
-                            <Table verticalSpacing="xs" horizontalSpacing="sm" withRowBorders={false}>
-                              <Table.Thead>
-                                <Table.Tr>
-                                  <Table.Th>Subtask</Table.Th>
-                                  <Table.Th>Parent task</Table.Th>
-                                  <Table.Th>Project</Table.Th>
-                                  <Table.Th>Due date</Table.Th>
-                                  <Table.Th>Status</Table.Th>
-                                </Table.Tr>
-                              </Table.Thead>
-                              <Table.Tbody>
-                                {subtasks.slice(0, 50).map((s) => (
-                                  <Table.Tr key={s.id}>
-                                    <Table.Td><Text size="sm">{s.name}</Text></Table.Td>
-                                    <Table.Td><Text size="sm" c="dimmed">{s.parent_task_name}</Text></Table.Td>
-                                    <Table.Td><Text size="sm" c="dimmed">{s.project_name}</Text></Table.Td>
-                                    <Table.Td><Text size="sm">{s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—'}</Text></Table.Td>
-                                    <Table.Td><StatusBadge completed_at={s.completed_at} /></Table.Td>
-                                  </Table.Tr>
-                                ))}
-                              </Table.Tbody>
-                            </Table>
-                          )}
-                          {subtasks.length > 50 && <Text size="xs" c="dimmed" mt="xs">Showing 50 of {subtasks.length} subtasks</Text>}
-                        </Table.Td>
-                      </Table.Tr>
-                    </>
-                  );
-                })}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
+            {/* Member-level pagination */}
+            {totalMemberPages > 1 && (
+              <Group justify="space-between" mt="md" px="md">
+                <Text size="sm" c="dimmed">
+                  Showing {((memberPage - 1) * MEMBERS_PER_PAGE) + 1}–{Math.min(memberPage * MEMBERS_PER_PAGE, members.length)} of {members.length} members
+                </Text>
+                <Pagination size="sm" total={totalMemberPages} value={memberPage} onChange={setMemberPage} />
+              </Group>
+            )}
+          </>
         )}
       </ContainerBox>
     </>
