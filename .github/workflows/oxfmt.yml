@@ -1,0 +1,35 @@
+name: Oxfmt
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: write
+
+jobs:
+  oxfmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run oxfmt
+        run: npx oxfmt ./resources/js
+
+      - uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: Apply oxfmt changes

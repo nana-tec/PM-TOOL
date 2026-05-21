@@ -25,6 +25,10 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
   const overdueCount = overdueTasks?.length || 0;
   const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+  const totalSubtasks = projects.reduce((s, p) => s + (p.all_subtasks_count || 0), 0);
+  const completedSubtasks = projects.reduce((s, p) => s + (p.completed_subtasks_count || 0), 0);
+  const pendingSubtasks = totalSubtasks - completedSubtasks;
+
   const stats = [
     {
       label: 'Active Projects',
@@ -45,6 +49,18 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
       color: 'orange',
     },
     {
+      label: 'Subtasks Done',
+      value: completedSubtasks,
+      icon: IconChecks,
+      color: 'teal',
+    },
+    {
+      label: 'Subtasks Pending',
+      value: pendingSubtasks,
+      icon: IconClock,
+      color: 'yellow',
+    },
+    {
       label: 'Overdue Tasks',
       value: overdueCount,
       icon: IconAlertTriangle,
@@ -61,7 +77,7 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
 
   return (
     <SimpleGrid
-      cols={{ base: 2, sm: 3, md: 5 }}
+      cols={{ base: 2, sm: 3, md: 4, lg: 7 }}
       spacing='md'
     >
       {stats.map(stat => (

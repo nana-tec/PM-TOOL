@@ -12,11 +12,17 @@ export function ProjectCard({ project, compact = false }) {
           all: project.parent_only_all_tasks_count,
           completed: project.parent_only_completed_tasks_count,
           overdue: project.parent_only_overdue_tasks_count,
+          subtasksAll: project.parent_only_all_subtasks_count,
+          subtasksCompleted: project.parent_only_completed_subtasks_count,
+          subtasksPending: project.parent_only_pending_subtasks_count,
         }
       : {
           all: project.all_tasks_count,
           completed: project.completed_tasks_count,
           overdue: project.overdue_tasks_count,
+          subtasksAll: project.all_subtasks_count,
+          subtasksCompleted: project.completed_subtasks_count,
+          subtasksPending: project.pending_subtasks_count,
         };
 
   let completedPercent = 0;
@@ -94,6 +100,34 @@ export function ProjectCard({ project, compact = false }) {
             color='red'
           />
         </Progress.Root>
+        <Group
+          mt={4}
+          gap='xs'
+          wrap='nowrap'
+        >
+          <Text
+            size='xs'
+            c='dimmed'
+          >
+            {counts.all} tasks
+          </Text>
+          {counts.subtasksAll > 0 && (
+            <>
+              <Text
+                size='xs'
+                c='dimmed'
+              >
+                |
+              </Text>
+              <Text
+                size='xs'
+                c='dimmed'
+              >
+                {counts.subtasksCompleted}/{counts.subtasksAll} subtasks
+              </Text>
+            </>
+          )}
+        </Group>
       </Card>
     );
   }
@@ -150,7 +184,7 @@ export function ProjectCard({ project, compact = false }) {
                 tt='uppercase'
                 fw={600}
               >
-                Completed
+                Tasks completed
               </Text>
               <Text
                 fw={700}
@@ -166,7 +200,7 @@ export function ProjectCard({ project, compact = false }) {
                 tt='uppercase'
                 fw={600}
               >
-                Pending
+                Tasks pending
               </Text>
               <Text
                 fw={700}
@@ -205,6 +239,57 @@ export function ProjectCard({ project, compact = false }) {
               <Text fw={700}>{counts.all}</Text>
             </Stack>
           </Group>
+
+          {counts.subtasksAll > 0 && (
+            <Group
+              gap='md'
+              mt={6}
+            >
+              <Stack gap={2}>
+                <Text
+                  size='xs'
+                  c='dimmed'
+                  tt='uppercase'
+                  fw={600}
+                >
+                  Subtasks done
+                </Text>
+                <Text
+                  fw={700}
+                  c='teal'
+                >
+                  {counts.subtasksCompleted}
+                </Text>
+              </Stack>
+              <Stack gap={2}>
+                <Text
+                  size='xs'
+                  c='dimmed'
+                  tt='uppercase'
+                  fw={600}
+                >
+                  Subtasks pending
+                </Text>
+                <Text
+                  fw={700}
+                  c='yellow'
+                >
+                  {counts.subtasksPending}
+                </Text>
+              </Stack>
+              <Stack gap={2}>
+                <Text
+                  size='xs'
+                  c='dimmed'
+                  tt='uppercase'
+                  fw={600}
+                >
+                  Total subtasks
+                </Text>
+                <Text fw={700}>{counts.subtasksAll}</Text>
+              </Stack>
+            </Group>
+          )}
         </Stack>
         <RingProgress
           size={90}
