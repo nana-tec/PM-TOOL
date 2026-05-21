@@ -1,28 +1,28 @@
 :global(.kanban-view) {
-    .viewport {
-        display: flex;
-        gap: rem(15px);
+  .viewport {
+    display: flex;
+    gap: rem(15px);
 
-        padding-left: 4rem;
-        padding-right: 4rem;
+    padding-left: 4rem;
+    padding-right: 4rem;
 
-        height: calc(100dvh - 147px);
-    }
+    height: calc(100dvh - 147px);
+  }
 
-    overflow-x: auto;
-    margin-left: -4rem;
-    margin-right: -4rem;
-    margin-bottom: -4rem;
+  overflow-x: auto;
+  margin-left: -4rem;
+  margin-right: -4rem;
+  margin-bottom: -4rem;
 }
 
 :global(.gantt-view) {
-    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+  color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
 }
 
 :global(.list-view) {
-    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+  color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
 }
 
 :global(.vcs-view) {
-    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+  color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
 }
