@@ -457,7 +457,8 @@ const MemberReport = () => {
                                   size='xs'
                                   c='dimmed'
                                 >
-                                  {member.projects_count} project{member.projects_count !== 1 ? 's' : ''}
+                                  {member.projects_count} project
+                                  {member.projects_count !== 1 ? 's' : ''}
                                   {member.subprojects_count > 0 && (
                                     <>
                                       , {member.subprojects_count} subproject
