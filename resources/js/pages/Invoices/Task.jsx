@@ -76,12 +76,18 @@ export default function Task({ task, selectedTasks, toggleTask, currency, type, 
               />
             ))}
             {task.priority && (
-              <Pill size='sm' color={priorityColor[task.priority] || 'gray'}>
+              <Pill
+                size='sm'
+                color={priorityColor[task.priority] || 'gray'}
+              >
                 {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
               </Pill>
             )}
             {task.complexity && (
-              <Pill size='sm' color={complexityColor[task.complexity] || 'gray'}>
+              <Pill
+                size='sm'
+                color={complexityColor[task.complexity] || 'gray'}
+              >
                 {task.complexity.toUpperCase()}
               </Pill>
             )}

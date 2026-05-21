@@ -16,7 +16,8 @@ export function parseUnifiedPatch(patch) {
         oldLine = parseInt(m[1], 10);
         newLine = parseInt(m[3], 10);
       } else {
-        oldLine = 0; newLine = 0;
+        oldLine = 0;
+        newLine = 0;
       }
       current = { header: raw, lines: [] };
       continue;
@@ -33,7 +34,8 @@ export function parseUnifiedPatch(patch) {
       oldLine += 1;
     } else if (raw.startsWith(' ') || raw === '') {
       current.lines.push({ type: 'ctx', text: raw.slice(1), oldLine: oldLine, newLine: newLine });
-      oldLine += 1; newLine += 1;
+      oldLine += 1;
+      newLine += 1;
     } else if (raw.startsWith('\\')) {
       current.lines.push({ type: 'meta', text: raw, oldLine: null, newLine: null });
     } else if (raw.startsWith('---') || raw.startsWith('+++')) {
@@ -68,8 +70,10 @@ export function buildSideBySide(hunks) {
         else if (!l && r) kind = 'add';
         rows.push({ left: l, right: r, kind, leftLine: lNum, rightLine: rNum });
       }
-      leftBlock = []; rightBlock = [];
-      leftNums = []; rightNums = [];
+      leftBlock = [];
+      rightBlock = [];
+      leftNums = [];
+      rightNums = [];
     };
     for (const ln of h.lines) {
       if (ln.type === 'del') {
@@ -80,7 +84,13 @@ export function buildSideBySide(hunks) {
         rightNums.push(ln.newLine);
       } else if (ln.type === 'ctx') {
         flushBlocks();
-        rows.push({ left: ln.text, right: ln.text, kind: 'ctx', leftLine: ln.oldLine, rightLine: ln.newLine });
+        rows.push({
+          left: ln.text,
+          right: ln.text,
+          kind: 'ctx',
+          leftLine: ln.oldLine,
+          rightLine: ln.newLine,
+        });
       } else if (ln.type === 'meta') {
         flushBlocks();
         rows.push({ left: ln.text, right: ln.text, kind: 'meta', leftLine: null, rightLine: null });
@@ -98,7 +108,7 @@ export function copyToClipboard(text) {
     return navigator.clipboard.writeText(text);
   }
   // fallback
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
@@ -106,7 +116,11 @@ export function copyToClipboard(text) {
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
-    try { document.execCommand('copy'); } catch (_) { /* best-effort fallback copy may fail silently */ }
+    try {
+      document.execCommand('copy');
+    } catch (_) {
+      /* best-effort fallback copy may fail silently */
+    }
     document.body.removeChild(ta);
     resolve();
   });

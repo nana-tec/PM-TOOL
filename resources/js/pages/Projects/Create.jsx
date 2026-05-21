@@ -19,7 +19,7 @@ import {
 import { useEffect, useState } from 'react';
 import { PricingType } from '@/utils/enums';
 
-const getQueryParam = (param) => new URLSearchParams(window.location.search).get(param);
+const getQueryParam = param => new URLSearchParams(window.location.search).get(param);
 
 const ProjectCreate = ({ dropdowns: { companies, users, currencies, projects } }) => {
   const [currencySymbol, setCurrencySymbol] = useState();

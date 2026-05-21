@@ -1,19 +1,19 @@
-import { useComputedColorScheme } from "@mantine/core";
-import { RichTextEditor as Editor, Link } from "@mantine/tiptap";
-import Highlight from "@tiptap/extension-highlight";
-import Mention from "@tiptap/extension-mention";
-import Placeholder from "@tiptap/extension-placeholder";
-import Underline from "@tiptap/extension-underline";
-import HorizontalRule from "@tiptap/extension-horizontal-rule";
-import { useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import { forwardRef, useImperativeHandle } from "react";
-import suggestion from "./RichTextEditor/Mention/suggestion.js";
-import classes from "./css/RichTextEditor.module.css";
+import { useComputedColorScheme } from '@mantine/core';
+import { RichTextEditor as Editor, Link } from '@mantine/tiptap';
+import Highlight from '@tiptap/extension-highlight';
+import Mention from '@tiptap/extension-mention';
+import Placeholder from '@tiptap/extension-placeholder';
+import Underline from '@tiptap/extension-underline';
+import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import { useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { forwardRef, useImperativeHandle } from 'react';
+import suggestion from './RichTextEditor/Mention/suggestion.js';
+import classes from './css/RichTextEditor.module.css';
 
 const RichTextEditor = forwardRef(function RichTextEditor(
   { onChange, placeholder, content, height = 200, readOnly = false, ...props },
-  ref,
+  ref
 ) {
   const editor = useEditor({
     editable: !readOnly,
@@ -26,7 +26,7 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       Placeholder.configure({ placeholder }),
       Mention.configure({
         HTMLAttributes: {
-          class: "mention",
+          class: 'mention',
         },
         suggestion,
       }),
@@ -46,8 +46,14 @@ const RichTextEditor = forwardRef(function RichTextEditor(
   const computedColorScheme = useComputedColorScheme();
 
   return (
-    <Editor editor={editor} {...props}>
-      <Editor.Toolbar sticky stickyOffset={60}>
+    <Editor
+      editor={editor}
+      {...props}
+    >
+      <Editor.Toolbar
+        sticky
+        stickyOffset={60}
+      >
         <Editor.ControlsGroup>
           <Editor.Bold />
           <Editor.Italic />
@@ -81,9 +87,9 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       </Editor.Toolbar>
 
       <Editor.Content
-        bg={computedColorScheme === "dark" ? "dark.6" : "white"}
+        bg={computedColorScheme === 'dark' ? 'dark.6' : 'white'}
         className={classes.content}
-        style={{ "--rich-text-editor-height": `${height}px` }}
+        style={{ '--rich-text-editor-height': `${height}px` }}
       />
     </Editor>
   );

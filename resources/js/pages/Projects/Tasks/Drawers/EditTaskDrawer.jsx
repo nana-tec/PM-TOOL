@@ -8,6 +8,7 @@ import { hasRoles } from '@/utils/user';
 import { usePage } from '@inertiajs/react';
 import {
   Breadcrumbs,
+  Button,
   Checkbox,
   Drawer,
   Group,
@@ -28,6 +29,7 @@ import classes from './css/TaskDrawer.module.css';
 import { PricingType, TaskPriority, TaskComplexity } from '@/utils/enums';
 import TaskHistory from './TaskHistory';
 import SubTasks from './SubTasks';
+import { NotifyAssignedDrawer } from './NotifyAssignedDrawer';
 
 export function EditTaskDrawer() {
   const editorRef = useRef(null);
@@ -67,6 +69,8 @@ export function EditTaskDrawer() {
     subscribed_users: [],
     labels: [],
   });
+
+  const [notifyDrawerOpen, setNotifyDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (edit.opened) {
@@ -210,7 +214,12 @@ export function EditTaskDrawer() {
             #{task?.number}: {data.name}
           </Text>
           {/* Quick access to history from title bar */}
-          {task && <TaskHistory task={task} onRestored={onHistoryRestored} />}
+          {task && (
+            <TaskHistory
+              task={task}
+              onRestored={onHistoryRestored}
+            />
+          )}
         </Group>
       }
       position='right'
@@ -294,8 +303,14 @@ export function EditTaskDrawer() {
             </div>
             <div className={classes.sidebar}>
               {/* Also expose history from sidebar top */}
-              <Group justify='flex-end' mb='sm'>
-                <TaskHistory task={task} onRestored={onHistoryRestored} />
+              <Group
+                justify='flex-end'
+                mb='sm'
+              >
+                <TaskHistory
+                  task={task}
+                  onRestored={onHistoryRestored}
+                />
               </Group>
 
               <Select
@@ -443,12 +458,27 @@ export function EditTaskDrawer() {
                 }))}
                 readOnly={!can('edit task')}
               />
+
+              <Button
+                variant='light'
+                fullWidth
+                mt='md'
+                onClick={() => setNotifyDrawerOpen(true)}
+              >
+                Notify assigned users
+              </Button>
             </div>
           </form>
         </>
       ) : (
         <></>
       )}
+
+      <NotifyAssignedDrawer
+        task={task}
+        opened={notifyDrawerOpen}
+        onClose={() => setNotifyDrawerOpen(false)}
+      />
     </Drawer>
   );
 }

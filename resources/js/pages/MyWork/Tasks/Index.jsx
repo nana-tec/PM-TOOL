@@ -1,7 +1,7 @@
-import EmptyWithIcon from "@/components/EmptyWithIcon";
-import Layout from "@/layouts/MainLayout";
-import { usePage } from "@inertiajs/react";
-import { redirectTo } from "@/utils/route";
+import EmptyWithIcon from '@/components/EmptyWithIcon';
+import Layout from '@/layouts/MainLayout';
+import { usePage } from '@inertiajs/react';
+import { redirectTo } from '@/utils/route';
 import {
   Accordion,
   Box,
@@ -20,8 +20,8 @@ import {
   Avatar,
   Grid,
   SegmentedControl,
-  Switch
-} from "@mantine/core";
+  Switch,
+} from '@mantine/core';
 import {
   IconRocket,
   IconStar,
@@ -33,12 +33,12 @@ import {
   IconLayoutKanban,
   IconLayoutList,
   IconClock,
-  IconCalendarDue
-} from "@tabler/icons-react";
-import { useState, useMemo } from "react";
-import Task from "./Task";
-import classes from "./css/Index.module.css";
-import GanttChart from "@/components/GanttChart";
+  IconCalendarDue,
+} from '@tabler/icons-react';
+import { useState, useMemo } from 'react';
+import Task from './Task';
+import classes from './css/Index.module.css';
+import GanttChart from '@/components/GanttChart';
 
 const TasksIndex = () => {
   let { projects } = usePage().props;
@@ -49,7 +49,7 @@ const TasksIndex = () => {
   const [ganttZoom, setGanttZoom] = useState('month'); // 'week' | 'month' | 'quarter'
   const [ganttGroupByProject, setGanttGroupByProject] = useState(true);
 
-  projects = projects.filter((i) => i.tasks.length);
+  projects = projects.filter(i => i.tasks.length);
 
   // Extract all tasks with enhanced data
   const allTasks = useMemo(() => {
@@ -61,7 +61,9 @@ const TasksIndex = () => {
         project_favorite: project.favorite,
         // Enhanced priority calculation
         priority_score: calculatePriorityScore(task),
-        days_until_due: task.due_on ? Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24)) : null
+        days_until_due: task.due_on
+          ? Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24))
+          : null,
       }))
     );
   }, [projects]);
@@ -88,9 +90,11 @@ const TasksIndex = () => {
     }
 
     // Due soon
-    const daysUntilDue = task.due_on ? Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+    const daysUntilDue = task.due_on
+      ? Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24))
+      : null;
     if (daysUntilDue !== null && daysUntilDue <= 3 && daysUntilDue >= 0) {
-      score += 50 - (daysUntilDue * 15);
+      score += 50 - daysUntilDue * 15;
     }
 
     // High-priority labels
@@ -123,7 +127,7 @@ const TasksIndex = () => {
               id: label.id,
               name: label.name,
               color: label.color,
-              tasks: []
+              tasks: [],
             };
           }
           labelGroups[label.id].tasks.push(task);
@@ -138,7 +142,7 @@ const TasksIndex = () => {
         id: 'no-label',
         name: 'No Labels',
         color: '#868e96',
-        tasks: noLabelTasks
+        tasks: noLabelTasks,
       });
     }
 
@@ -152,7 +156,7 @@ const TasksIndex = () => {
       tomorrow: { name: 'Due Tomorrow', tasks: [], color: '#fab005' },
       thisWeek: { name: 'This Week', tasks: [], color: '#51cf66' },
       later: { name: 'Later', tasks: [], color: '#868e96' },
-      noDueDate: { name: 'No Due Date', tasks: [], color: '#adb5bd' }
+      noDueDate: { name: 'No Due Date', tasks: [], color: '#adb5bd' },
     };
 
     const today = new Date();
@@ -196,16 +200,22 @@ const TasksIndex = () => {
         break;
       case 'date':
         sortedProjects.sort((a, b) => {
-          const aLatestDue = Math.min(...a.tasks.filter(t => t.due_on).map(t => new Date(t.due_on)));
-          const bLatestDue = Math.min(...b.tasks.filter(t => t.due_on).map(t => new Date(t.due_on)));
+          const aLatestDue = Math.min(
+            ...a.tasks.filter(t => t.due_on).map(t => new Date(t.due_on))
+          );
+          const bLatestDue = Math.min(
+            ...b.tasks.filter(t => t.due_on).map(t => new Date(t.due_on))
+          );
           return aLatestDue - bLatestDue;
         });
         break;
       case 'priority':
       default:
         sortedProjects.sort((a, b) => {
-          const aAvgPriority = a.tasks.reduce((sum, task) => sum + calculatePriorityScore(task), 0) / a.tasks.length;
-          const bAvgPriority = b.tasks.reduce((sum, task) => sum + calculatePriorityScore(task), 0) / b.tasks.length;
+          const aAvgPriority =
+            a.tasks.reduce((sum, task) => sum + calculatePriorityScore(task), 0) / a.tasks.length;
+          const bAvgPriority =
+            b.tasks.reduce((sum, task) => sum + calculatePriorityScore(task), 0) / b.tasks.length;
           return bAvgPriority - aAvgPriority;
         });
         break;
@@ -217,19 +227,25 @@ const TasksIndex = () => {
       favorite: project.favorite,
       tasks: project.tasks.sort((a, b) => calculatePriorityScore(b) - calculatePriorityScore(a)),
       taskCount: project.tasks.length,
-      overdueCount: project.tasks.filter(t => t.due_on && new Date(t.due_on) < new Date() && !t.completed_at).length
+      overdueCount: project.tasks.filter(
+        t => t.due_on && new Date(t.due_on) < new Date() && !t.completed_at
+      ).length,
     }));
   }
 
-  let opened = projects.filter((i) => i.favorite).map((i) => i.id.toString());
+  let opened = projects.filter(i => i.favorite).map(i => i.id.toString());
 
   if (opened.length === 0) {
-    opened = projects[0]?.id.toString() || "";
+    opened = projects[0]?.id.toString() || '';
   }
 
   const ViewControls = () => (
-    <Grid justify="space-between" align="end" mb="lg">
-      <Grid.Col span="content">
+    <Grid
+      justify='space-between'
+      align='end'
+      mb='lg'
+    >
+      <Grid.Col span='content'>
         <Group>
           {viewMode !== 'gantt' && (
             <>
@@ -239,9 +255,9 @@ const TasksIndex = () => {
                 data={[
                   { value: 'project', label: 'Group by Project' },
                   { value: 'labels', label: 'Group by Labels' },
-                  { value: 'dates', label: 'Group by Due Date' }
+                  { value: 'dates', label: 'Group by Due Date' },
                 ]}
-                size="sm"
+                size='sm'
                 w={180}
               />
 
@@ -252,9 +268,9 @@ const TasksIndex = () => {
                   data={[
                     { value: 'priority', label: 'Sort by Priority' },
                     { value: 'alphabetical', label: 'Sort Alphabetically' },
-                    { value: 'date', label: 'Sort by Due Date' }
+                    { value: 'date', label: 'Sort by Due Date' },
                   ]}
-                  size="sm"
+                  size='sm'
                   w={160}
                 />
               )}
@@ -264,7 +280,7 @@ const TasksIndex = () => {
           {viewMode === 'gantt' && (
             <>
               <SegmentedControl
-                size="sm"
+                size='sm'
                 value={ganttZoom}
                 onChange={setGanttZoom}
                 data={[
@@ -274,44 +290,56 @@ const TasksIndex = () => {
                 ]}
               />
               <Switch
-                size="sm"
+                size='sm'
                 checked={ganttGroupByProject}
-                onChange={(e) => setGanttGroupByProject(e.currentTarget.checked)}
-                label="Group by project"
+                onChange={e => setGanttGroupByProject(e.currentTarget.checked)}
+                label='Group by project'
               />
             </>
           )}
         </Group>
       </Grid.Col>
 
-      <Grid.Col span="content">
+      <Grid.Col span='content'>
         <Group>
           <ActionIcon.Group>
             <ActionIcon
-              size="lg"
-              variant={viewMode === "list" ? "filled" : "default"}
-              onClick={() => setViewMode("list")}
+              size='lg'
+              variant={viewMode === 'list' ? 'filled' : 'default'}
+              onClick={() => setViewMode('list')}
             >
-              <Tooltip label="List view" openDelay={250} withArrow>
-                <IconLayoutList style={{ width: "40%", height: "40%" }} />
+              <Tooltip
+                label='List view'
+                openDelay={250}
+                withArrow
+              >
+                <IconLayoutList style={{ width: '40%', height: '40%' }} />
               </Tooltip>
             </ActionIcon>
             <ActionIcon
-              size="lg"
-              variant={viewMode === "kanban" ? "filled" : "default"}
-              onClick={() => setViewMode("kanban")}
+              size='lg'
+              variant={viewMode === 'kanban' ? 'filled' : 'default'}
+              onClick={() => setViewMode('kanban')}
             >
-              <Tooltip label="Kanban view" openDelay={250} withArrow>
-                <IconLayoutKanban style={{ width: "45%", height: "45%" }} />
+              <Tooltip
+                label='Kanban view'
+                openDelay={250}
+                withArrow
+              >
+                <IconLayoutKanban style={{ width: '45%', height: '45%' }} />
               </Tooltip>
             </ActionIcon>
             <ActionIcon
-              size="lg"
-              variant={viewMode === "gantt" ? "filled" : "default"}
-              onClick={() => setViewMode("gantt")}
+              size='lg'
+              variant={viewMode === 'gantt' ? 'filled' : 'default'}
+              onClick={() => setViewMode('gantt')}
             >
-              <Tooltip label="Gantt view" openDelay={250} withArrow>
-                <IconTable style={{ width: "45%", height: "45%" }} />
+              <Tooltip
+                label='Gantt view'
+                openDelay={250}
+                withArrow
+              >
+                <IconTable style={{ width: '45%', height: '45%' }} />
               </Tooltip>
             </ActionIcon>
           </ActionIcon.Group>
@@ -332,8 +360,13 @@ const TasksIndex = () => {
   };
 
   const renderProjectGroups = () => (
-    <Accordion variant="separated" radius="md" multiple defaultValue={opened}>
-      {groupedTasks.map((project) => (
+    <Accordion
+      variant='separated'
+      radius='md'
+      multiple
+      defaultValue={opened}
+    >
+      {groupedTasks.map(project => (
         <Accordion.Item
           key={project.id}
           value={project.id.toString()}
@@ -344,7 +377,7 @@ const TasksIndex = () => {
               project.favorite ? (
                 <IconStarFilled
                   style={{
-                    color: "var(--mantine-color-yellow-4)",
+                    color: 'var(--mantine-color-yellow-4)',
                     width: rem(20),
                     height: rem(20),
                   }}
@@ -359,16 +392,30 @@ const TasksIndex = () => {
               )
             }
           >
-            <Group justify="space-between" w="100%">
-              <Text fz={18} fw={600}>
+            <Group
+              justify='space-between'
+              w='100%'
+            >
+              <Text
+                fz={18}
+                fw={600}
+              >
                 {project.name}
               </Text>
-              <Group gap="xs">
-                <Badge variant="light" size="sm" color="blue">
+              <Group gap='xs'>
+                <Badge
+                  variant='light'
+                  size='sm'
+                  color='blue'
+                >
                   {project.taskCount} tasks
                 </Badge>
                 {project.overdueCount > 0 && (
-                  <Badge variant="light" size="sm" color="red">
+                  <Badge
+                    variant='light'
+                    size='sm'
+                    color='red'
+                  >
                     {project.overdueCount} overdue
                   </Badge>
                 )}
@@ -377,8 +424,12 @@ const TasksIndex = () => {
           </Accordion.Control>
           <Accordion.Panel>
             <Stack gap={6}>
-              {project.tasks.map((task) => (
-                <Task key={task.id} task={task} enhanced />
+              {project.tasks.map(task => (
+                <Task
+                  key={task.id}
+                  task={task}
+                  enhanced
+                />
               ))}
             </Stack>
           </Accordion.Panel>
@@ -388,27 +439,44 @@ const TasksIndex = () => {
   );
 
   const renderLabelGroups = () => (
-    <Stack gap="md">
-      {groupedTasks.map((group) => (
-        <Card key={group.id} shadow="sm" padding="md" radius="md" className={classes.labelGroup}>
-          <Group justify="space-between" mb="sm">
-            <Group gap="sm">
+    <Stack gap='md'>
+      {groupedTasks.map(group => (
+        <Card
+          key={group.id}
+          shadow='sm'
+          padding='md'
+          radius='md'
+          className={classes.labelGroup}
+        >
+          <Group
+            justify='space-between'
+            mb='sm'
+          >
+            <Group gap='sm'>
               <Badge
-                variant="light"
+                variant='light'
                 color={group.color}
-                size="lg"
+                size='lg'
                 leftSection={<IconTags size={14} />}
               >
                 {group.name}
               </Badge>
-              <Text size="sm" c="dimmed">
+              <Text
+                size='sm'
+                c='dimmed'
+              >
                 {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
               </Text>
             </Group>
           </Group>
           <Stack gap={6}>
-            {group.tasks.map((task) => (
-              <Task key={`${group.id}-${task.id}`} task={task} enhanced showProject />
+            {group.tasks.map(task => (
+              <Task
+                key={`${group.id}-${task.id}`}
+                task={task}
+                enhanced
+                showProject
+              />
             ))}
           </Stack>
         </Card>
@@ -417,27 +485,44 @@ const TasksIndex = () => {
   );
 
   const renderDateGroups = () => (
-    <Stack gap="md">
-      {groupedTasks.map((group) => (
-        <Card key={group.id} shadow="sm" padding="md" radius="md" className={classes.dateGroup}>
-          <Group justify="space-between" mb="sm">
-            <Group gap="sm">
+    <Stack gap='md'>
+      {groupedTasks.map(group => (
+        <Card
+          key={group.id}
+          shadow='sm'
+          padding='md'
+          radius='md'
+          className={classes.dateGroup}
+        >
+          <Group
+            justify='space-between'
+            mb='sm'
+          >
+            <Group gap='sm'>
               <Badge
-                variant="light"
+                variant='light'
                 color={group.color}
-                size="lg"
+                size='lg'
                 leftSection={<IconCalendar size={14} />}
               >
                 {group.name}
               </Badge>
-              <Text size="sm" c="dimmed">
+              <Text
+                size='sm'
+                c='dimmed'
+              >
                 {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
               </Text>
             </Group>
           </Group>
           <Stack gap={6}>
-            {group.tasks.map((task) => (
-              <Task key={`${group.id}-${task.id}`} task={task} enhanced showProject />
+            {group.tasks.map(task => (
+              <Task
+                key={`${group.id}-${task.id}`}
+                task={task}
+                enhanced
+                showProject
+              />
             ))}
           </Stack>
         </Card>
@@ -449,25 +534,30 @@ const TasksIndex = () => {
     const statusColumns = {
       todo: {
         name: 'To Do',
-        tasks: allTasks.filter(task => !task.completed_at && (!task.due_on || new Date(task.due_on) >= new Date())),
-        color: '#228be6'
+        tasks: allTasks.filter(
+          task => !task.completed_at && (!task.due_on || new Date(task.due_on) >= new Date())
+        ),
+        color: '#228be6',
       },
       inProgress: {
         name: 'In Progress',
-        tasks: allTasks.filter(task => !task.completed_at && task.due_on && new Date(task.due_on) < new Date()),
-        color: '#fd7e14'
+        tasks: allTasks.filter(
+          task => !task.completed_at && task.due_on && new Date(task.due_on) < new Date()
+        ),
+        color: '#fd7e14',
       },
       completed: {
         name: 'Completed',
         tasks: allTasks.filter(task => task.completed_at),
-        color: '#51cf66'
-      }
+        color: '#51cf66',
+      },
     };
 
-    const getPriorityLevel = (task) => {
+    const getPriorityLevel = task => {
       const isOverdue = task.due_on && new Date(task.due_on) < new Date() && !task.completed_at;
-      const daysUntilDue = task.due_on ?
-        Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+      const daysUntilDue = task.due_on
+        ? Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24))
+        : null;
 
       if (isOverdue) return 'critical';
       if (daysUntilDue !== null && daysUntilDue <= 1 && daysUntilDue >= 0) return 'high';
@@ -478,29 +568,41 @@ const TasksIndex = () => {
     return (
       <div className={classes.kanbanViewport}>
         {Object.entries(statusColumns).map(([key, column]) => (
-          <div key={key} className={classes.kanbanColumn}>
+          <div
+            key={key}
+            className={classes.kanbanColumn}
+          >
             <div className={classes.columnHeader}>
-              <Group justify="space-between" mb="md">
-                <Group gap="sm">
-                  <Text fz={18} fw={700} c={column.color}>
+              <Group
+                justify='space-between'
+                mb='md'
+              >
+                <Group gap='sm'>
+                  <Text
+                    fz={18}
+                    fw={700}
+                    c={column.color}
+                  >
                     {column.name}
                   </Text>
-                  <div style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: column.color,
-                    boxShadow: `0 0 8px ${column.color}40`
-                  }} />
+                  <div
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: column.color,
+                      boxShadow: `0 0 8px ${column.color}40`,
+                    }}
+                  />
                 </Group>
                 <Badge
-                  variant="light"
+                  variant='light'
                   color={column.color}
-                  size="lg"
+                  size='lg'
                   style={{
                     background: `${column.color}15`,
                     color: column.color,
-                    fontWeight: 600
+                    fontWeight: 600,
                   }}
                 >
                   {column.tasks.length}
@@ -510,77 +612,120 @@ const TasksIndex = () => {
 
             <div className={classes.columnTasks}>
               {column.tasks.map((task, index) => {
-                const isOverdue = task.due_on && new Date(task.due_on) < new Date() && !task.completed_at;
+                const isOverdue =
+                  task.due_on && new Date(task.due_on) < new Date() && !task.completed_at;
                 const priority = getPriorityLevel(task);
 
                 return (
                   <Card
                     key={task.id}
-                    shadow="sm"
-                    padding="md"
-                    radius="md"
+                    shadow='sm'
+                    padding='md'
+                    radius='md'
                     className={classes.kanbanTask}
                     data-priority={priority}
-                    onClick={() => redirectTo("projects.tasks.open", [task.project_id, task.id])}
+                    onClick={() => redirectTo('projects.tasks.open', [task.project_id, task.id])}
                     style={{
-                      animationDelay: `${0.5 + (index * 0.1)}s`
+                      animationDelay: `${0.5 + index * 0.1}s`,
                     }}
                   >
-                    <Stack gap="sm">
+                    <Stack gap='sm'>
                       {/* Task header with priority and favorite */}
-                      <Group justify="space-between" align="flex-start">
-                        <Group gap="xs" style={{ flex: 1 }}>
+                      <Group
+                        justify='space-between'
+                        align='flex-start'
+                      >
+                        <Group
+                          gap='xs'
+                          style={{ flex: 1 }}
+                        >
                           {priority !== 'normal' && (
-                            <div style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: priority === 'critical' ? '#fa5252' :
-                                             priority === 'high' ? '#fd7e14' : '#fab005',
-                              flexShrink: 0,
-                              marginTop: '2px',
-                              boxShadow: `0 0 4px ${priority === 'critical' ? '#fa5252' :
-                                                   priority === 'high' ? '#fd7e14' : '#fab005'}60`
-                            }} />
+                            <div
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor:
+                                  priority === 'critical'
+                                    ? '#fa5252'
+                                    : priority === 'high'
+                                      ? '#fd7e14'
+                                      : '#fab005',
+                                flexShrink: 0,
+                                marginTop: '2px',
+                                boxShadow: `0 0 4px ${
+                                  priority === 'critical'
+                                    ? '#fa5252'
+                                    : priority === 'high'
+                                      ? '#fd7e14'
+                                      : '#fab005'
+                                }60`,
+                              }}
+                            />
                           )}
-                          <Text size="sm" fw={600} lineClamp={2} style={{ flex: 1 }}>
+                          <Text
+                            size='sm'
+                            fw={600}
+                            lineClamp={2}
+                            style={{ flex: 1 }}
+                          >
                             #{task.number}: {task.name}
                           </Text>
                         </Group>
                         {task.project_favorite && (
                           <IconStar
                             size={16}
-                            color="var(--mantine-color-yellow-6)"
+                            color='var(--mantine-color-yellow-6)'
                             style={{
                               flexShrink: 0,
-                              filter: 'drop-shadow(0 0 2px rgba(255, 193, 7, 0.5))'
+                              filter: 'drop-shadow(0 0 2px rgba(255, 193, 7, 0.5))',
                             }}
                           />
                         )}
                       </Group>
 
                       {/* Project and task group info */}
-                      <Group gap="xs">
-                        <Badge variant="dot" size="xs" color="gray">
+                      <Group gap='xs'>
+                        <Badge
+                          variant='dot'
+                          size='xs'
+                          color='gray'
+                        >
                           {task.project_name}
                         </Badge>
-                        <Text size="xs" c="dimmed">
+                        <Text
+                          size='xs'
+                          c='dimmed'
+                        >
                           {task.task_group.name}
                         </Text>
                       </Group>
 
                       {/* Assignee with enhanced styling */}
                       {task.assigned_to_user && (
-                        <Group gap="xs" style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-8))',
-                          borderRadius: 'var(--mantine-radius-sm)',
-                          border: '1px solid light-dark(var(--mantine-color-blue-2), var(--mantine-color-dark-6))'
-                        }}>
-                          <Avatar size={20} color="blue" radius="xl">
+                        <Group
+                          gap='xs'
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor:
+                              'light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-8))',
+                            borderRadius: 'var(--mantine-radius-sm)',
+                            border:
+                              '1px solid light-dark(var(--mantine-color-blue-2), var(--mantine-color-dark-6))',
+                          }}
+                        >
+                          <Avatar
+                            size={20}
+                            color='blue'
+                            radius='xl'
+                          >
                             {task.assigned_to_user.name.charAt(0)}
                           </Avatar>
-                          <Text size="xs" fw={500} c="blue">
+                          <Text
+                            size='xs'
+                            fw={500}
+                            c='blue'
+                          >
                             {task.assigned_to_user.name}
                           </Text>
                         </Group>
@@ -588,21 +733,29 @@ const TasksIndex = () => {
 
                       {/* Due date with enhanced styling */}
                       {task.due_on && (
-                        <Group gap="xs" style={{
-                          padding: '4px 8px',
-                          backgroundColor: isOverdue ?
-                            'light-dark(var(--mantine-color-red-0), var(--mantine-color-red-9))' :
-                            'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))',
-                          borderRadius: 'var(--mantine-radius-sm)',
-                          border: `1px solid ${isOverdue ?
-                            'light-dark(var(--mantine-color-red-3), var(--mantine-color-red-7))' :
-                            'light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))'}`
-                        }}>
-                          <IconCalendarDue size={12} color={isOverdue ? 'var(--mantine-color-red-6)' : undefined} />
+                        <Group
+                          gap='xs'
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: isOverdue
+                              ? 'light-dark(var(--mantine-color-red-0), var(--mantine-color-red-9))'
+                              : 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))',
+                            borderRadius: 'var(--mantine-radius-sm)',
+                            border: `1px solid ${
+                              isOverdue
+                                ? 'light-dark(var(--mantine-color-red-3), var(--mantine-color-red-7))'
+                                : 'light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))'
+                            }`,
+                          }}
+                        >
+                          <IconCalendarDue
+                            size={12}
+                            color={isOverdue ? 'var(--mantine-color-red-6)' : undefined}
+                          />
                           <Text
-                            size="xs"
+                            size='xs'
                             fw={isOverdue ? 600 : 400}
-                            c={isOverdue ? "red" : "dimmed"}
+                            c={isOverdue ? 'red' : 'dimmed'}
                           >
                             {new Date(task.due_on).toLocaleDateString()}
                           </Text>
@@ -611,14 +764,26 @@ const TasksIndex = () => {
 
                       {/* Time estimation */}
                       {task.estimation && (
-                        <Group gap="xs" style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'light-dark(var(--mantine-color-teal-0), var(--mantine-color-dark-8))',
-                          borderRadius: 'var(--mantine-radius-sm)',
-                          border: '1px solid light-dark(var(--mantine-color-teal-2), var(--mantine-color-dark-6))'
-                        }}>
-                          <IconClock size={12} color="var(--mantine-color-teal-6)" />
-                          <Text size="xs" fw={500} c="teal">
+                        <Group
+                          gap='xs'
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor:
+                              'light-dark(var(--mantine-color-teal-0), var(--mantine-color-dark-8))',
+                            borderRadius: 'var(--mantine-radius-sm)',
+                            border:
+                              '1px solid light-dark(var(--mantine-color-teal-2), var(--mantine-color-dark-6))',
+                          }}
+                        >
+                          <IconClock
+                            size={12}
+                            color='var(--mantine-color-teal-6)'
+                          />
+                          <Text
+                            size='xs'
+                            fw={500}
+                            c='teal'
+                          >
                             {task.estimation}h estimated
                           </Text>
                         </Group>
@@ -626,24 +791,31 @@ const TasksIndex = () => {
 
                       {/* Labels with improved styling */}
                       {task.labels.length > 0 && (
-                        <Group gap={6} style={{ marginTop: '4px' }}>
-                          {task.labels.slice(0, 3).map((label) => (
+                        <Group
+                          gap={6}
+                          style={{ marginTop: '4px' }}
+                        >
+                          {task.labels.slice(0, 3).map(label => (
                             <Badge
                               key={label.id}
-                              size="xs"
-                              variant="light"
+                              size='xs'
+                              variant='light'
                               color={label.color}
                               style={{
                                 textTransform: 'none',
                                 fontWeight: 500,
-                                border: `1px solid ${label.color}40`
+                                border: `1px solid ${label.color}40`,
                               }}
                             >
                               {label.name}
                             </Badge>
                           ))}
                           {task.labels.length > 3 && (
-                            <Badge size="xs" variant="outline" color="gray">
+                            <Badge
+                              size='xs'
+                              variant='outline'
+                              color='gray'
+                            >
                               +{task.labels.length - 3}
                             </Badge>
                           )}
@@ -655,24 +827,44 @@ const TasksIndex = () => {
               })}
 
               {column.tasks.length === 0 && (
-                <Center p="xl" className={classes.emptyColumn}>
-                  <Stack align="center" gap="sm">
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      backgroundColor: `${column.color}20`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: `2px dashed ${column.color}60`
-                    }}>
-                      <IconGridDots size={24} color={`${column.color}80`} />
+                <Center
+                  p='xl'
+                  className={classes.emptyColumn}
+                >
+                  <Stack
+                    align='center'
+                    gap='sm'
+                  >
+                    <div
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '50%',
+                        backgroundColor: `${column.color}20`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: `2px dashed ${column.color}60`,
+                      }}
+                    >
+                      <IconGridDots
+                        size={24}
+                        color={`${column.color}80`}
+                      />
                     </div>
-                    <Text size="sm" c="dimmed" ta="center" fw={500}>
+                    <Text
+                      size='sm'
+                      c='dimmed'
+                      ta='center'
+                      fw={500}
+                    >
                       No tasks yet
                     </Text>
-                    <Text size="xs" c="dimmed" ta="center">
+                    <Text
+                      size='xs'
+                      c='dimmed'
+                      ta='center'
+                    >
                       Tasks will appear here
                     </Text>
                   </Stack>
@@ -690,18 +882,24 @@ const TasksIndex = () => {
       tasks={allTasks}
       zoom={ganttZoom}
       groupByProject={ganttGroupByProject}
-      onBarClick={(task) => redirectTo("projects.tasks.open", [task.project_id, task.id])}
+      onBarClick={task => redirectTo('projects.tasks.open', [task.project_id, task.id])}
     />
   );
 
   return (
     <>
-      <Breadcrumbs fz={14} mb={30}>
+      <Breadcrumbs
+        fz={14}
+        mb={30}
+      >
         <div>My Work</div>
         <div>Tasks</div>
       </Breadcrumbs>
 
-      <Title order={1} mb={20}>
+      <Title
+        order={1}
+        mb={20}
+      >
         Tasks assigned to you
       </Title>
 
@@ -710,13 +908,17 @@ const TasksIndex = () => {
           <>
             <ViewControls />
 
-            {viewMode === 'list' ? renderListView() : viewMode === 'kanban' ? renderKanbanView() : renderGanttView()}
+            {viewMode === 'list'
+              ? renderListView()
+              : viewMode === 'kanban'
+                ? renderKanbanView()
+                : renderGanttView()}
           </>
         ) : (
           <Center mih={300}>
             <EmptyWithIcon
-              title="All caught up!"
-              subtitle="No tasks assigned at the moment"
+              title='All caught up!'
+              subtitle='No tasks assigned at the moment'
               icon={IconRocket}
             />
           </Center>
@@ -726,6 +928,6 @@ const TasksIndex = () => {
   );
 };
 
-TasksIndex.layout = (page) => <Layout title="My Tasks">{page}</Layout>;
+TasksIndex.layout = page => <Layout title='My Tasks'>{page}</Layout>;
 
 export default TasksIndex;

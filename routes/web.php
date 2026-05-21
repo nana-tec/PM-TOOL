@@ -21,6 +21,7 @@ use App\Http\Controllers\SubTaskController;
 use App\Http\Controllers\Task\AttachmentController;
 use App\Http\Controllers\Task\CommentController;
 use App\Http\Controllers\Task\GroupController;
+use App\Http\Controllers\Task\NotifyAssignedController;
 use App\Http\Controllers\Task\TimeLogController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
@@ -109,6 +110,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('{project}/tasks/{task}/restore', [TaskController::class, 'restore'])->name('tasks.restore')->scopeBindings();
 
         Route::post('{project}/tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete')->scopeBindings();
+        Route::post('{project}/tasks/{task}/notify-assigned', [NotifyAssignedController::class, 'notify'])->name('tasks.notify-assigned')->scopeBindings();
         Route::post('{project}/tasks/reorder', [TaskController::class, 'reorder'])->name('tasks.reorder');
         Route::post('{project}/tasks/move', [TaskController::class, 'move'])->name('tasks.move');
 

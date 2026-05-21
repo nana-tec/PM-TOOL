@@ -27,7 +27,7 @@ const ProjectEdit = ({ dropdowns: { companies, users, currencies, projects } }) 
   const [currencySymbol, setCurrencySymbol] = useState();
 
   // build a set of descendant ids from loaded children
-  const getDescendantIds = (node) => {
+  const getDescendantIds = node => {
     if (!node || !node.children) return [];
     const ids = [];
     for (const child of node.children) {
@@ -38,7 +38,9 @@ const ProjectEdit = ({ dropdowns: { companies, users, currencies, projects } }) 
   };
 
   const descendantIds = getDescendantIds(item);
-  const filteredProjects = projects.filter(p => ![item.id, ...descendantIds].includes(Number(p.value)));
+  const filteredProjects = projects.filter(
+    p => ![item.id, ...descendantIds].includes(Number(p.value))
+  );
 
   const [form, submit, updateValue] = useForm('post', route('projects.update', item.id), {
     _method: 'put',

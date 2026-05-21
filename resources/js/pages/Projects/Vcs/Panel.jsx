@@ -1,6 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Anchor, Alert, Badge, Button, Divider, Group, Loader, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput, Textarea, Title, Tooltip, Switch, MultiSelect, Accordion, SegmentedControl, SimpleGrid } from '@mantine/core';
-import { IconBrandGithub, IconBrandGitlab, IconExternalLink, IconGitBranch, IconGitCommit, IconGitMerge, IconPlus, IconRefresh, IconTrash, IconAlertCircle, IconInfoCircle, IconDownload } from '@tabler/icons-react';
+import {
+  ActionIcon,
+  Anchor,
+  Alert,
+  Badge,
+  Button,
+  Divider,
+  Group,
+  Loader,
+  Modal,
+  Paper,
+  ScrollArea,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+  Tooltip,
+  Switch,
+  MultiSelect,
+  Accordion,
+  SegmentedControl,
+  SimpleGrid,
+} from '@mantine/core';
+import {
+  IconBrandGithub,
+  IconBrandGitlab,
+  IconExternalLink,
+  IconGitBranch,
+  IconGitCommit,
+  IconGitMerge,
+  IconPlus,
+  IconRefresh,
+  IconTrash,
+  IconAlertCircle,
+  IconInfoCircle,
+  IconDownload,
+} from '@tabler/icons-react';
 import axios from 'axios';
 import { showNotification } from '@mantine/notifications';
 import DiffViewer from '@/components/DiffViewer';
@@ -132,7 +169,10 @@ export default function VcsPanel({ projectId }) {
   const [loadingReviewThreads, setLoadingReviewThreads] = useState(false);
   const [replyBodies, setReplyBodies] = useState({}); // {threadId: text}
 
-  const providerIcon = useMemo(() => PROVIDERS.find(p => p.value === (integration?.provider || provider))?.icon, [integration, provider]);
+  const providerIcon = useMemo(
+    () => PROVIDERS.find(p => p.value === (integration?.provider || provider))?.icon,
+    [integration, provider]
+  );
 
   const notifyError = (title, message) => showNotification({ color: 'red', title, message });
   const notifySuccess = (title, message) => showNotification({ color: 'green', title, message });
@@ -153,8 +193,11 @@ export default function VcsPanel({ projectId }) {
       // GitHub PR base invalid
       const errors = data?.errors;
       if (Array.isArray(errors)) {
-        const baseInvalid = errors.find(er => er?.resource === 'PullRequest' && er?.field === 'base' && er?.code === 'invalid');
-        if (baseInvalid) return 'Invalid target branch. Ensure the target/base branch exists and you have access.';
+        const baseInvalid = errors.find(
+          er => er?.resource === 'PullRequest' && er?.field === 'base' && er?.code === 'invalid'
+        );
+        if (baseInvalid)
+          return 'Invalid target branch. Ensure the target/base branch exists and you have access.';
       }
       // GitHub merge weird schema error
       if (status === 422 && /links\/1\/schema/.test(String(msg))) {
@@ -173,19 +216,34 @@ export default function VcsPanel({ projectId }) {
     if (!number) return;
     setLoadingReviewThreads(true);
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.review-comments', [projectId, number]), { params: { ...tokenParams(), page, per_page: 50 } });
+      const { data } = await axios.get(
+        route('projects.vcs.pulls.review-comments', [projectId, number]),
+        { params: { ...tokenParams(), page, per_page: 50 } }
+      );
       setReviewComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
       setReviewCommentsHasNext(!!data.has_next);
       setReviewCommentsPage(page);
-      const loadedNow = (data?.comments?.length ?? 0);
-      const totalLoaded = page === 1 ? loadedNow : (reviewComments.length + loadedNow);
+      const loadedNow = data?.comments?.length ?? 0;
+      const totalLoaded = page === 1 ? loadedNow : reviewComments.length + loadedNow;
       if (loadedNow > 0) {
-        showNotification({ color: 'blue', title: 'Review comments', message: `Loaded ${loadedNow} ${loadedNow === 1 ? 'comment' : 'comments'} (total ${totalLoaded})` });
+        showNotification({
+          color: 'blue',
+          title: 'Review comments',
+          message: `Loaded ${loadedNow} ${loadedNow === 1 ? 'comment' : 'comments'} (total ${totalLoaded})`,
+        });
       } else if (page === 1) {
-        showNotification({ color: 'gray', title: 'Review comments', message: 'No review comments found' });
+        showNotification({
+          color: 'gray',
+          title: 'Review comments',
+          message: 'No review comments found',
+        });
       }
     } catch (e) {
-      showNotification({ color: 'red', title: 'Failed to load review comments', message: e?.response?.data?.error || e.message });
+      showNotification({
+        color: 'red',
+        title: 'Failed to load review comments',
+        message: e?.response?.data?.error || e.message,
+      });
     } finally {
       setLoadingReviewThreads(false);
     }
@@ -196,12 +254,24 @@ export default function VcsPanel({ projectId }) {
     const body = (replyBodies[threadId] || '').trim();
     if (!body) return;
     try {
-      await axios.post(route('projects.vcs.pulls.review-comments.reply', [projectId, prDetails.number, threadId]), { body }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.pulls.review-comments.reply', [projectId, prDetails.number, threadId]),
+        { body },
+        { params: tokenParams() }
+      );
       setReplyBodies(prev => ({ ...prev, [threadId]: '' }));
       await fetchPullReviewComments(prDetails.number, 1);
-      showNotification({ color: 'green', title: 'Reply posted', message: 'Your reply was added to the thread.' });
+      showNotification({
+        color: 'green',
+        title: 'Reply posted',
+        message: 'Your reply was added to the thread.',
+      });
     } catch (e) {
-      showNotification({ color: 'red', title: 'Failed to reply', message: e?.response?.data?.error || e.message });
+      showNotification({
+        color: 'red',
+        title: 'Failed to reply',
+        message: e?.response?.data?.error || e.message,
+      });
     }
   }
 
@@ -335,7 +405,9 @@ export default function VcsPanel({ projectId }) {
     setBranchesLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.branches', projectId), { params: { ...tokenParams(), page, per_page: 30 } });
+      const { data } = await axios.get(route('projects.vcs.branches', projectId), {
+        params: { ...tokenParams(), page, per_page: 30 },
+      });
       setBranches(prev => (page === 1 ? data.branches : [...prev, ...data.branches]));
       setBranchesHasNext(!!data.has_next);
       setBranchesPage(page);
@@ -358,7 +430,9 @@ export default function VcsPanel({ projectId }) {
     setCommitsLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.commits', projectId), { params: { ...tokenParams(), branch, page, per_page: 20 } });
+      const { data } = await axios.get(route('projects.vcs.commits', projectId), {
+        params: { ...tokenParams(), branch, page, per_page: 20 },
+      });
       setCommits(prev => (page === 1 ? data.commits : [...prev, ...data.commits]));
       setCommitsHasNext(!!data.has_next);
       setCommitsPage(page);
@@ -376,7 +450,9 @@ export default function VcsPanel({ projectId }) {
     setIssuesLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.issues', projectId), { params: { ...tokenParams(), state, page, per_page: 20 } });
+      const { data } = await axios.get(route('projects.vcs.issues', projectId), {
+        params: { ...tokenParams(), state, page, per_page: 20 },
+      });
       setIssues(prev => (page === 1 ? data.issues : [...prev, ...data.issues]));
       setIssuesHasNext(!!data.has_next);
       setIssuesPage(page);
@@ -394,7 +470,9 @@ export default function VcsPanel({ projectId }) {
     setPullsLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls', projectId), { params: { ...tokenParams(), state, page, per_page: 20 } });
+      const { data } = await axios.get(route('projects.vcs.pulls', projectId), {
+        params: { ...tokenParams(), state, page, per_page: 20 },
+      });
       setPulls(prev => (page === 1 ? data.pulls : [...prev, ...data.pulls]));
       setPullsHasNext(!!data.has_next);
       setPullsPage(page);
@@ -434,7 +512,11 @@ export default function VcsPanel({ projectId }) {
     setCreatingIssue(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.issues.create', projectId), { title: issueTitle, body: issueBody || null }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.issues.create', projectId),
+        { title: issueTitle, body: issueBody || null },
+        { params: tokenParams() }
+      );
       setIssueTitle('');
       setIssueBody('');
       setIssueOpen(false);
@@ -454,7 +536,17 @@ export default function VcsPanel({ projectId }) {
     setCreatingPr(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.pulls.open', projectId), { source_branch: prSource, target_branch: prTarget, title: prTitle, body: prBody || null, draft: provider === 'github' ? !!prDraft : undefined }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.pulls.open', projectId),
+        {
+          source_branch: prSource,
+          target_branch: prTarget,
+          title: prTitle,
+          body: prBody || null,
+          draft: provider === 'github' ? !!prDraft : undefined,
+        },
+        { params: tokenParams() }
+      );
       setPrOpen(false);
       setPrSource('');
       setPrTarget('');
@@ -462,7 +554,10 @@ export default function VcsPanel({ projectId }) {
       setPrBody('');
       setPrDraft(false);
       await fetchPulls(pullsState, 1);
-      notifySuccess('Request opened', `${integration.provider === 'github' ? 'Pull request' : 'Merge request'} opened`);
+      notifySuccess(
+        'Request opened',
+        `${integration.provider === 'github' ? 'Pull request' : 'Merge request'} opened`
+      );
     } catch (e) {
       const msg = parseApiError(e, 'Failed to open request');
       setError(msg);
@@ -476,7 +571,11 @@ export default function VcsPanel({ projectId }) {
     if (!number) return;
     setError('');
     try {
-      await axios.post(route('projects.vcs.merge', projectId), { number, strategy: strategy || null }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.merge', projectId),
+        { number, strategy: strategy || null },
+        { params: tokenParams() }
+      );
       await fetchPulls(pullsState, 1);
       notifySuccess('Merged', 'Request merged successfully');
     } catch (e) {
@@ -486,13 +585,21 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const markReadyForReview = async (number) => {
+  const markReadyForReview = async number => {
     if (!number) return;
     setMarkingReady(true);
     try {
-      await axios.post(route('projects.vcs.pulls.ready', [projectId, number]), {}, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.pulls.ready', [projectId, number]),
+        {},
+        { params: tokenParams() }
+      );
       await openPrDetails(number);
-      showNotification({ color: 'green', title: 'Ready for review', message: 'PR marked as ready' });
+      showNotification({
+        color: 'green',
+        title: 'Ready for review',
+        message: 'PR marked as ready',
+      });
     } catch (e) {
       const msg = parseApiError(e, 'Failed to mark ready');
       setError(msg);
@@ -503,7 +610,7 @@ export default function VcsPanel({ projectId }) {
   };
 
   // PR details
-  const openPrDetails = async (number) => {
+  const openPrDetails = async number => {
     setPrDetailsOpen(true);
     setLoadingPrDetails(true);
     setPrDetails(null);
@@ -514,7 +621,9 @@ export default function VcsPanel({ projectId }) {
     setSelectedReviewerUsernames([]);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), { params: tokenParams() });
+      const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), {
+        params: tokenParams(),
+      });
       setPrDetails(data.pull);
       await Promise.all([
         fetchPrStatuses(number),
@@ -533,11 +642,13 @@ export default function VcsPanel({ projectId }) {
   };
 
   // Status checks
-  const fetchPrStatuses = async (number) => {
+  const fetchPrStatuses = async number => {
     if (!number) return;
     setLoadingStatuses(true);
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.statuses', [projectId, number]), { params: tokenParams() });
+      const { data } = await axios.get(route('projects.vcs.pulls.statuses', [projectId, number]), {
+        params: tokenParams(),
+      });
       setPrStatusSha(data.sha || '');
       setPrStatuses(data.statuses || []);
     } catch (e) {
@@ -549,10 +660,13 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const fetchRequiredChecks = async (number) => {
+  const fetchRequiredChecks = async number => {
     if (!number) return;
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.required-checks', [projectId, number]), { params: tokenParams() });
+      const { data } = await axios.get(
+        route('projects.vcs.pulls.required-checks', [projectId, number]),
+        { params: tokenParams() }
+      );
       setRequiredChecks(data.required || []);
     } catch (e) {
       // non-fatal; ignore silently
@@ -560,10 +674,12 @@ export default function VcsPanel({ projectId }) {
   };
 
   // Lightweight PR details refresh (without comments/reviewers)
-  const refreshPrDetailsOnly = async (number) => {
+  const refreshPrDetailsOnly = async number => {
     if (!number) return;
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), { params: tokenParams() });
+      const { data } = await axios.get(route('projects.vcs.pulls.details', [projectId, number]), {
+        params: tokenParams(),
+      });
       setPrDetails(data.pull);
     } catch (_) {
       // ignore transient errors during polling
@@ -574,7 +690,9 @@ export default function VcsPanel({ projectId }) {
   const fetchReviewers = async (number, page = 1) => {
     setLoadingReviewers(true);
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.reviewers', [projectId, number]), { params: { ...tokenParams(), page, per_page: 50 } });
+      const { data } = await axios.get(route('projects.vcs.pulls.reviewers', [projectId, number]), {
+        params: { ...tokenParams(), page, per_page: 50 },
+      });
       setReviewers(prev => (page === 1 ? data.reviewers : [...prev, ...data.reviewers]));
       setReviewersHasNext(!!data.has_next);
       setReviewersPage(page);
@@ -591,8 +709,16 @@ export default function VcsPanel({ projectId }) {
     if (!prDetails || selectedReviewerUsernames.length === 0) return;
     setAddingReviewers(true);
     try {
-      await axios.post(route('projects.vcs.pulls.reviewers.add', [projectId, prDetails.number]), { usernames: selectedReviewerUsernames }, { params: tokenParams() });
-      showNotification({ color: 'green', title: 'Reviewers added', message: 'Selected reviewers have been requested.' });
+      await axios.post(
+        route('projects.vcs.pulls.reviewers.add', [projectId, prDetails.number]),
+        { usernames: selectedReviewerUsernames },
+        { params: tokenParams() }
+      );
+      showNotification({
+        color: 'green',
+        title: 'Reviewers added',
+        message: 'Selected reviewers have been requested.',
+      });
       setSelectedReviewerUsernames([]);
       // refresh PR details to reflect requested reviewers
       await openPrDetails(prDetails.number);
@@ -606,7 +732,7 @@ export default function VcsPanel({ projectId }) {
   };
 
   // Issue comments
-  const openIssueDetails = async (issue) => {
+  const openIssueDetails = async issue => {
     setIssueDetails(issue);
     setIssueDetailsOpen(true);
     await fetchIssueComments(issue.id, 1);
@@ -615,7 +741,10 @@ export default function VcsPanel({ projectId }) {
   const fetchIssueComments = async (issueId, page = 1) => {
     setLoadingIssueComments(true);
     try {
-      const { data } = await axios.get(route('projects.vcs.issues.comments', [projectId, issueId]), { params: { ...tokenParams(), page, per_page: 20 } });
+      const { data } = await axios.get(
+        route('projects.vcs.issues.comments', [projectId, issueId]),
+        { params: { ...tokenParams(), page, per_page: 20 } }
+      );
       setIssueComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
       setIssueCommentsHasNext(!!data.has_next);
       setIssueCommentsPage(page);
@@ -632,10 +761,18 @@ export default function VcsPanel({ projectId }) {
     if (!issueDetails || !newIssueComment.trim()) return;
     setSubmittingIssueComment(true);
     try {
-      await axios.post(route('projects.vcs.issues.comments.add', [projectId, issueDetails.id]), { body: newIssueComment }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.issues.comments.add', [projectId, issueDetails.id]),
+        { body: newIssueComment },
+        { params: tokenParams() }
+      );
       setNewIssueComment('');
       await fetchIssueComments(issueDetails.id, 1);
-      showNotification({ color: 'green', title: 'Comment added', message: 'Your comment was posted' });
+      showNotification({
+        color: 'green',
+        title: 'Comment added',
+        message: 'Your comment was posted',
+      });
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
@@ -665,9 +802,21 @@ export default function VcsPanel({ projectId }) {
 
   const exportCompareCSV = () => {
     const rows = [];
-    rows.push(['type', 'sha/filename', 'message', 'author', 'date', 'additions', 'deletions'].join(','));
+    rows.push(
+      ['type', 'sha/filename', 'message', 'author', 'date', 'additions', 'deletions'].join(',')
+    );
     (compareCommits || []).forEach(c => {
-      rows.push(['commit', c.sha, JSON.stringify(c.message || ''), JSON.stringify(c.author || ''), c.date || '', '', ''].join(','));
+      rows.push(
+        [
+          'commit',
+          c.sha,
+          JSON.stringify(c.message || ''),
+          JSON.stringify(c.author || ''),
+          c.date || '',
+          '',
+          '',
+        ].join(',')
+      );
     });
     (compareFiles || []).forEach(f => {
       rows.push(['file', f.filename, '', '', '', f.additions ?? 0, f.deletions ?? 0].join(','));
@@ -681,7 +830,9 @@ export default function VcsPanel({ projectId }) {
     setLoadingPrComments(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.pulls.comments', [projectId, number]), { params: { ...tokenParams(), page, per_page: 20 } });
+      const { data } = await axios.get(route('projects.vcs.pulls.comments', [projectId, number]), {
+        params: { ...tokenParams(), page, per_page: 20 },
+      });
       setPrComments(prev => (page === 1 ? data.comments : [...prev, ...data.comments]));
       setPrCommentsHasNext(!!data.has_next);
       setPrCommentsPage(page);
@@ -699,10 +850,18 @@ export default function VcsPanel({ projectId }) {
     setSubmittingComment(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.pulls.comments.add', [projectId, prDetails.number]), { body: newComment }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.pulls.comments.add', [projectId, prDetails.number]),
+        { body: newComment },
+        { params: tokenParams() }
+      );
       setNewComment('');
       await fetchPrComments(prDetails.number, 1);
-      showNotification({ color: 'green', title: 'Comment added', message: 'Your comment was posted' });
+      showNotification({
+        color: 'green',
+        title: 'Comment added',
+        message: 'Your comment was posted',
+      });
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
@@ -712,19 +871,24 @@ export default function VcsPanel({ projectId }) {
     }
   };
 
-  const submitReview = async (event) => {
+  const submitReview = async event => {
     if (!prDetails) return;
     setSubmittingReview(true);
     setError('');
     try {
-      await axios.post(route('projects.vcs.pulls.reviews.submit', [projectId, prDetails.number]), { event, body: newComment || null }, { params: tokenParams() });
+      await axios.post(
+        route('projects.vcs.pulls.reviews.submit', [projectId, prDetails.number]),
+        { event, body: newComment || null },
+        { params: tokenParams() }
+      );
       if (event !== 'COMMENT') setNewComment('');
-      showNotification({ color: 'green', title: 'Review submitted', message: event.replace('_', ' ').toLowerCase() });
+      showNotification({
+        color: 'green',
+        title: 'Review submitted',
+        message: event.replace('_', ' ').toLowerCase(),
+      });
       // refresh statuses and details (mergeability/checks may change)
-      await Promise.all([
-        fetchPrStatuses(prDetails.number),
-        openPrDetails(prDetails.number),
-      ]);
+      await Promise.all([fetchPrStatuses(prDetails.number), openPrDetails(prDetails.number)]);
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
       setError(msg);
@@ -750,7 +914,10 @@ export default function VcsPanel({ projectId }) {
     const id = setInterval(tick, 15000);
     // initial tick
     tick();
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, [prDetailsOpen, prDetails?.number]);
 
   const doCompare = async () => {
@@ -758,12 +925,20 @@ export default function VcsPanel({ projectId }) {
     setCompareLoading(true);
     setError('');
     try {
-      const { data } = await axios.post(route('projects.vcs.compare', projectId), { base: compareBase, head: compareHead }, { params: tokenParams() });
+      const { data } = await axios.post(
+        route('projects.vcs.compare', projectId),
+        { base: compareBase, head: compareHead },
+        { params: tokenParams() }
+      );
       setCompareCommits(data.commits || []);
       setCompareFiles(data.files || []);
       setExpandedFiles((data.files || []).slice(0, 5).map(f => f.filename)); // open first few by default
       if ((data.commits || []).length === 0 && (!data.files || data.files.length === 0)) {
-        showNotification({ color: 'yellow', title: 'No differences', message: 'No commits or file changes found for this comparison.' });
+        showNotification({
+          color: 'yellow',
+          title: 'No differences',
+          message: 'No commits or file changes found for this comparison.',
+        });
       }
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
@@ -780,7 +955,9 @@ export default function VcsPanel({ projectId }) {
     setLoadingCompareFromPr(true);
     setError('');
     try {
-      const { data } = await axios.get(route('projects.vcs.compare.by-pr', [projectId, num]), { params: tokenParams() });
+      const { data } = await axios.get(route('projects.vcs.compare.by-pr', [projectId, num]), {
+        params: tokenParams(),
+      });
       setCompareBase(data.base || '');
       setCompareHead(data.head || '');
       setCompareCommits(data.commits || []);
@@ -789,7 +966,11 @@ export default function VcsPanel({ projectId }) {
       // Also load file-level review comments for this PR
       await fetchPullReviewComments(num, 1);
       if (!data.base || !data.head) {
-        showNotification({ color: 'yellow', title: 'Missing data', message: 'Could not determine base/head from PR' });
+        showNotification({
+          color: 'yellow',
+          title: 'Missing data',
+          message: 'Could not determine base/head from PR',
+        });
       }
     } catch (e) {
       const msg = e?.response?.data?.error || e.message;
@@ -805,10 +986,16 @@ export default function VcsPanel({ projectId }) {
   };
   const collapseAllFiles = () => setExpandedFiles([]);
   const copyAllPatches = async () => {
-    const patches = (compareFiles || []).map(f => `--- ${f.filename}\n+++ ${f.filename}\n${f.patch || ''}`).join('\n');
+    const patches = (compareFiles || [])
+      .map(f => `--- ${f.filename}\n+++ ${f.filename}\n${f.patch || ''}`)
+      .join('\n');
     try {
       await navigator.clipboard.writeText(patches);
-      showNotification({ color: 'green', title: 'Copied', message: 'All patches copied to clipboard' });
+      showNotification({
+        color: 'green',
+        title: 'Copied',
+        message: 'All patches copied to clipboard',
+      });
     } catch (_) {
       // fallback
       const ta = document.createElement('textarea');
@@ -818,9 +1005,17 @@ export default function VcsPanel({ projectId }) {
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
-      try { document.execCommand('copy'); } catch (_) { /* ignore fallback copy failure */ }
+      try {
+        document.execCommand('copy');
+      } catch (_) {
+        /* ignore fallback copy failure */
+      }
       document.body.removeChild(ta);
-      showNotification({ color: 'green', title: 'Copied', message: 'All patches copied to clipboard' });
+      showNotification({
+        color: 'green',
+        title: 'Copied',
+        message: 'All patches copied to clipboard',
+      });
     }
   };
 
@@ -829,29 +1024,60 @@ export default function VcsPanel({ projectId }) {
     if (!integration || integration.provider !== 'github') return false;
     if (prDetails?.draft) return true;
     if (!requiredChecks || requiredChecks.length === 0) return false;
-    return requiredChecks.every(ctx => (prStatuses.find(s => s.context === ctx)?.state || 'pending') === 'success');
+    return requiredChecks.every(
+      ctx => (prStatuses.find(s => s.context === ctx)?.state || 'pending') === 'success'
+    );
   }, [integration, prDetails, requiredChecks, prStatuses]);
 
-  const reRequestReviewer = async (username) => {
+  const reRequestReviewer = async username => {
     if (!prDetails || !username) return;
     try {
-      await axios.post(route('projects.vcs.pulls.reviewers.add', [projectId, prDetails.number]), { usernames: [username] }, { params: tokenParams() });
-      showNotification({ color: 'green', title: 'Review re-requested', message: `Requested review from ${username}` });
+      await axios.post(
+        route('projects.vcs.pulls.reviewers.add', [projectId, prDetails.number]),
+        { usernames: [username] },
+        { params: tokenParams() }
+      );
+      showNotification({
+        color: 'green',
+        title: 'Review re-requested',
+        message: `Requested review from ${username}`,
+      });
       await openPrDetails(prDetails.number);
     } catch (e) {
-      showNotification({ color: 'red', title: 'Failed to re-request', message: e?.response?.data?.error || e.message });
+      showNotification({
+        color: 'red',
+        title: 'Failed to re-request',
+        message: e?.response?.data?.error || e.message,
+      });
     }
   };
 
   return (
-    <Paper withBorder p="md" radius="md">
-      <Group justify="space-between" mb="sm">
+    <Paper
+      withBorder
+      p='md'
+      radius='md'
+    >
+      <Group
+        justify='space-between'
+        mb='sm'
+      >
         <Title order={3}>Version control</Title>
         {integration && (
-          <Group gap="xs">
-            <Badge color="teal" variant="light">{integration.provider}</Badge>
-            <Tooltip label="Remove integration">
-              <ActionIcon color="red" variant="subtle" onClick={removeIntegration} loading={saving}>
+          <Group gap='xs'>
+            <Badge
+              color='teal'
+              variant='light'
+            >
+              {integration.provider}
+            </Badge>
+            <Tooltip label='Remove integration'>
+              <ActionIcon
+                color='red'
+                variant='subtle'
+                onClick={removeIntegration}
+                loading={saving}
+              >
                 <IconTrash size={16} />
               </ActionIcon>
             </Tooltip>
@@ -860,110 +1086,252 @@ export default function VcsPanel({ projectId }) {
       </Group>
 
       {error && (
-        <Alert color="red" icon={<IconAlertCircle size={16} />} mb="sm" variant="light">{error}</Alert>
+        <Alert
+          color='red'
+          icon={<IconAlertCircle size={16} />}
+          mb='sm'
+          variant='light'
+        >
+          {error}
+        </Alert>
       )}
 
       {loading ? (
-        <Group justify="center" my="md"><Loader size="sm" /></Group>
+        <Group
+          justify='center'
+          my='md'
+        >
+          <Loader size='sm' />
+        </Group>
       ) : (
-        <Stack gap="md">
+        <Stack gap='md'>
           {/* Configure */}
-          <Paper withBorder p="sm" radius="sm">
-            <Group gap="md" wrap="wrap" align="flex-end">
+          <Paper
+            withBorder
+            p='sm'
+            radius='sm'
+          >
+            <Group
+              gap='md'
+              wrap='wrap'
+              align='flex-end'
+            >
               <div style={{ minWidth: 220 }}>
-                <Select label="Provider" data={PROVIDERS} value={provider} onChange={setProvider} />
+                <Select
+                  label='Provider'
+                  data={PROVIDERS}
+                  value={provider}
+                  onChange={setProvider}
+                />
               </div>
               <TextInput
-                label={provider === 'github' ? 'Repository (owner/name)' : 'Project path (group/name)'}
+                label={
+                  provider === 'github' ? 'Repository (owner/name)' : 'Project path (group/name)'
+                }
                 placeholder={provider === 'github' ? 'acme/my-repo' : 'group/subgroup/project'}
                 value={repo}
-                onChange={(e) => setRepo(e.target.value)}
+                onChange={e => setRepo(e.target.value)}
                 style={{ minWidth: 260 }}
               />
               {provider === 'gitlab' && (
                 <TextInput
-                  label="Base URL (self-hosted)"
-                  placeholder="https://gitlab.example.com"
+                  label='Base URL (self-hosted)'
+                  placeholder='https://gitlab.example.com'
                   value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
+                  onChange={e => setBaseUrl(e.target.value)}
                   style={{ minWidth: 260 }}
                 />
               )}
-              <TextInput label="Default branch" placeholder="main" value={defaultBranch} onChange={(e) => setDefaultBranch(e.target.value)} style={{ minWidth: 160 }} />
-              <TextInput label="Project access token" placeholder={integration?.has_token ? '•••••••• (leave blank to keep)' : 'Personal access token'} value={token} onChange={(e) => setToken(e.target.value)} style={{ minWidth: 240 }} />
-              <Button onClick={saveIntegration} loading={saving}>Save</Button>
+              <TextInput
+                label='Default branch'
+                placeholder='main'
+                value={defaultBranch}
+                onChange={e => setDefaultBranch(e.target.value)}
+                style={{ minWidth: 160 }}
+              />
+              <TextInput
+                label='Project access token'
+                placeholder={
+                  integration?.has_token
+                    ? '•••••••• (leave blank to keep)'
+                    : 'Personal access token'
+                }
+                value={token}
+                onChange={e => setToken(e.target.value)}
+                style={{ minWidth: 240 }}
+              />
+              <Button
+                onClick={saveIntegration}
+                loading={saving}
+              >
+                Save
+              </Button>
             </Group>
           </Paper>
 
           {/* Personal token */}
           {integration && (
-            <Paper withBorder p="sm" radius="sm">
-              <Group justify="space-between" align="flex-end" wrap="wrap">
+            <Paper
+              withBorder
+              p='sm'
+              radius='sm'
+            >
+              <Group
+                justify='space-between'
+                align='flex-end'
+                wrap='wrap'
+              >
                 <Group>
-                  <Switch checked={useUserToken} onChange={(e) => setUseUserToken(e.currentTarget.checked)} label="Use my personal token for API calls" />
-                  <Badge color={hasUserToken ? 'green' : 'gray'} variant="light">{hasUserToken ? 'Token on file' : 'No token saved'}</Badge>
+                  <Switch
+                    checked={useUserToken}
+                    onChange={e => setUseUserToken(e.currentTarget.checked)}
+                    label='Use my personal token for API calls'
+                  />
+                  <Badge
+                    color={hasUserToken ? 'green' : 'gray'}
+                    variant='light'
+                  >
+                    {hasUserToken ? 'Token on file' : 'No token saved'}
+                  </Badge>
                 </Group>
-                <Group wrap="wrap" align="flex-end">
-                  <TextInput label="My personal token" placeholder="Paste token (not shown after save)" value={userToken} onChange={(e) => setUserToken(e.target.value)} style={{ minWidth: 260 }} />
-                  <Button variant="light" onClick={saveUserToken} loading={savingUserToken} disabled={!userToken?.trim()}>Save token</Button>
-                  <Button variant="subtle" color="red" onClick={deleteUserToken} loading={savingUserToken} disabled={!hasUserToken}>Remove token</Button>
+                <Group
+                  wrap='wrap'
+                  align='flex-end'
+                >
+                  <TextInput
+                    label='My personal token'
+                    placeholder='Paste token (not shown after save)'
+                    value={userToken}
+                    onChange={e => setUserToken(e.target.value)}
+                    style={{ minWidth: 260 }}
+                  />
+                  <Button
+                    variant='light'
+                    onClick={saveUserToken}
+                    loading={savingUserToken}
+                    disabled={!userToken?.trim()}
+                  >
+                    Save token
+                  </Button>
+                  <Button
+                    variant='subtle'
+                    color='red'
+                    onClick={deleteUserToken}
+                    loading={savingUserToken}
+                    disabled={!hasUserToken}
+                  >
+                    Remove token
+                  </Button>
                 </Group>
               </Group>
             </Paper>
           )}
 
           {!integration ? (
-            <Text c="dimmed">Connect this project to GitHub or GitLab to view branches/commits, create issues and open merge requests.</Text>
+            <Text c='dimmed'>
+              Connect this project to GitHub or GitLab to view branches/commits, create issues and
+              open merge requests.
+            </Text>
           ) : (
-            <Stack gap="md">
-              <Group justify="space-between">
-                <Group gap="xs">
+            <Stack gap='md'>
+              <Group justify='space-between'>
+                <Group gap='xs'>
                   {providerIcon && (providerIcon ? <providerIcon size={18} /> : null)}
                   <Text fw={600}>{integration.repo}</Text>
                   {(() => {
-                    const isLocalHost = (u) => {
+                    const isLocalHost = u => {
                       try {
                         const x = new URL(u);
                         return ['localhost', '127.0.0.1', '::1'].includes(x.hostname);
-                      } catch { return true; }
+                      } catch {
+                        return true;
+                      }
                     };
-                    const baseDefault = integration.provider === 'github' ? 'https://github.com' : 'https://gitlab.com';
+                    const baseDefault =
+                      integration.provider === 'github'
+                        ? 'https://github.com'
+                        : 'https://gitlab.com';
                     const rawBase = integration.base_url || baseDefault;
                     const base = isLocalHost(rawBase) ? baseDefault : rawBase;
                     const repoPath = String(integration.repo || '').replace(/^\/+/, '');
                     const url = `${base.replace(/\/$/, '')}/${repoPath}`;
                     return (
-                      <Anchor href={url} target="_blank" rel="noreferrer">
-                        Open repo <IconExternalLink size={14} style={{ verticalAlign: 'middle' }} />
+                      <Anchor
+                        href={url}
+                        target='_blank'
+                        rel='noreferrer'
+                      >
+                        Open repo{' '}
+                        <IconExternalLink
+                          size={14}
+                          style={{ verticalAlign: 'middle' }}
+                        />
                       </Anchor>
                     );
                   })()}
                 </Group>
-                <Group gap="xs">
-                  <Tooltip label="Reload data">
-                    <ActionIcon variant="subtle" onClick={() => { fetchBranches(1); fetchIssues(issuesState, 1); fetchPulls(pullsState, 1); if (selectedBranch) fetchCommits(selectedBranch, 1); }}>
+                <Group gap='xs'>
+                  <Tooltip label='Reload data'>
+                    <ActionIcon
+                      variant='subtle'
+                      onClick={() => {
+                        fetchBranches(1);
+                        fetchIssues(issuesState, 1);
+                        fetchPulls(pullsState, 1);
+                        if (selectedBranch) fetchCommits(selectedBranch, 1);
+                      }}
+                    >
                       <IconRefresh size={16} />
                     </ActionIcon>
                   </Tooltip>
-                  <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => { setPrSource(selectedBranch || ''); setPrTarget(defaultBranch || 'main'); setPrTitle(''); setPrBody(''); setPrDraft(false); setPrOpen(true); }}>
+                  <Button
+                    size='xs'
+                    variant='light'
+                    leftSection={<IconPlus size={14} />}
+                    onClick={() => {
+                      setPrSource(selectedBranch || '');
+                      setPrTarget(defaultBranch || 'main');
+                      setPrTitle('');
+                      setPrBody('');
+                      setPrDraft(false);
+                      setPrOpen(true);
+                    }}
+                  >
                     Open {integration.provider === 'github' ? 'PR' : 'MR'}
                   </Button>
                 </Group>
               </Group>
 
-              <SimpleGrid cols={{ base: 1, lg: 2, xl: 3 }} spacing="md">
+              <SimpleGrid
+                cols={{ base: 1, lg: 2, xl: 3 }}
+                spacing='md'
+              >
                 {/* Branches & commits */}
-                <Paper withBorder p="sm" radius="sm">
-                  <Group gap="sm" justify="space-between" align="center">
-                    <Group gap="sm">
+                <Paper
+                  withBorder
+                  p='sm'
+                  radius='sm'
+                >
+                  <Group
+                    gap='sm'
+                    justify='space-between'
+                    align='center'
+                  >
+                    <Group gap='sm'>
                       <IconGitBranch size={16} />
                       <Text fw={600}>Branches</Text>
                     </Group>
-                    <Tooltip label="The first branch with results is selected automatically"><IconInfoCircle size={14} /></Tooltip>
+                    <Tooltip label='The first branch with results is selected automatically'>
+                      <IconInfoCircle size={14} />
+                    </Tooltip>
                   </Group>
-                  <Group mt="sm" gap="sm" align="flex-end">
+                  <Group
+                    mt='sm'
+                    gap='sm'
+                    align='flex-end'
+                  >
                     <Select
-                      placeholder="Select branch"
+                      placeholder='Select branch'
                       data={branches.map(b => ({ value: b.name, label: b.name }))}
                       value={selectedBranch}
                       onChange={setSelectedBranch}
@@ -971,98 +1339,335 @@ export default function VcsPanel({ projectId }) {
                       nothingFound={branchesLoading ? 'Loading...' : 'No branches'}
                       style={{ minWidth: 220 }}
                     />
-                    <ActionIcon variant="subtle" onClick={() => fetchBranches(1)} loading={branchesLoading}><IconRefresh size={16} /></ActionIcon>
+                    <ActionIcon
+                      variant='subtle'
+                      onClick={() => fetchBranches(1)}
+                      loading={branchesLoading}
+                    >
+                      <IconRefresh size={16} />
+                    </ActionIcon>
                     {!branchesLoading && branchesHasNext && (
-                      <Button size="xs" variant="light" onClick={() => fetchBranches(branchesPage + 1)}>Load more branches</Button>
+                      <Button
+                        size='xs'
+                        variant='light'
+                        onClick={() => fetchBranches(branchesPage + 1)}
+                      >
+                        Load more branches
+                      </Button>
                     )}
                   </Group>
-                  <Divider my="xs" />
-                  <ScrollArea.Autosize mah={240} type="always" scrollbarSize={8}>
-                    <Stack gap="xs">
-                      {commits.map((c) => (
-                        <Group key={c.sha} gap="xs" align="flex-start" wrap="nowrap">
+                  <Divider my='xs' />
+                  <ScrollArea.Autosize
+                    mah={240}
+                    type='always'
+                    scrollbarSize={8}
+                  >
+                    <Stack gap='xs'>
+                      {commits.map(c => (
+                        <Group
+                          key={c.sha}
+                          gap='xs'
+                          align='flex-start'
+                          wrap='nowrap'
+                        >
                           <IconGitCommit size={14} />
-                          <Stack gap={2} style={{ flex: 1 }}>
-                            <Text size="sm" fw={600} lineClamp={2}>{c.message}</Text>
-                            <Text size="xs" c="dimmed">{c.sha.substring(0, 7)} · {c.author || 'Unknown'} · {c.date ? new Date(c.date).toLocaleString() : ''}</Text>
+                          <Stack
+                            gap={2}
+                            style={{ flex: 1 }}
+                          >
+                            <Text
+                              size='sm'
+                              fw={600}
+                              lineClamp={2}
+                            >
+                              {c.message}
+                            </Text>
+                            <Text
+                              size='xs'
+                              c='dimmed'
+                            >
+                              {c.sha.substring(0, 7)} · {c.author || 'Unknown'} ·{' '}
+                              {c.date ? new Date(c.date).toLocaleString() : ''}
+                            </Text>
                           </Stack>
                           {c.url && (
-                            <Anchor href={c.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>
+                            <Anchor
+                              href={c.url}
+                              target='_blank'
+                              rel='noreferrer'
+                            >
+                              <IconExternalLink size={14} />
+                            </Anchor>
                           )}
                         </Group>
                       ))}
-                      {commitsLoading && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                      {commitsLoading && (
+                        <Group
+                          justify='center'
+                          my='sm'
+                        >
+                          <Loader size='xs' />
+                        </Group>
+                      )}
                       {!commitsLoading && commitsHasNext && (
-                        <Group justify="center" mt="xs"><Button variant="light" size="xs" onClick={() => fetchCommits(selectedBranch, commitsPage + 1)}>Load more commits</Button></Group>
+                        <Group
+                          justify='center'
+                          mt='xs'
+                        >
+                          <Button
+                            variant='light'
+                            size='xs'
+                            onClick={() => fetchCommits(selectedBranch, commitsPage + 1)}
+                          >
+                            Load more commits
+                          </Button>
+                        </Group>
                       )}
                     </Stack>
                   </ScrollArea.Autosize>
                 </Paper>
 
                 {/* Issues */}
-                <Paper withBorder p="sm" radius="sm">
-                  <Group gap="sm" justify="space-between" align="center">
-                    <Group gap="sm">
+                <Paper
+                  withBorder
+                  p='sm'
+                  radius='sm'
+                >
+                  <Group
+                    gap='sm'
+                    justify='space-between'
+                    align='center'
+                  >
+                    <Group gap='sm'>
                       <IconPlus size={16} />
                       <Text fw={600}>Issues</Text>
                     </Group>
-                    <Select value={issuesState} onChange={(v) => { setIssuesState(v); fetchIssues(v, 1); }} data={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }]} style={{ width: 120 }} />
+                    <Select
+                      value={issuesState}
+                      onChange={v => {
+                        setIssuesState(v);
+                        fetchIssues(v, 1);
+                      }}
+                      data={[
+                        { value: 'open', label: 'Open' },
+                        { value: 'closed', label: 'Closed' },
+                      ]}
+                      style={{ width: 120 }}
+                    />
                   </Group>
-                  <Divider my="xs" />
-                  <ScrollArea.Autosize mah={240} type="always" scrollbarSize={8}>
+                  <Divider my='xs' />
+                  <ScrollArea.Autosize
+                    mah={240}
+                    type='always'
+                    scrollbarSize={8}
+                  >
                     <Stack gap={8}>
-                      {issues.map((i) => (
-                        <Group key={i.id} gap="xs" wrap="nowrap" justify="space-between">
-                          <Stack gap={2} style={{ flex: 1 }}>
-                            <Anchor size="sm" fw={600} onClick={() => openIssueDetails(i)}>
+                      {issues.map(i => (
+                        <Group
+                          key={i.id}
+                          gap='xs'
+                          wrap='nowrap'
+                          justify='space-between'
+                        >
+                          <Stack
+                            gap={2}
+                            style={{ flex: 1 }}
+                          >
+                            <Anchor
+                              size='sm'
+                              fw={600}
+                              onClick={() => openIssueDetails(i)}
+                            >
                               {i.title}
                             </Anchor>
-                            <Group gap={6}><Badge size="xs" variant="light" color={i.state === 'open' || i.state === 'opened' ? 'green' : 'gray'}>{i.state}</Badge>{i.url && (<Anchor href={i.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
+                            <Group gap={6}>
+                              <Badge
+                                size='xs'
+                                variant='light'
+                                color={
+                                  i.state === 'open' || i.state === 'opened' ? 'green' : 'gray'
+                                }
+                              >
+                                {i.state}
+                              </Badge>
+                              {i.url && (
+                                <Anchor
+                                  href={i.url}
+                                  target='_blank'
+                                  rel='noreferrer'
+                                >
+                                  <IconExternalLink size={14} />
+                                </Anchor>
+                              )}
+                            </Group>
                           </Stack>
                         </Group>
                       ))}
-                      {issuesLoading && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                      {issuesLoading && (
+                        <Group
+                          justify='center'
+                          my='sm'
+                        >
+                          <Loader size='xs' />
+                        </Group>
+                      )}
                       {!issuesLoading && issuesHasNext && (
-                        <Group justify="center" mt="xs"><Button variant="light" size="xs" onClick={() => fetchIssues(issuesState, issuesPage + 1)}>Load more issues</Button></Group>
+                        <Group
+                          justify='center'
+                          mt='xs'
+                        >
+                          <Button
+                            variant='light'
+                            size='xs'
+                            onClick={() => fetchIssues(issuesState, issuesPage + 1)}
+                          >
+                            Load more issues
+                          </Button>
+                        </Group>
                       )}
                     </Stack>
                   </ScrollArea.Autosize>
-                  <Group justify="flex-end" mt="sm">
-                    <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setIssueOpen(true)}>New issue</Button>
+                  <Group
+                    justify='flex-end'
+                    mt='sm'
+                  >
+                    <Button
+                      size='xs'
+                      variant='light'
+                      leftSection={<IconPlus size={14} />}
+                      onClick={() => setIssueOpen(true)}
+                    >
+                      New issue
+                    </Button>
                   </Group>
                 </Paper>
 
                 {/* Pull Requests / Merge Requests */}
-                <Paper withBorder p="sm" radius="sm">
-                  <Group gap="sm" justify="space-between" align="center">
-                    <Group gap="sm">
+                <Paper
+                  withBorder
+                  p='sm'
+                  radius='sm'
+                >
+                  <Group
+                    gap='sm'
+                    justify='space-between'
+                    align='center'
+                  >
+                    <Group gap='sm'>
                       <IconGitMerge size={16} />
-                      <Text fw={600}>{integration.provider === 'github' ? 'Pull requests' : 'Merge requests'}</Text>
+                      <Text fw={600}>
+                        {integration.provider === 'github' ? 'Pull requests' : 'Merge requests'}
+                      </Text>
                     </Group>
-                    <Select value={pullsState} onChange={(v) => { setPullsState(v); fetchPulls(v, 1); }} data={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'merged', label: 'Merged' }]} style={{ width: 140 }} />
+                    <Select
+                      value={pullsState}
+                      onChange={v => {
+                        setPullsState(v);
+                        fetchPulls(v, 1);
+                      }}
+                      data={[
+                        { value: 'open', label: 'Open' },
+                        { value: 'closed', label: 'Closed' },
+                        { value: 'merged', label: 'Merged' },
+                      ]}
+                      style={{ width: 140 }}
+                    />
                   </Group>
-                  <Divider my="xs" />
-                  <ScrollArea.Autosize mah={240} type="always" scrollbarSize={8}>
+                  <Divider my='xs' />
+                  <ScrollArea.Autosize
+                    mah={240}
+                    type='always'
+                    scrollbarSize={8}
+                  >
                     <Stack gap={8}>
-                      {pulls.map((p) => (
-                        <Group key={p.number} gap="xs" wrap="nowrap" justify="space-between" align="center">
-                          <Stack gap={2} style={{ flex: 1 }}>
-                            <Text size="sm" fw={600}>{p.title}</Text>
-                            <Group gap={6}><Badge size="xs" variant="light" color={p.state === 'open' || p.state === 'opened' ? 'green' : p.state === 'merged' ? 'blue' : 'gray'}>{p.state}</Badge>{p.url && (<Anchor href={p.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>)}</Group>
+                      {pulls.map(p => (
+                        <Group
+                          key={p.number}
+                          gap='xs'
+                          wrap='nowrap'
+                          justify='space-between'
+                          align='center'
+                        >
+                          <Stack
+                            gap={2}
+                            style={{ flex: 1 }}
+                          >
+                            <Text
+                              size='sm'
+                              fw={600}
+                            >
+                              {p.title}
+                            </Text>
+                            <Group gap={6}>
+                              <Badge
+                                size='xs'
+                                variant='light'
+                                color={
+                                  p.state === 'open' || p.state === 'opened'
+                                    ? 'green'
+                                    : p.state === 'merged'
+                                      ? 'blue'
+                                      : 'gray'
+                                }
+                              >
+                                {p.state}
+                              </Badge>
+                              {p.url && (
+                                <Anchor
+                                  href={p.url}
+                                  target='_blank'
+                                  rel='noreferrer'
+                                >
+                                  <IconExternalLink size={14} />
+                                </Anchor>
+                              )}
+                            </Group>
                           </Stack>
-                          <Group gap="xs">
-                            <Button size="xs" variant="light" onClick={() => openPrDetails(p.number)}>Details</Button>
-                            {(pullsState === 'open' || p.state === 'open' || p.state === 'opened') && (
-                              <Tooltip label="Merge now (strategy below)">
-                                <ActionIcon variant="light" color="green" onClick={() => mergePull(p.number)}><IconGitMerge size={16} /></ActionIcon>
+                          <Group gap='xs'>
+                            <Button
+                              size='xs'
+                              variant='light'
+                              onClick={() => openPrDetails(p.number)}
+                            >
+                              Details
+                            </Button>
+                            {(pullsState === 'open' ||
+                              p.state === 'open' ||
+                              p.state === 'opened') && (
+                              <Tooltip label='Merge now (strategy below)'>
+                                <ActionIcon
+                                  variant='light'
+                                  color='green'
+                                  onClick={() => mergePull(p.number)}
+                                >
+                                  <IconGitMerge size={16} />
+                                </ActionIcon>
                               </Tooltip>
                             )}
                           </Group>
                         </Group>
                       ))}
-                      {pullsLoading && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                      {pullsLoading && (
+                        <Group
+                          justify='center'
+                          my='sm'
+                        >
+                          <Loader size='xs' />
+                        </Group>
+                      )}
                       {!pullsLoading && pullsHasNext && (
-                        <Group justify="center" mt="xs"><Button variant="light" size="xs" onClick={() => fetchPulls(pullsState, pullsPage + 1)}>Load more {integration.provider === 'github' ? 'PRs' : 'MRs'}</Button></Group>
+                        <Group
+                          justify='center'
+                          mt='xs'
+                        >
+                          <Button
+                            variant='light'
+                            size='xs'
+                            onClick={() => fetchPulls(pullsState, pullsPage + 1)}
+                          >
+                            Load more {integration.provider === 'github' ? 'PRs' : 'MRs'}
+                          </Button>
+                        </Group>
                       )}
                     </Stack>
                   </ScrollArea.Autosize>
@@ -1074,69 +1679,242 @@ export default function VcsPanel({ projectId }) {
       )}
 
       {/* Create Issue Modal */}
-      <Modal opened={issueOpen} onClose={() => setIssueOpen(false)} title="Create issue" size="md">
+      <Modal
+        opened={issueOpen}
+        onClose={() => setIssueOpen(false)}
+        title='Create issue'
+        size='md'
+      >
         <Stack>
-          <TextInput label="Title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} required />
-          <Textarea label="Description" value={issueBody} onChange={(e) => setIssueBody(e.target.value)} minRows={4} autosize />
-          <Group justify="flex-end">
-            <Button onClick={createIssue} loading={creatingIssue} disabled={!issueTitle?.trim()}>Create</Button>
+          <TextInput
+            label='Title'
+            value={issueTitle}
+            onChange={e => setIssueTitle(e.target.value)}
+            required
+          />
+          <Textarea
+            label='Description'
+            value={issueBody}
+            onChange={e => setIssueBody(e.target.value)}
+            minRows={4}
+            autosize
+          />
+          <Group justify='flex-end'>
+            <Button
+              onClick={createIssue}
+              loading={creatingIssue}
+              disabled={!issueTitle?.trim()}
+            >
+              Create
+            </Button>
           </Group>
         </Stack>
       </Modal>
 
       {/* Open PR/MR Modal */}
-      <Modal opened={prOpen} onClose={() => setPrOpen(false)} title={integration?.provider === 'github' ? 'Open pull request' : 'Open merge request'} size="md">
+      <Modal
+        opened={prOpen}
+        onClose={() => setPrOpen(false)}
+        title={integration?.provider === 'github' ? 'Open pull request' : 'Open merge request'}
+        size='md'
+      >
         <Stack>
-          <Select label="Source branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prSource} onChange={setPrSource} placeholder="Select source branch (or owner:branch for forks)" />
-          <Select label="Target branch" data={branches.map(b => ({ value: b.name, label: b.name }))} searchable value={prTarget} onChange={setPrTarget} placeholder={defaultBranch || 'main'} />
-          <TextInput label="Title" value={prTitle} onChange={(e) => setPrTitle(e.target.value)} required />
-          <Textarea label="Description" value={prBody} onChange={(e) => setPrBody(e.target.value)} minRows={4} autosize />
+          <Select
+            label='Source branch'
+            data={branches.map(b => ({ value: b.name, label: b.name }))}
+            searchable
+            value={prSource}
+            onChange={setPrSource}
+            placeholder='Select source branch (or owner:branch for forks)'
+          />
+          <Select
+            label='Target branch'
+            data={branches.map(b => ({ value: b.name, label: b.name }))}
+            searchable
+            value={prTarget}
+            onChange={setPrTarget}
+            placeholder={defaultBranch || 'main'}
+          />
+          <TextInput
+            label='Title'
+            value={prTitle}
+            onChange={e => setPrTitle(e.target.value)}
+            required
+          />
+          <Textarea
+            label='Description'
+            value={prBody}
+            onChange={e => setPrBody(e.target.value)}
+            minRows={4}
+            autosize
+          />
           {integration?.provider === 'github' && (
-            <Switch checked={prDraft} onChange={(e) => setPrDraft(e.currentTarget.checked)} label="Create as draft" />
+            <Switch
+              checked={prDraft}
+              onChange={e => setPrDraft(e.currentTarget.checked)}
+              label='Create as draft'
+            />
           )}
-          <Group justify="flex-end">
-            <Button onClick={openPr} loading={creatingPr} disabled={!prSource?.trim() || !prTarget?.trim() || !prTitle?.trim()}>Open {integration?.provider === 'github' ? 'PR' : 'MR'}</Button>
+          <Group justify='flex-end'>
+            <Button
+              onClick={openPr}
+              loading={creatingPr}
+              disabled={!prSource?.trim() || !prTarget?.trim() || !prTitle?.trim()}
+            >
+              Open {integration?.provider === 'github' ? 'PR' : 'MR'}
+            </Button>
           </Group>
         </Stack>
       </Modal>
 
       {/* PR Details Modal */}
-      <Modal opened={prDetailsOpen} onClose={() => setPrDetailsOpen(false)} title="Request details" size="xl">
+      <Modal
+        opened={prDetailsOpen}
+        onClose={() => setPrDetailsOpen(false)}
+        title='Request details'
+        size='xl'
+      >
         {!prDetails || loadingPrDetails ? (
-          <Group justify="center" my="md"><Loader size="sm" /></Group>
+          <Group
+            justify='center'
+            my='md'
+          >
+            <Loader size='sm' />
+          </Group>
         ) : (
           <Stack>
-            <Group justify="space-between" align="flex-start">
+            <Group
+              justify='space-between'
+              align='flex-start'
+            >
               <Stack gap={2}>
                 <Text fw={600}>{prDetails.title}</Text>
                 <Group gap={6}>
-                  <Badge size="xs" variant="light" color={prDetails.state === 'open' || prDetails.state === 'opened' ? 'green' : prDetails.state === 'merged' ? 'blue' : 'gray'}>{prDetails.state}{prDetails.draft ? ' (draft)' : ''}</Badge>
+                  <Badge
+                    size='xs'
+                    variant='light'
+                    color={
+                      prDetails.state === 'open' || prDetails.state === 'opened'
+                        ? 'green'
+                        : prDetails.state === 'merged'
+                          ? 'blue'
+                          : 'gray'
+                    }
+                  >
+                    {prDetails.state}
+                    {prDetails.draft ? ' (draft)' : ''}
+                  </Badge>
                   {prDetails.mergeable !== null && (
-                    <Badge size="xs" variant="light" color={prDetails.mergeable ? 'green' : 'red'}>{prDetails.mergeable ? 'Mergeable' : 'Not mergeable'}</Badge>
+                    <Badge
+                      size='xs'
+                      variant='light'
+                      color={prDetails.mergeable ? 'green' : 'red'}
+                    >
+                      {prDetails.mergeable ? 'Mergeable' : 'Not mergeable'}
+                    </Badge>
                   )}
-                  {prDetails.url && <Anchor href={prDetails.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
+                  {prDetails.url && (
+                    <Anchor
+                      href={prDetails.url}
+                      target='_blank'
+                      rel='noreferrer'
+                    >
+                      <IconExternalLink size={14} />
+                    </Anchor>
+                  )}
                 </Group>
               </Stack>
-              <Stack gap={6} align="flex-end">
-                <Group gap="xs">
-                  <Button size="xs" variant="light" onClick={() => { setCompareBase(prDetails.base || ''); setCompareHead(prDetails.head || ''); setCompareOpen(true); }}>Compare</Button>
-                  <Tooltip label="Approve">
-                    <Button size="xs" color="green" variant="light" loading={submittingReview} onClick={() => submitReview('APPROVE')}>Approve</Button>
+              <Stack
+                gap={6}
+                align='flex-end'
+              >
+                <Group gap='xs'>
+                  <Button
+                    size='xs'
+                    variant='light'
+                    onClick={() => {
+                      setCompareBase(prDetails.base || '');
+                      setCompareHead(prDetails.head || '');
+                      setCompareOpen(true);
+                    }}
+                  >
+                    Compare
+                  </Button>
+                  <Tooltip label='Approve'>
+                    <Button
+                      size='xs'
+                      color='green'
+                      variant='light'
+                      loading={submittingReview}
+                      onClick={() => submitReview('APPROVE')}
+                    >
+                      Approve
+                    </Button>
                   </Tooltip>
-                  <Tooltip label="Request changes">
-                    <Button size="xs" color="red" variant="light" loading={submittingReview} onClick={() => submitReview('REQUEST_CHANGES')}>Request changes</Button>
+                  <Tooltip label='Request changes'>
+                    <Button
+                      size='xs'
+                      color='red'
+                      variant='light'
+                      loading={submittingReview}
+                      onClick={() => submitReview('REQUEST_CHANGES')}
+                    >
+                      Request changes
+                    </Button>
                   </Tooltip>
                 </Group>
-                <Group gap="xs" align="center">
-                  <Select data={[{ value: 'merge', label: 'Merge' }, { value: 'squash', label: 'Squash' }, { value: 'rebase', label: 'Rebase' }]} value={mergeStrategy} onChange={setMergeStrategy} size="xs" w={140} />
-                  <Button size="xs" color="green" variant="filled" onClick={() => mergePull(prDetails.number, mergeStrategy)} leftSection={<IconGitMerge size={14} />}>Merge</Button>
+                <Group
+                  gap='xs'
+                  align='center'
+                >
+                  <Select
+                    data={[
+                      { value: 'merge', label: 'Merge' },
+                      { value: 'squash', label: 'Squash' },
+                      { value: 'rebase', label: 'Rebase' },
+                    ]}
+                    value={mergeStrategy}
+                    onChange={setMergeStrategy}
+                    size='xs'
+                    w={140}
+                  />
+                  <Button
+                    size='xs'
+                    color='green'
+                    variant='filled'
+                    onClick={() => mergePull(prDetails.number, mergeStrategy)}
+                    leftSection={<IconGitMerge size={14} />}
+                  >
+                    Merge
+                  </Button>
                   {integration?.provider === 'github' && (
-                    <Tooltip label={prGating ? 'All required checks are passing' : 'Waiting for required checks to pass'}>
-                      <Button size="xs" variant="outline" color={prGating ? 'green' : 'gray'} disabled={!prGating} onClick={() => mergePull(prDetails.number, mergeStrategy)}>Merge when ready</Button>
+                    <Tooltip
+                      label={
+                        prGating
+                          ? 'All required checks are passing'
+                          : 'Waiting for required checks to pass'
+                      }
+                    >
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        color={prGating ? 'green' : 'gray'}
+                        disabled={!prGating}
+                        onClick={() => mergePull(prDetails.number, mergeStrategy)}
+                      >
+                        Merge when ready
+                      </Button>
                     </Tooltip>
                   )}
                   {integration?.provider === 'github' && prDetails?.draft && (
-                    <Button size="xs" variant="light" onClick={() => markReadyForReview(prDetails.number)} loading={markingReady}>Mark ready for review</Button>
+                    <Button
+                      size='xs'
+                      variant='light'
+                      onClick={() => markReadyForReview(prDetails.number)}
+                      loading={markingReady}
+                    >
+                      Mark ready for review
+                    </Button>
                   )}
                 </Group>
               </Stack>
@@ -1146,23 +1924,61 @@ export default function VcsPanel({ projectId }) {
 
             {/* Status checks */}
             <Stack>
-              <Group justify="space-between">
+              <Group justify='space-between'>
                 <Text fw={600}>Status checks</Text>
-                <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} loading={loadingStatuses} onClick={() => { fetchPrStatuses(prDetails.number); fetchRequiredChecks(prDetails.number); }}>Refresh statuses</Button>
+                <Button
+                  size='xs'
+                  variant='light'
+                  leftSection={<IconRefresh size={14} />}
+                  loading={loadingStatuses}
+                  onClick={() => {
+                    fetchPrStatuses(prDetails.number);
+                    fetchRequiredChecks(prDetails.number);
+                  }}
+                >
+                  Refresh statuses
+                </Button>
               </Group>
-              {prStatusSha && <Text size="xs" c="dimmed">Head SHA: {prStatusSha}</Text>}
+              {prStatusSha && (
+                <Text
+                  size='xs'
+                  c='dimmed'
+                >
+                  Head SHA: {prStatusSha}
+                </Text>
+              )}
               {requiredChecks.length > 0 && (
                 <Stack gap={6}>
-                  <Text size="sm" fw={600}>Required checks</Text>
+                  <Text
+                    size='sm'
+                    fw={600}
+                  >
+                    Required checks
+                  </Text>
                   <Stack>
-                    {requiredChecks.map((ctx) => {
+                    {requiredChecks.map(ctx => {
                       const st = prStatuses.find(s => s.context === ctx);
                       const state = st?.state || 'pending';
-                      const color = state === 'success' ? 'green' : (state === 'failure' || state === 'error') ? 'red' : state === 'pending' ? 'yellow' : 'gray';
+                      const color =
+                        state === 'success'
+                          ? 'green'
+                          : state === 'failure' || state === 'error'
+                            ? 'red'
+                            : state === 'pending'
+                              ? 'yellow'
+                              : 'gray';
                       return (
-                        <Group key={ctx} justify="space-between">
-                          <Text size="sm">{ctx}</Text>
-                          <Badge size="xs" color={color}>{state}</Badge>
+                        <Group
+                          key={ctx}
+                          justify='space-between'
+                        >
+                          <Text size='sm'>{ctx}</Text>
+                          <Badge
+                            size='xs'
+                            color={color}
+                          >
+                            {state}
+                          </Badge>
                         </Group>
                       );
                     })}
@@ -1171,16 +1987,42 @@ export default function VcsPanel({ projectId }) {
               )}
               <Stack>
                 {prStatuses.length === 0 ? (
-                  <Text c="dimmed">No statuses.</Text>
-                ) : prStatuses.map((s, idx) => (
-                  <Group key={idx} justify="space-between">
-                    <Text size="sm">{s.context}</Text>
-                    <Group gap={6}>
-                      <Badge size="xs" color={s.state === 'success' ? 'green' : s.state === 'failure' || s.state === 'error' ? 'red' : s.state === 'pending' ? 'yellow' : 'gray'}>{s.state}</Badge>
-                      {s.url && <Anchor href={s.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
+                  <Text c='dimmed'>No statuses.</Text>
+                ) : (
+                  prStatuses.map((s, idx) => (
+                    <Group
+                      key={idx}
+                      justify='space-between'
+                    >
+                      <Text size='sm'>{s.context}</Text>
+                      <Group gap={6}>
+                        <Badge
+                          size='xs'
+                          color={
+                            s.state === 'success'
+                              ? 'green'
+                              : s.state === 'failure' || s.state === 'error'
+                                ? 'red'
+                                : s.state === 'pending'
+                                  ? 'yellow'
+                                  : 'gray'
+                          }
+                        >
+                          {s.state}
+                        </Badge>
+                        {s.url && (
+                          <Anchor
+                            href={s.url}
+                            target='_blank'
+                            rel='noreferrer'
+                          >
+                            <IconExternalLink size={14} />
+                          </Anchor>
+                        )}
+                      </Group>
                     </Group>
-                  </Group>
-                ))}
+                  ))
+                )}
               </Stack>
             </Stack>
 
@@ -1188,32 +2030,72 @@ export default function VcsPanel({ projectId }) {
 
             {/* Reviewers picker */}
             <Stack>
-              <Group justify="space-between">
+              <Group justify='space-between'>
                 <Text fw={600}>Request reviewers</Text>
                 <Group>
                   {reviewersHasNext && (
-                    <Button size="xs" variant="subtle" onClick={() => fetchReviewers(prDetails.number, reviewersPage + 1)} loading={loadingReviewers}>Load more</Button>
+                    <Button
+                      size='xs'
+                      variant='subtle'
+                      onClick={() => fetchReviewers(prDetails.number, reviewersPage + 1)}
+                      loading={loadingReviewers}
+                    >
+                      Load more
+                    </Button>
                   )}
                 </Group>
               </Group>
               <MultiSelect
-                data={reviewers.map(r => ({ value: r.username, label: r.name ? `${r.name} (${r.username})` : r.username }))}
+                data={reviewers.map(r => ({
+                  value: r.username,
+                  label: r.name ? `${r.name} (${r.username})` : r.username,
+                }))}
                 value={selectedReviewerUsernames}
                 onChange={setSelectedReviewerUsernames}
                 searchable
-                placeholder="Select reviewers"
+                placeholder='Select reviewers'
               />
-              <Group justify="flex-end">
-                <Button size="xs" onClick={addSelectedReviewers} loading={addingReviewers} disabled={selectedReviewerUsernames.length === 0}>Request reviewers</Button>
+              <Group justify='flex-end'>
+                <Button
+                  size='xs'
+                  onClick={addSelectedReviewers}
+                  loading={addingReviewers}
+                  disabled={selectedReviewerUsernames.length === 0}
+                >
+                  Request reviewers
+                </Button>
               </Group>
               {prDetails.requested_reviewers?.length > 0 && (
-                <Group gap={6} wrap="wrap">
-                  <Text size="sm" fw={600}>Requested:</Text>
+                <Group
+                  gap={6}
+                  wrap='wrap'
+                >
+                  <Text
+                    size='sm'
+                    fw={600}
+                  >
+                    Requested:
+                  </Text>
                   {prDetails.requested_reviewers.map(u => (
-                    <Group key={u} gap={4} align="center">
-                      <Badge size="xs" variant="light">{u}</Badge>
-                      <Tooltip label="Re-request review">
-                        <ActionIcon size="xs" variant="subtle" onClick={() => reRequestReviewer(u)}><IconRefresh size={14} /></ActionIcon>
+                    <Group
+                      key={u}
+                      gap={4}
+                      align='center'
+                    >
+                      <Badge
+                        size='xs'
+                        variant='light'
+                      >
+                        {u}
+                      </Badge>
+                      <Tooltip label='Re-request review'>
+                        <ActionIcon
+                          size='xs'
+                          variant='subtle'
+                          onClick={() => reRequestReviewer(u)}
+                        >
+                          <IconRefresh size={14} />
+                        </ActionIcon>
                       </Tooltip>
                     </Group>
                   ))}
@@ -1228,22 +2110,74 @@ export default function VcsPanel({ projectId }) {
               <Text fw={600}>Comments</Text>
               <Stack>
                 {prComments.map(c => (
-                  <Paper key={c.id} withBorder p="sm" radius="sm">
-                    <Group justify="space-between">
-                      <Text size="sm" fw={600}>{c.user || 'User'}</Text>
-                      <Text size="xs" c="dimmed">{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</Text>
+                  <Paper
+                    key={c.id}
+                    withBorder
+                    p='sm'
+                    radius='sm'
+                  >
+                    <Group justify='space-between'>
+                      <Text
+                        size='sm'
+                        fw={600}
+                      >
+                        {c.user || 'User'}
+                      </Text>
+                      <Text
+                        size='xs'
+                        c='dimmed'
+                      >
+                        {c.created_at ? new Date(c.created_at).toLocaleString() : ''}
+                      </Text>
                     </Group>
-                    <Text size="sm" mt={4}>{c.body}</Text>
+                    <Text
+                      size='sm'
+                      mt={4}
+                    >
+                      {c.body}
+                    </Text>
                   </Paper>
                 ))}
-                {loadingPrComments && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                {loadingPrComments && (
+                  <Group
+                    justify='center'
+                    my='sm'
+                  >
+                    <Loader size='xs' />
+                  </Group>
+                )}
                 {!loadingPrComments && prCommentsHasNext && (
-                  <Group justify="center"><Button size="xs" variant="light" onClick={() => fetchPrComments(prDetails.number, prCommentsPage + 1)}>Load more comments</Button></Group>
+                  <Group justify='center'>
+                    <Button
+                      size='xs'
+                      variant='light'
+                      onClick={() => fetchPrComments(prDetails.number, prCommentsPage + 1)}
+                    >
+                      Load more comments
+                    </Button>
+                  </Group>
                 )}
               </Stack>
-              <Group align="flex-end" wrap="nowrap">
-                <Textarea label="Add a comment / review note" value={newComment} onChange={(e) => setNewComment(e.target.value)} autosize minRows={2} style={{ flex: 1 }} />
-                <Button variant="light" onClick={addPrComment} loading={submittingComment} disabled={!newComment.trim()}>Comment</Button>
+              <Group
+                align='flex-end'
+                wrap='nowrap'
+              >
+                <Textarea
+                  label='Add a comment / review note'
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                  autosize
+                  minRows={2}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  variant='light'
+                  onClick={addPrComment}
+                  loading={submittingComment}
+                  disabled={!newComment.trim()}
+                >
+                  Comment
+                </Button>
               </Group>
             </Stack>
           </Stack>
@@ -1251,17 +2185,45 @@ export default function VcsPanel({ projectId }) {
       </Modal>
 
       {/* Issue Details Modal */}
-      <Modal opened={issueDetailsOpen} onClose={() => setIssueDetailsOpen(false)} title="Issue details" size="lg">
+      <Modal
+        opened={issueDetailsOpen}
+        onClose={() => setIssueDetailsOpen(false)}
+        title='Issue details'
+        size='lg'
+      >
         {!issueDetails ? (
-          <Group justify="center" my="md"><Loader size="sm" /></Group>
+          <Group
+            justify='center'
+            my='md'
+          >
+            <Loader size='sm' />
+          </Group>
         ) : (
           <Stack>
-            <Group justify="space-between">
+            <Group justify='space-between'>
               <Stack gap={2}>
                 <Text fw={600}>{issueDetails.title}</Text>
                 <Group gap={6}>
-                  <Badge size="xs" variant="light" color={issueDetails.state === 'open' || issueDetails.state === 'opened' ? 'green' : 'gray'}>{issueDetails.state}</Badge>
-                  {issueDetails.url && <Anchor href={issueDetails.url} target="_blank" rel="noreferrer"><IconExternalLink size={14} /></Anchor>}
+                  <Badge
+                    size='xs'
+                    variant='light'
+                    color={
+                      issueDetails.state === 'open' || issueDetails.state === 'opened'
+                        ? 'green'
+                        : 'gray'
+                    }
+                  >
+                    {issueDetails.state}
+                  </Badge>
+                  {issueDetails.url && (
+                    <Anchor
+                      href={issueDetails.url}
+                      target='_blank'
+                      rel='noreferrer'
+                    >
+                      <IconExternalLink size={14} />
+                    </Anchor>
+                  )}
                 </Group>
               </Stack>
             </Group>
@@ -1270,22 +2232,74 @@ export default function VcsPanel({ projectId }) {
               <Text fw={600}>Comments</Text>
               <Stack>
                 {issueComments.map(c => (
-                  <Paper key={c.id} withBorder p="sm" radius="sm">
-                    <Group justify="space-between">
-                      <Text size="sm" fw={600}>{c.user || 'User'}</Text>
-                      <Text size="xs" c="dimmed">{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</Text>
+                  <Paper
+                    key={c.id}
+                    withBorder
+                    p='sm'
+                    radius='sm'
+                  >
+                    <Group justify='space-between'>
+                      <Text
+                        size='sm'
+                        fw={600}
+                      >
+                        {c.user || 'User'}
+                      </Text>
+                      <Text
+                        size='xs'
+                        c='dimmed'
+                      >
+                        {c.created_at ? new Date(c.created_at).toLocaleString() : ''}
+                      </Text>
                     </Group>
-                    <Text size="sm" mt={4}>{c.body}</Text>
+                    <Text
+                      size='sm'
+                      mt={4}
+                    >
+                      {c.body}
+                    </Text>
                   </Paper>
                 ))}
-                {loadingIssueComments && <Group justify="center" my="sm"><Loader size="xs" /></Group>}
+                {loadingIssueComments && (
+                  <Group
+                    justify='center'
+                    my='sm'
+                  >
+                    <Loader size='xs' />
+                  </Group>
+                )}
                 {!loadingIssueComments && issueCommentsHasNext && (
-                  <Group justify="center"><Button size="xs" variant="light" onClick={() => fetchIssueComments(issueDetails.id, issueCommentsPage + 1)}>Load more comments</Button></Group>
+                  <Group justify='center'>
+                    <Button
+                      size='xs'
+                      variant='light'
+                      onClick={() => fetchIssueComments(issueDetails.id, issueCommentsPage + 1)}
+                    >
+                      Load more comments
+                    </Button>
+                  </Group>
                 )}
               </Stack>
-              <Group align="flex-end" wrap="nowrap">
-                <Textarea label="Add a comment" value={newIssueComment} onChange={(e) => setNewIssueComment(e.target.value)} autosize minRows={2} style={{ flex: 1 }} />
-                <Button variant="light" onClick={addIssueComment} loading={submittingIssueComment} disabled={!newIssueComment.trim()}>Comment</Button>
+              <Group
+                align='flex-end'
+                wrap='nowrap'
+              >
+                <Textarea
+                  label='Add a comment'
+                  value={newIssueComment}
+                  onChange={e => setNewIssueComment(e.target.value)}
+                  autosize
+                  minRows={2}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  variant='light'
+                  onClick={addIssueComment}
+                  loading={submittingIssueComment}
+                  disabled={!newIssueComment.trim()}
+                >
+                  Comment
+                </Button>
               </Group>
             </Stack>
           </Stack>
@@ -1293,97 +2307,331 @@ export default function VcsPanel({ projectId }) {
       </Modal>
 
       {/* Compare Modal */}
-      <Modal opened={compareOpen} onClose={() => setCompareOpen(false)} title="Compare" size={compareFullScreen ? '90%' : 'xl'} centered radius="md" overlayProps={{ opacity: 0.55, blur: 2 }}>
+      <Modal
+        opened={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        title='Compare'
+        size={compareFullScreen ? '90%' : 'xl'}
+        centered
+        radius='md'
+        overlayProps={{ opacity: 0.55, blur: 2 }}
+      >
         <Stack>
           <Group grow>
-            <TextInput label="Base" placeholder="target branch or owner:branch" value={compareBase} onChange={(e) => setCompareBase(e.target.value)} />
-            <TextInput label="Head" placeholder="source branch or owner:branch" value={compareHead} onChange={(e) => setCompareHead(e.target.value)} />
+            <TextInput
+              label='Base'
+              placeholder='target branch or owner:branch'
+              value={compareBase}
+              onChange={e => setCompareBase(e.target.value)}
+            />
+            <TextInput
+              label='Head'
+              placeholder='source branch or owner:branch'
+              value={compareHead}
+              onChange={e => setCompareHead(e.target.value)}
+            />
           </Group>
-          <Group gap="xs" align="flex-end">
-            <TextInput label="PR number" placeholder="e.g. 123" value={comparePrNumber} onChange={(e) => setComparePrNumber(e.target.value)} style={{ width: 140 }} />
-            <Button variant="light" onClick={loadCompareFromPr} loading={loadingCompareFromPr} disabled={!String(comparePrNumber || '').trim()}>Load from PR</Button>
+          <Group
+            gap='xs'
+            align='flex-end'
+          >
+            <TextInput
+              label='PR number'
+              placeholder='e.g. 123'
+              value={comparePrNumber}
+              onChange={e => setComparePrNumber(e.target.value)}
+              style={{ width: 140 }}
+            />
+            <Button
+              variant='light'
+              onClick={loadCompareFromPr}
+              loading={loadingCompareFromPr}
+              disabled={!String(comparePrNumber || '').trim()}
+            >
+              Load from PR
+            </Button>
             <div style={{ flex: 1 }} />
-            <Button onClick={doCompare} loading={compareLoading} disabled={!compareBase.trim() || !compareHead.trim()}>Compare</Button>
+            <Button
+              onClick={doCompare}
+              loading={compareLoading}
+              disabled={!compareBase.trim() || !compareHead.trim()}
+            >
+              Compare
+            </Button>
           </Group>
-          <Group justify="space-between" align="center">
-            <SegmentedControl size="xs" value={diffMode} onChange={setDiffMode} data={[{ value: 'unified', label: 'Unified' }, { value: 'side-by-side', label: 'Side by side' }]} />
+          <Group
+            justify='space-between'
+            align='center'
+          >
+            <SegmentedControl
+              size='xs'
+              value={diffMode}
+              onChange={setDiffMode}
+              data={[
+                { value: 'unified', label: 'Unified' },
+                { value: 'side-by-side', label: 'Side by side' },
+              ]}
+            />
             <Group>
-              <Switch size="xs" checked={colorfulDiff} onChange={(e) => setColorfulDiff(e.currentTarget.checked)} label="Colorful" />
-              <Button size="xs" variant="light" onClick={() => setCompareFullScreen(v => !v)}>{compareFullScreen ? 'Standard size' : 'Expand'}</Button>
-              <Button size="xs" variant="light" onClick={expandAllFiles} disabled={!compareFiles || compareFiles.length === 0}>Expand all</Button>
-              <Button size="xs" variant="light" onClick={collapseAllFiles} disabled={expandedFiles.length === 0}>Collapse all</Button>
-              <Button size="xs" variant="light" onClick={copyAllPatches} disabled={!compareFiles || compareFiles.length === 0}>Copy all patches</Button>
+              <Switch
+                size='xs'
+                checked={colorfulDiff}
+                onChange={e => setColorfulDiff(e.currentTarget.checked)}
+                label='Colorful'
+              />
+              <Button
+                size='xs'
+                variant='light'
+                onClick={() => setCompareFullScreen(v => !v)}
+              >
+                {compareFullScreen ? 'Standard size' : 'Expand'}
+              </Button>
+              <Button
+                size='xs'
+                variant='light'
+                onClick={expandAllFiles}
+                disabled={!compareFiles || compareFiles.length === 0}
+              >
+                Expand all
+              </Button>
+              <Button
+                size='xs'
+                variant='light'
+                onClick={collapseAllFiles}
+                disabled={expandedFiles.length === 0}
+              >
+                Collapse all
+              </Button>
+              <Button
+                size='xs'
+                variant='light'
+                onClick={copyAllPatches}
+                disabled={!compareFiles || compareFiles.length === 0}
+              >
+                Copy all patches
+              </Button>
             </Group>
           </Group>
           {compareLoading ? (
-            <Group justify="center" my="md"><Loader size="sm" /></Group>
+            <Group
+              justify='center'
+              my='md'
+            >
+              <Loader size='sm' />
+            </Group>
           ) : (
             <Stack>
-              <Paper withBorder p="sm" radius="sm">
-                <Text fw={600} mb={6}>Commits</Text>
-                <ScrollArea.Autosize mah={200} type="always" scrollbarSize={10}>
+              <Paper
+                withBorder
+                p='sm'
+                radius='sm'
+              >
+                <Text
+                  fw={600}
+                  mb={6}
+                >
+                  Commits
+                </Text>
+                <ScrollArea.Autosize
+                  mah={200}
+                  type='always'
+                  scrollbarSize={10}
+                >
                   <Stack gap={6}>
-                    {compareCommits.length === 0 && <Text c="dimmed">No commits.</Text>}
+                    {compareCommits.length === 0 && <Text c='dimmed'>No commits.</Text>}
                     {compareCommits.map(c => (
                       <div key={c.sha}>
-                        <Text size="sm" fw={600}>{c.message}</Text>
-                        <Text size="xs" c="dimmed">{c.sha.substring(0,7)} · {c.author || 'Unknown'} · {c.date ? new Date(c.date).toLocaleString() : ''}</Text>
+                        <Text
+                          size='sm'
+                          fw={600}
+                        >
+                          {c.message}
+                        </Text>
+                        <Text
+                          size='xs'
+                          c='dimmed'
+                        >
+                          {c.sha.substring(0, 7)} · {c.author || 'Unknown'} ·{' '}
+                          {c.date ? new Date(c.date).toLocaleString() : ''}
+                        </Text>
                       </div>
                     ))}
                   </Stack>
                 </ScrollArea.Autosize>
               </Paper>
 
-              <Paper withBorder p="sm" radius="sm">
-                <Text fw={600} mb={6}>Files</Text>
-                {(!compareFiles || compareFiles.length === 0) ? (
-                  <Text c="dimmed">No file changes.</Text>
+              <Paper
+                withBorder
+                p='sm'
+                radius='sm'
+              >
+                <Text
+                  fw={600}
+                  mb={6}
+                >
+                  Files
+                </Text>
+                {!compareFiles || compareFiles.length === 0 ? (
+                  <Text c='dimmed'>No file changes.</Text>
                 ) : (
-                  <Accordion multiple value={expandedFiles} onChange={setExpandedFiles} styles={{ item: { borderColor: 'var(--mantine-color-dark-5)' } }}>
-                    {compareFiles.map((f) => (
-                      <Accordion.Item key={f.filename} value={f.filename}>
+                  <Accordion
+                    multiple
+                    value={expandedFiles}
+                    onChange={setExpandedFiles}
+                    styles={{ item: { borderColor: 'var(--mantine-color-dark-5)' } }}
+                  >
+                    {compareFiles.map(f => (
+                      <Accordion.Item
+                        key={f.filename}
+                        value={f.filename}
+                      >
                         <Accordion.Control>
-                          <Group justify="space-between" wrap="nowrap">
-                            <Text size="sm">{f.filename}</Text>
+                          <Group
+                            justify='space-between'
+                            wrap='nowrap'
+                          >
+                            <Text size='sm'>{f.filename}</Text>
                             <Group gap={6}>
-                              <Badge size="xs" color="green" variant="light">+{f.additions ?? 0}</Badge>
-                              <Badge size="xs" color="red" variant="light">-{f.deletions ?? 0}</Badge>
-                              <Button size="xs" variant="subtle" onClick={(e) => { e.stopPropagation(); setFocusFile({ filename: f.filename, patch: f.patch || '', additions: f.additions ?? 0, deletions: f.deletions ?? 0 }); }}>Open</Button>
+                              <Badge
+                                size='xs'
+                                color='green'
+                                variant='light'
+                              >
+                                +{f.additions ?? 0}
+                              </Badge>
+                              <Badge
+                                size='xs'
+                                color='red'
+                                variant='light'
+                              >
+                                -{f.deletions ?? 0}
+                              </Badge>
+                              <Button
+                                size='xs'
+                                variant='subtle'
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setFocusFile({
+                                    filename: f.filename,
+                                    patch: f.patch || '',
+                                    additions: f.additions ?? 0,
+                                    deletions: f.deletions ?? 0,
+                                  });
+                                }}
+                              >
+                                Open
+                              </Button>
                             </Group>
                           </Group>
                         </Accordion.Control>
                         <Accordion.Panel>
-                          <DiffViewer filename={f.filename} patch={f.patch || ''} mode={diffMode} additions={f.additions ?? 0} deletions={f.deletions ?? 0} colorful={colorfulDiff} height={compareFullScreen ? '60vh' : 360} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${f.filename} copied` })} />
+                          <DiffViewer
+                            filename={f.filename}
+                            patch={f.patch || ''}
+                            mode={diffMode}
+                            additions={f.additions ?? 0}
+                            deletions={f.deletions ?? 0}
+                            colorful={colorfulDiff}
+                            height={compareFullScreen ? '60vh' : 360}
+                            onCopy={() =>
+                              showNotification({
+                                color: 'green',
+                                title: 'Copied',
+                                message: `Patch for ${f.filename} copied`,
+                              })
+                            }
+                          />
                           {(prDetails?.number || comparePrNumber) && (
-                            <Stack mt="sm">
-                              <Group justify="space-between">
-                                <Text fw={600} size="sm">Review comments</Text>
+                            <Stack mt='sm'>
+                              <Group justify='space-between'>
+                                <Text
+                                  fw={600}
+                                  size='sm'
+                                >
+                                  Review comments
+                                </Text>
                                 {reviewCommentsHasNext && (
-                                  <Button size="xs" variant="subtle" onClick={() => fetchPullReviewComments(prDetails?.number || comparePrNumber, reviewCommentsPage + 1)} loading={loadingReviewThreads}>Load more</Button>
+                                  <Button
+                                    size='xs'
+                                    variant='subtle'
+                                    onClick={() =>
+                                      fetchPullReviewComments(
+                                        prDetails?.number || comparePrNumber,
+                                        reviewCommentsPage + 1
+                                      )
+                                    }
+                                    loading={loadingReviewThreads}
+                                  >
+                                    Load more
+                                  </Button>
                                 )}
                               </Group>
                               {(() => {
-                                const fileThreads = groupReviewThreadsByFile.get(f.filename) || new Map();
+                                const fileThreads =
+                                  groupReviewThreadsByFile.get(f.filename) || new Map();
                                 const tids = Array.from(fileThreads.keys());
-                                if (tids.length === 0) return <Text c="dimmed">No review comments for this file.</Text>;
+                                if (tids.length === 0)
+                                  return <Text c='dimmed'>No review comments for this file.</Text>;
                                 return (
                                   <Stack>
-                                    {tids.map((tid) => (
-                                      <Paper key={tid} withBorder p="xs" radius="sm">
+                                    {tids.map(tid => (
+                                      <Paper
+                                        key={tid}
+                                        withBorder
+                                        p='xs'
+                                        radius='sm'
+                                      >
                                         <Stack gap={6}>
-                                          {(fileThreads.get(tid) || []).map((cmt) => (
+                                          {(fileThreads.get(tid) || []).map(cmt => (
                                             <div key={cmt.id}>
-                                              <Group justify="space-between">
-                                                <Text size="sm" fw={600}>{cmt.user || 'User'}</Text>
-                                                <Text size="xs" c="dimmed">{cmt.created_at ? new Date(cmt.created_at).toLocaleString() : ''}</Text>
+                                              <Group justify='space-between'>
+                                                <Text
+                                                  size='sm'
+                                                  fw={600}
+                                                >
+                                                  {cmt.user || 'User'}
+                                                </Text>
+                                                <Text
+                                                  size='xs'
+                                                  c='dimmed'
+                                                >
+                                                  {cmt.created_at
+                                                    ? new Date(cmt.created_at).toLocaleString()
+                                                    : ''}
+                                                </Text>
                                               </Group>
-                                              <Text size="sm" mt={2}>{cmt.body}</Text>
+                                              <Text
+                                                size='sm'
+                                                mt={2}
+                                              >
+                                                {cmt.body}
+                                              </Text>
                                             </div>
                                           ))}
                                           {prDetails && (
-                                            <Group align="flex-end" wrap="nowrap">
-                                              <TextInput placeholder="Reply" value={replyBodies[tid] || ''} onChange={(e) => setReplyBodies(prev => ({ ...prev, [tid]: e.target.value }))} style={{ flex: 1 }} />
-                                              <Button size="xs" variant="light" onClick={() => replyToThread(tid)} disabled={!((replyBodies[tid] || '').trim())}>Reply</Button>
+                                            <Group
+                                              align='flex-end'
+                                              wrap='nowrap'
+                                            >
+                                              <TextInput
+                                                placeholder='Reply'
+                                                value={replyBodies[tid] || ''}
+                                                onChange={e =>
+                                                  setReplyBodies(prev => ({
+                                                    ...prev,
+                                                    [tid]: e.target.value,
+                                                  }))
+                                                }
+                                                style={{ flex: 1 }}
+                                              />
+                                              <Button
+                                                size='xs'
+                                                variant='light'
+                                                onClick={() => replyToThread(tid)}
+                                                disabled={!(replyBodies[tid] || '').trim()}
+                                              >
+                                                Reply
+                                              </Button>
                                             </Group>
                                           )}
                                         </Stack>
@@ -1402,24 +2650,80 @@ export default function VcsPanel({ projectId }) {
               </Paper>
             </Stack>
           )}
-          <Group justify="space-between" mt="sm">
+          <Group
+            justify='space-between'
+            mt='sm'
+          >
             <Group>
-              <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={exportCompareCSV}>Export CSV</Button>
-              <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={exportCompareJSON}>Export JSON</Button>
+              <Button
+                size='xs'
+                variant='light'
+                leftSection={<IconDownload size={14} />}
+                onClick={exportCompareCSV}
+              >
+                Export CSV
+              </Button>
+              <Button
+                size='xs'
+                variant='light'
+                leftSection={<IconDownload size={14} />}
+                onClick={exportCompareJSON}
+              >
+                Export JSON
+              </Button>
             </Group>
           </Group>
         </Stack>
       </Modal>
 
       {/* Focused file modal (large, centered) */}
-      <Modal opened={!!focusFile} onClose={() => setFocusFile(null)} title={focusFile?.filename || 'File'} size="90%" centered radius="md" overlayProps={{ opacity: 0.55, blur: 2 }}>
-         {focusFile && (
-           <Stack>
--            <DiffViewer filename={focusFile.filename} patch={focusFile.patch} mode={diffMode} additions={focusFile.additions} deletions={focusFile.deletions} colorful={true} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${focusFile.filename} copied` })} />
-+            <DiffViewer filename={focusFile.filename} patch={focusFile.patch} mode={diffMode} additions={focusFile.additions} deletions={focusFile.deletions} colorful={true} height={'75vh'} onCopy={() => showNotification({ color: 'green', title: 'Copied', message: `Patch for ${focusFile.filename} copied` })} />
-           </Stack>
-         )}
-       </Modal>
+      <Modal
+        opened={!!focusFile}
+        onClose={() => setFocusFile(null)}
+        title={focusFile?.filename || 'File'}
+        size='90%'
+        centered
+        radius='md'
+        overlayProps={{ opacity: 0.55, blur: 2 }}
+      >
+        {focusFile && (
+          <Stack>
+            -{' '}
+            <DiffViewer
+              filename={focusFile.filename}
+              patch={focusFile.patch}
+              mode={diffMode}
+              additions={focusFile.additions}
+              deletions={focusFile.deletions}
+              colorful={true}
+              onCopy={() =>
+                showNotification({
+                  color: 'green',
+                  title: 'Copied',
+                  message: `Patch for ${focusFile.filename} copied`,
+                })
+              }
+            />
+            +{' '}
+            <DiffViewer
+              filename={focusFile.filename}
+              patch={focusFile.patch}
+              mode={diffMode}
+              additions={focusFile.additions}
+              deletions={focusFile.deletions}
+              colorful={true}
+              height={'75vh'}
+              onCopy={() =>
+                showNotification({
+                  color: 'green',
+                  title: 'Copied',
+                  message: `Patch for ${focusFile.filename} copied`,
+                })
+              }
+            />
+          </Stack>
+        )}
+      </Modal>
     </Paper>
   );
 }

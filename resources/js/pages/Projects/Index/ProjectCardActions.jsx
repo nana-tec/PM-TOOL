@@ -1,81 +1,116 @@
-import { openConfirmModal } from "@/components/ConfirmModal";
-import useForm from "@/hooks/useForm";
-import { router } from "@inertiajs/react";
-import { ActionIcon, Menu, rem } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconDots, IconPencil, IconUsers, IconTable, IconFolders, IconListDetails } from "@tabler/icons-react";
-import UserAccessModal from "./Modals/UserAccessModal.jsx";
+import { openConfirmModal } from '@/components/ConfirmModal';
+import useForm from '@/hooks/useForm';
+import { router } from '@inertiajs/react';
+import { ActionIcon, Menu, rem } from '@mantine/core';
+import {
+  IconArchive,
+  IconArchiveOff,
+  IconDots,
+  IconPencil,
+  IconUsers,
+  IconTable,
+  IconFolders,
+  IconListDetails,
+} from '@tabler/icons-react';
+import UserAccessModal from './Modals/UserAccessModal.jsx';
 
 export default function ProjectCardActions({ item }) {
-  const [archiveForm] = useForm("delete", route("projects.destroy", item.id));
-  const [restoreForm] = useForm("post", route("projects.restore", item.id));
+  const [archiveForm] = useForm('delete', route('projects.destroy', item.id));
+  const [restoreForm] = useForm('post', route('projects.restore', item.id));
 
   const openArchiveModal = () =>
     openConfirmModal({
-      type: "danger",
-      title: "Archive project",
+      type: 'danger',
+      title: 'Archive project',
       content: `Are you sure you want to archive this project? This action will prevent users from accessing it.`,
-      confirmLabel: "Archive",
-      confirmProps: { color: "red" },
+      confirmLabel: 'Archive',
+      confirmProps: { color: 'red' },
       onConfirm: () => archiveForm.submit({ preserveScroll: true }),
     });
 
   const openRestoreModal = () =>
     openConfirmModal({
-      type: "info",
-      title: "Restore project",
+      type: 'info',
+      title: 'Restore project',
       content: `Are you sure you want to restore this project?`,
-      confirmLabel: "Restore",
-      confirmProps: { color: "blue" },
+      confirmLabel: 'Restore',
+      confirmProps: { color: 'blue' },
       onConfirm: () => restoreForm.submit({ preserveScroll: true }),
     });
 
   const openUserAccess = () => UserAccessModal(item);
-  const openGantt = () => router.visit(route("projects.tasks", item.id) + "?view=gantt");
-  const openTasks = () => router.visit(route("projects.tasks", item.id));
-  const openSubprojects = () => router.visit(route("projects.open", item.id));
+  const openGantt = () => router.visit(route('projects.tasks', item.id) + '?view=gantt');
+  const openTasks = () => router.visit(route('projects.tasks', item.id));
+  const openSubprojects = () => router.visit(route('projects.open', item.id));
 
   return (
     <>
-      {(can("edit project user access") ||
-        can("edit project") ||
-        can("restore project") ||
-        can("archive project")) && (
+      {(can('edit project user access') ||
+        can('edit project') ||
+        can('restore project') ||
+        can('archive project')) && (
         <Menu
           withArrow
-          position="bottom-end"
-          shadow="md"
-          transitionProps={{ duration: 100, transition: "pop-top-right" }}
+          position='bottom-end'
+          shadow='md'
+          transitionProps={{ duration: 100, transition: 'pop-top-right' }}
           offset={{ mainAxis: 3, alignmentAxis: 5 }}
           data-ignore-link
         >
           <Menu.Target>
-            <ActionIcon variant="subtle" color="gray" data-ignore-link>
-              <IconDots style={{ width: rem(20), height: rem(20) }} stroke={1.5} data-ignore-link />
+            <ActionIcon
+              variant='subtle'
+              color='gray'
+              data-ignore-link
+            >
+              <IconDots
+                style={{ width: rem(20), height: rem(20) }}
+                stroke={1.5}
+                data-ignore-link
+              />
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
             <Menu.Item
-              leftSection={<IconListDetails style={{ width: rem(16), height: rem(16) }} stroke={1.5} data-ignore-link />}
+              leftSection={
+                <IconListDetails
+                  style={{ width: rem(16), height: rem(16) }}
+                  stroke={1.5}
+                  data-ignore-link
+                />
+              }
               onClick={openTasks}
               data-ignore-link
             >
               View tasks
             </Menu.Item>
             <Menu.Item
-              leftSection={<IconFolders style={{ width: rem(16), height: rem(16) }} stroke={1.5} data-ignore-link />}
+              leftSection={
+                <IconFolders
+                  style={{ width: rem(16), height: rem(16) }}
+                  stroke={1.5}
+                  data-ignore-link
+                />
+              }
               onClick={openSubprojects}
               data-ignore-link
             >
               Open subprojects
             </Menu.Item>
             <Menu.Item
-              leftSection={<IconTable style={{ width: rem(16), height: rem(16) }} stroke={1.5} data-ignore-link />}
+              leftSection={
+                <IconTable
+                  style={{ width: rem(16), height: rem(16) }}
+                  stroke={1.5}
+                  data-ignore-link
+                />
+              }
               onClick={openGantt}
               data-ignore-link
             >
               Open Gantt
             </Menu.Item>
-            {can("edit project user access") && (
+            {can('edit project user access') && (
               <Menu.Item
                 leftSection={
                   <IconUsers
@@ -90,7 +125,7 @@ export default function ProjectCardActions({ item }) {
                 User access
               </Menu.Item>
             )}
-            {can("edit project") && (
+            {can('edit project') && (
               <Menu.Item
                 leftSection={
                   <IconPencil
@@ -99,13 +134,13 @@ export default function ProjectCardActions({ item }) {
                     data-ignore-link
                   />
                 }
-                onClick={() => router.visit(route("projects.edit", item.id))}
+                onClick={() => router.visit(route('projects.edit', item.id))}
                 data-ignore-link
               >
                 Edit
               </Menu.Item>
             )}
-            {can("restore project") && route().params.archived && (
+            {can('restore project') && route().params.archived && (
               <Menu.Item
                 leftSection={
                   <IconArchiveOff
@@ -114,14 +149,14 @@ export default function ProjectCardActions({ item }) {
                     data-ignore-link
                   />
                 }
-                color="blue"
+                color='blue'
                 onClick={openRestoreModal}
                 data-ignore-link
               >
                 Restore
               </Menu.Item>
             )}
-            {can("archive project") && !route().params.archived && (
+            {can('archive project') && !route().params.archived && (
               <Menu.Item
                 leftSection={
                   <IconArchive
@@ -130,7 +165,7 @@ export default function ProjectCardActions({ item }) {
                     data-ignore-link
                   />
                 }
-                color="red"
+                color='red'
                 onClick={openArchiveModal}
                 data-ignore-link
               >

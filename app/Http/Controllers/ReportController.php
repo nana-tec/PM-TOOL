@@ -230,6 +230,15 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(DISTINCT project_id) AS cnt')
             ->pluck('cnt', 'user_id');
 
+        $subProjectCounts = DB::table('tasks')
+            ->join('projects', 'projects.id', '=', 'tasks.project_id')
+            ->whereIn('assigned_to_user_id', $userIds)
+            ->whereNull('tasks.archived_at')
+            ->whereNotNull('projects.parent_id')
+            ->groupBy('assigned_to_user_id')
+            ->selectRaw('assigned_to_user_id AS user_id, COUNT(DISTINCT projects.parent_id) AS cnt')
+            ->pluck('cnt', 'user_id');
+
         $nearestDue = (clone $tasksBase)
             ->whereNull('tasks.completed_at')
             ->whereNotNull('tasks.due_on')
@@ -278,7 +287,7 @@ class ReportController extends Controller
 
         $members = $users->map(function ($user) use (
             $completedCounts, $pendingCounts, $overdueCounts,
-            $subCompleted, $subPending, $projectCounts, $nearestDue,
+            $subCompleted, $subPending, $projectCounts, $subProjectCounts, $nearestDue,
             $taskRows, $subTaskRows
         ) {
             $completed = (int) ($completedCounts[$user->id] ?? 0);
@@ -287,6 +296,7 @@ class ReportController extends Controller
             $subDone = (int) ($subCompleted[$user->id] ?? 0);
             $subPend = (int) ($subPending[$user->id] ?? 0);
             $projects = (int) ($projectCounts[$user->id] ?? 0);
+            $subProjects = (int) ($subProjectCounts[$user->id] ?? 0);
             $allUnits = $completed + $subDone + $pending + $subPend;
             $completedUnits = $completed + $subDone;
             $completionRate = $allUnits > 0 ? round(($completedUnits / $allUnits) * 100, 1) : 0;
@@ -302,6 +312,7 @@ class ReportController extends Controller
                 'total_pending' => $pending + $subPend,
                 'completion_rate' => $completionRate,
                 'projects_count' => $projects,
+                'subprojects_count' => $subProjects,
                 'nearest_due' => $nearestDue[$user->id] ?? null,
                 'rank' => 0,
                 'tasks' => ($taskRows[$user->id] ?? collect())->values()->toArray(),

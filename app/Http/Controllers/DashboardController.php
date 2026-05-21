@@ -41,12 +41,48 @@ class DashboardController extends Controller
             $p->parent_only_all_tasks_count = Task::where('project_id', $p->id)->count();
             $p->parent_only_completed_tasks_count = Task::where('project_id', $p->id)->whereNotNull('completed_at')->count();
             $p->parent_only_overdue_tasks_count = Task::where('project_id', $p->id)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+            // parent-only subtask counts
+            $p->parent_only_all_subtasks_count = DB::table('sub_tasks AS st')
+                ->join('tasks', 'tasks.id', '=', 'st.task_id')
+                ->where('tasks.project_id', $p->id)
+                ->whereNull('tasks.archived_at')
+                ->count();
+            $p->parent_only_completed_subtasks_count = DB::table('sub_tasks AS st')
+                ->join('tasks', 'tasks.id', '=', 'st.task_id')
+                ->where('tasks.project_id', $p->id)
+                ->whereNull('tasks.archived_at')
+                ->whereNotNull('st.completed_at')
+                ->count();
+            $p->parent_only_pending_subtasks_count = DB::table('sub_tasks AS st')
+                ->join('tasks', 'tasks.id', '=', 'st.task_id')
+                ->where('tasks.project_id', $p->id)
+                ->whereNull('tasks.archived_at')
+                ->whereNull('st.completed_at')
+                ->count();
             // aggregated counts including descendants
             $descIds = $p->allDescendantIds();
             $allIds = array_merge([$p->id], $descIds);
             $p->all_tasks_count = Task::whereIn('project_id', $allIds)->count();
             $p->completed_tasks_count = Task::whereIn('project_id', $allIds)->whereNotNull('completed_at')->count();
             $p->overdue_tasks_count = Task::whereIn('project_id', $allIds)->whereNull('completed_at')->whereDate('due_on', '<', now())->count();
+            // aggregated subtask counts
+            $p->all_subtasks_count = DB::table('sub_tasks AS st')
+                ->join('tasks', 'tasks.id', '=', 'st.task_id')
+                ->whereIn('tasks.project_id', $allIds)
+                ->whereNull('tasks.archived_at')
+                ->count();
+            $p->completed_subtasks_count = DB::table('sub_tasks AS st')
+                ->join('tasks', 'tasks.id', '=', 'st.task_id')
+                ->whereIn('tasks.project_id', $allIds)
+                ->whereNull('tasks.archived_at')
+                ->whereNotNull('st.completed_at')
+                ->count();
+            $p->pending_subtasks_count = DB::table('sub_tasks AS st')
+                ->join('tasks', 'tasks.id', '=', 'st.task_id')
+                ->whereIn('tasks.project_id', $allIds)
+                ->whereNull('tasks.archived_at')
+                ->whereNull('st.completed_at')
+                ->count();
         });
 
         return Inertia::render('Dashboard/Index', [

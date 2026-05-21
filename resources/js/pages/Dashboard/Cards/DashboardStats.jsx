@@ -1,4 +1,14 @@
-import { Card, Group, SimpleGrid, Stack, Text, ThemeIcon, rem, Progress, Tooltip } from '@mantine/core';
+import {
+  Card,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  rem,
+  Progress,
+  Tooltip,
+} from '@mantine/core';
 import {
   IconChecks,
   IconClock,
@@ -14,6 +24,10 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
   const pendingTasks = totalTasks - completedTasks;
   const overdueCount = overdueTasks?.length || 0;
   const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const totalSubtasks = projects.reduce((s, p) => s + (p.all_subtasks_count || 0), 0);
+  const completedSubtasks = projects.reduce((s, p) => s + (p.completed_subtasks_count || 0), 0);
+  const pendingSubtasks = totalSubtasks - completedSubtasks;
 
   const stats = [
     {
@@ -35,6 +49,18 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
       color: 'orange',
     },
     {
+      label: 'Subtasks Done',
+      value: completedSubtasks,
+      icon: IconChecks,
+      color: 'teal',
+    },
+    {
+      label: 'Subtasks Pending',
+      value: pendingSubtasks,
+      icon: IconClock,
+      color: 'yellow',
+    },
+    {
       label: 'Overdue Tasks',
       value: overdueCount,
       icon: IconAlertTriangle,
@@ -50,21 +76,56 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
   ];
 
   return (
-    <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }} spacing="md">
-      {stats.map((stat) => (
-        <Card key={stat.label} withBorder p="md" radius="md">
-          <Group justify="space-between" align="flex-start">
+    <SimpleGrid
+      cols={{ base: 2, sm: 3, md: 4, lg: 7 }}
+      spacing='md'
+    >
+      {stats.map(stat => (
+        <Card
+          key={stat.label}
+          withBorder
+          p='md'
+          radius='md'
+        >
+          <Group
+            justify='space-between'
+            align='flex-start'
+          >
             <Stack gap={4}>
-              <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{stat.label}</Text>
-              <Text fw={700} size="xl" c={stat.color}>{stat.value}</Text>
+              <Text
+                size='xs'
+                c='dimmed'
+                tt='uppercase'
+                fw={600}
+              >
+                {stat.label}
+              </Text>
+              <Text
+                fw={700}
+                size='xl'
+                c={stat.color}
+              >
+                {stat.value}
+              </Text>
             </Stack>
-            <ThemeIcon size="lg" radius="md" color={stat.color} variant="light">
+            <ThemeIcon
+              size='lg'
+              radius='md'
+              color={stat.color}
+              variant='light'
+            >
               <stat.icon style={{ width: rem(18), height: rem(18) }} />
             </ThemeIcon>
           </Group>
           {stat.progress !== undefined && (
             <Tooltip label={`${stat.progress}% complete`}>
-              <Progress value={stat.progress} color={stat.color} size="sm" radius="xl" mt="sm" />
+              <Progress
+                value={stat.progress}
+                color={stat.color}
+                size='sm'
+                radius='xl'
+                mt='sm'
+              />
             </Tooltip>
           )}
         </Card>
@@ -72,4 +133,3 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
     </SimpleGrid>
   );
 }
-

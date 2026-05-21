@@ -1,36 +1,28 @@
-import { Label } from "@/components/Label";
-import TaskGroupLabel from "@/components/TaskGroupLabel";
-import { diffForHumans } from "@/utils/datetime";
-import { redirectTo } from "@/utils/route";
-import { isOverdue } from "@/utils/task";
-import { shortName } from "@/utils/user";
-import { Link } from "@inertiajs/react";
-import {
-  Flex,
-  Group,
-  Pill,
-  Text,
-  Tooltip,
-  rem,
-  Badge,
-  Paper
-} from "@mantine/core";
+import { Label } from '@/components/Label';
+import TaskGroupLabel from '@/components/TaskGroupLabel';
+import { diffForHumans } from '@/utils/datetime';
+import { redirectTo } from '@/utils/route';
+import { isOverdue } from '@/utils/task';
+import { shortName } from '@/utils/user';
+import { Link } from '@inertiajs/react';
+import { Flex, Group, Pill, Text, Tooltip, rem, Badge, Paper } from '@mantine/core';
 import {
   IconClock,
   IconCalendarDue,
   IconCheckbox,
   IconFolderOpen,
-  IconHourglass
-} from "@tabler/icons-react";
-import classes from "./css/Task.module.css";
+  IconHourglass,
+} from '@tabler/icons-react';
+import classes from './css/Task.module.css';
 
 export default function Task({ task, enhanced = false, showProject = false }) {
   const isTaskOverdue = isOverdue(task);
   const isCompleted = task.completed_at !== null;
 
   // Calculate days until due
-  const daysUntilDue = task.due_on ?
-    Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+  const daysUntilDue = task.due_on
+    ? Math.ceil((new Date(task.due_on) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
 
   // Get priority level based on various factors
   const getPriorityLevel = () => {
@@ -45,7 +37,7 @@ export default function Task({ task, enhanced = false, showProject = false }) {
     critical: 'red',
     high: 'orange',
     medium: 'yellow',
-    normal: 'gray'
+    normal: 'gray',
   };
 
   // Badge color maps for persisted task priority/complexity
@@ -73,7 +65,8 @@ export default function Task({ task, enhanced = false, showProject = false }) {
 
     if (daysUntilDue === 0) return 'Due today';
     if (daysUntilDue === 1) return 'Due tomorrow';
-    if (daysUntilDue > 0 && daysUntilDue <= 7) return `Due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}`;
+    if (daysUntilDue > 0 && daysUntilDue <= 7)
+      return `Due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}`;
 
     return diffForHumans(task.due_on, true);
   };
@@ -82,21 +75,39 @@ export default function Task({ task, enhanced = false, showProject = false }) {
     <>
       {/* Priority indicator */}
       {enhanced && priorityLevel !== 'normal' && (
-        <div className={classes.priorityIndicator} data-priority={priorityLevel} />
+        <div
+          className={classes.priorityIndicator}
+          data-priority={priorityLevel}
+        />
       )}
 
       {/* Main content */}
-      <Group gap="sm" wrap="nowrap" style={{ flex: 1 }}>
+      <Group
+        gap='sm'
+        wrap='nowrap'
+        style={{ flex: 1 }}
+      >
         {/* Task Group */}
-        <Tooltip label="Task group" openDelay={1000} withArrow>
-          <TaskGroupLabel size="sm">{task.task_group.name}</TaskGroupLabel>
+        <Tooltip
+          label='Task group'
+          openDelay={1000}
+          withArrow
+        >
+          <TaskGroupLabel size='sm'>{task.task_group.name}</TaskGroupLabel>
         </Tooltip>
 
         {/* Assigned User */}
         {task.assigned_to_user && (
-          <Link href={route("users.edit", task.assigned_to_user.id)}>
-            <Tooltip label={task.assigned_to_user.name} openDelay={1000} withArrow>
-              <Pill size="sm" className={classes.user}>
+          <Link href={route('users.edit', task.assigned_to_user.id)}>
+            <Tooltip
+              label={task.assigned_to_user.name}
+              openDelay={1000}
+              withArrow
+            >
+              <Pill
+                size='sm'
+                className={classes.user}
+              >
                 {shortName(task.assigned_to_user.name)}
               </Pill>
             </Tooltip>
@@ -105,11 +116,15 @@ export default function Task({ task, enhanced = false, showProject = false }) {
 
         {/* Project name (when showing in label/date views) */}
         {enhanced && showProject && (
-          <Tooltip label="Project" openDelay={1000} withArrow>
+          <Tooltip
+            label='Project'
+            openDelay={1000}
+            withArrow
+          >
             <Badge
-              variant="light"
-              color="gray"
-              size="sm"
+              variant='light'
+              color='gray'
+              size='sm'
               leftSection={<IconFolderOpen size={12} />}
               className={classes.projectBadge}
             >
@@ -127,28 +142,41 @@ export default function Task({ task, enhanced = false, showProject = false }) {
         >
           <Text
             className={`${classes.name} ${enhanced ? classes.enhancedName : ''}`}
-            size="sm"
+            size='sm'
             fw={enhanced ? 500 : 500}
-            truncate="end"
-            c={isTaskOverdue && !isCompleted ? "red" : ""}
-            onClick={() => redirectTo("projects.tasks.open", [task.project_id, task.id])}
+            truncate='end'
+            c={isTaskOverdue && !isCompleted ? 'red' : ''}
+            onClick={() => redirectTo('projects.tasks.open', [task.project_id, task.id])}
           >
             #{task.number}: {task.name}
           </Text>
         </Tooltip>
 
         {/* Labels and task badges */}
-        <Group wrap="wrap" style={{ rowGap: rem(3), columnGap: rem(8) }}>
-          {task.labels.map((label) => (
-            <Label key={label.id} name={label.name} color={label.color} />
+        <Group
+          wrap='wrap'
+          style={{ rowGap: rem(3), columnGap: rem(8) }}
+        >
+          {task.labels.map(label => (
+            <Label
+              key={label.id}
+              name={label.name}
+              color={label.color}
+            />
           ))}
           {task.priority && (
-            <Pill size="sm" color={taskPriorityColor[task.priority] || 'gray'}>
+            <Pill
+              size='sm'
+              color={taskPriorityColor[task.priority] || 'gray'}
+            >
               {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
             </Pill>
           )}
           {task.complexity && (
-            <Pill size="sm" color={taskComplexityColor[task.complexity] || 'gray'}>
+            <Pill
+              size='sm'
+              color={taskComplexityColor[task.complexity] || 'gray'}
+            >
               {task.complexity.toUpperCase()}
             </Pill>
           )}
@@ -157,7 +185,10 @@ export default function Task({ task, enhanced = false, showProject = false }) {
 
       {/* Enhanced metadata */}
       {enhanced && (
-        <Group gap="xs" className={classes.metadata}>
+        <Group
+          gap='xs'
+          className={classes.metadata}
+        >
           {/* Due date */}
           {task.due_on && (
             <Tooltip
@@ -166,9 +197,11 @@ export default function Task({ task, enhanced = false, showProject = false }) {
               withArrow
             >
               <Badge
-                variant="light"
-                color={isTaskOverdue && !isCompleted ? 'red' : daysUntilDue <= 3 ? 'orange' : 'blue'}
-                size="sm"
+                variant='light'
+                color={
+                  isTaskOverdue && !isCompleted ? 'red' : daysUntilDue <= 3 ? 'orange' : 'blue'
+                }
+                size='sm'
                 leftSection={<IconCalendarDue size={12} />}
                 className={classes.dueBadge}
               >
@@ -179,11 +212,15 @@ export default function Task({ task, enhanced = false, showProject = false }) {
 
           {/* Estimation */}
           {task.estimation && (
-            <Tooltip label={`Estimated: ${task.estimation}h`} openDelay={1000} withArrow>
+            <Tooltip
+              label={`Estimated: ${task.estimation}h`}
+              openDelay={1000}
+              withArrow
+            >
               <Badge
-                variant="light"
-                color="teal"
-                size="sm"
+                variant='light'
+                color='teal'
+                size='sm'
                 leftSection={<IconClock size={12} />}
               >
                 {task.estimation}h
@@ -194,9 +231,9 @@ export default function Task({ task, enhanced = false, showProject = false }) {
           {/* Completion status */}
           {isCompleted && (
             <Badge
-              variant="light"
-              color="green"
-              size="sm"
+              variant='light'
+              color='green'
+              size='sm'
               leftSection={<IconCheckbox size={12} />}
             >
               Completed
@@ -211,16 +248,16 @@ export default function Task({ task, enhanced = false, showProject = false }) {
     return (
       <Paper
         className={`${classes.enhancedTask} ${isCompleted ? classes.completed : ''}`}
-        p="sm"
-        radius="md"
+        p='sm'
+        radius='md'
         withBorder
       >
         <Flex
-          direction="row"
-          align="center"
-          justify="space-between"
-          wrap="nowrap"
-          gap="md"
+          direction='row'
+          align='center'
+          justify='space-between'
+          wrap='nowrap'
+          gap='md'
         >
           <TaskContent />
         </Flex>
@@ -231,7 +268,7 @@ export default function Task({ task, enhanced = false, showProject = false }) {
   return (
     <Flex
       className={`${classes.task} ${isCompleted ? classes.completed : ''}`}
-      wrap="nowrap"
+      wrap='nowrap'
     >
       <TaskContent />
     </Flex>

@@ -1,22 +1,22 @@
-import { humanReadableTime } from "@/utils/timer";
-import { useInterval } from "@mantine/hooks";
-import dayjs from "dayjs";
-import { useEffect, useState } from "react";
-import { usePage } from "@inertiajs/react";
+import { humanReadableTime } from '@/utils/timer';
+import { useInterval } from '@mantine/hooks';
+import dayjs from 'dayjs';
+import { useEffect, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 
 export default function useTimer(task) {
-  const [timerValue, setTimerValue] = useState("");
+  const [timerValue, setTimerValue] = useState('');
   const {
     auth: { user },
   } = usePage().props;
 
-  const isTimerRunning = (timeLog) => {
+  const isTimerRunning = timeLog => {
     return timeLog.minutes === null && timeLog.timer_start !== null;
   };
 
   // Only consider current user's running timer
   const findMyRunningTimer = () =>
-    task.time_logs.find((timeLog) => isTimerRunning(timeLog) && timeLog.user_id === user.id);
+    task.time_logs.find(timeLog => isTimerRunning(timeLog) && timeLog.user_id === user.id);
 
   const [runningTimer, setRunningTimer] = useState(findMyRunningTimer());
 
@@ -37,7 +37,7 @@ export default function useTimer(task) {
       timerTick();
       timerInterval.start();
     } else {
-      setTimerValue("");
+      setTimerValue('');
       timerInterval.stop();
     }
     return timerInterval.stop;
