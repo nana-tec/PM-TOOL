@@ -9,6 +9,7 @@ use App\Events\Task\AttachmentsUploaded;
 use App\Events\Task\TaskCreated;
 use App\Models\Project;
 use App\Models\Task;
+use App\Notifications\TaskCreatedNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,7 @@ class CreateTask
     {
         $rows = collect($items)
             ->map(function (UploadedFile $item) use ($task) {
-                $filename = strtolower(Str::ulid()).'.'.$item->getClientOriginalExtension();
+                $filename = strtolower(Str::ulid()) . '.' . $item->getClientOriginalExtension();
                 $filepath = "tasks/{$task->id}/{$filename}";
 
                 $item->storeAs('public', $filepath);
@@ -87,8 +88,8 @@ class CreateTask
         $task->activities()->create([
             'project_id' => $task->project_id,
             'user_id' => auth()->id(),
-            'title' => ($attachments->count() > 1 ? 'Attachments where' : 'Attachment was').' uploaded',
-            'subtitle' => "to \"{$task->name}\" by ".auth()->user()->name,
+            'title' => ($attachments->count() > 1 ? 'Attachments where' : 'Attachment was') . ' uploaded',
+            'subtitle' => "to \"{$task->name}\" by " . auth()->user()->name,
         ]);
 
         if ($dispatchEvent) {
