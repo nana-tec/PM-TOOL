@@ -44,7 +44,7 @@ class TaskAssignedNotification extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject("[{$this->task->project->name}] Task {$this->task->name} was assigned to you")
-            ->greeting("You have been assigned a new task")
+            ->greeting('You have been assigned a new task')
             ->action('Open task', route('projects.tasks.open', ['project' => $this->task->project_id, 'task' => $this->task->id]))
             ->line($this->task->description);
     }

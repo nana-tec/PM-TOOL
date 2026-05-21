@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Task;
 
 use App\Http\Controllers\Controller;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\Project;
 use App\Notifications\TaskAssignedNotification;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class NotifyAssignedController extends Controller
 {
@@ -28,7 +26,7 @@ class NotifyAssignedController extends Controller
             return response()->json(['message' => 'No valid users selected'], 422);
         }
 
-        $users->each(fn(User $user) => $user->notify(new TaskAssignedNotification($task)));
+        $users->each(fn (User $user) => $user->notify(new TaskAssignedNotification($task)));
 
         return redirect()->back();
     }
