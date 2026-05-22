@@ -20,7 +20,7 @@ class ReportController extends Controller
 {
     public function loggedTimeSum(Request $request): Response
     {
-        Gate::allowIf(fn(User $user) => $user->can('view logged time sum report'));
+        Gate::allowIf(fn (User $user) => $user->can('view logged time sum report'));
 
         $completed = $request->get('completed', 'true') === 'true';
 
@@ -29,8 +29,8 @@ class ReportController extends Controller
                 ->join('tasks', 'tasks.id', '=', 'time_logs.task_id')
                 ->join('projects', 'projects.id', '=', 'tasks.project_id')
                 ->join('users', 'time_logs.user_id', '=', 'users.id')
-                ->when($request->projects, fn($query) => $query->whereIn('projects.id', $request->projects))
-                ->when($request->users, fn($query) => $query->whereIn('time_logs.user_id', $request->users))
+                ->when($request->projects, fn ($query) => $query->whereIn('projects.id', $request->projects))
+                ->when($request->users, fn ($query) => $query->whereIn('time_logs.user_id', $request->users))
                 ->when(
                     $request->dateRange,
                     function ($query) use ($request) {
@@ -39,7 +39,7 @@ class ReportController extends Controller
                             Carbon::parse($request->dateRange[1])->endOfDay(),
                         ]);
                     },
-                    fn($query) => $query->where('time_logs.created_at', '>', now()->subWeek())
+                    fn ($query) => $query->where('time_logs.created_at', '>', now()->subWeek())
                 )
                 ->{$completed ? 'whereNotNull' : 'whereNull'}('tasks.completed_at')
                 ->where('billable', $request->get('billable', 'true') === 'true')
@@ -63,7 +63,7 @@ class ReportController extends Controller
 
     public function dailyLoggedTime(Request $request): Response
     {
-        Gate::allowIf(fn(User $user) => $user->can('view daily logged time report'));
+        Gate::allowIf(fn (User $user) => $user->can('view daily logged time report'));
 
         $completed = $request->get('completed', 'true') === 'true';
 
@@ -71,8 +71,8 @@ class ReportController extends Controller
             ->join('tasks', 'tasks.id', '=', 'time_logs.task_id')
             ->join('projects', 'projects.id', '=', 'tasks.project_id')
             ->join('users', 'time_logs.user_id', '=', 'users.id')
-            ->when($request->projects, fn($query) => $query->whereIn('projects.id', $request->projects))
-            ->when($request->users, fn($query) => $query->whereIn('time_logs.user_id', $request->users))
+            ->when($request->projects, fn ($query) => $query->whereIn('projects.id', $request->projects))
+            ->when($request->users, fn ($query) => $query->whereIn('time_logs.user_id', $request->users))
             ->when(
                 $request->dateRange,
                 function ($query) use ($request) {
@@ -81,7 +81,7 @@ class ReportController extends Controller
                         Carbon::parse($request->dateRange[1])->endOfDay(),
                     ]);
                 },
-                fn($query) => $query->where('time_logs.created_at', '>', now()->subWeek())
+                fn ($query) => $query->where('time_logs.created_at', '>', now()->subWeek())
             )
             ->{$completed ? 'whereNotNull' : 'whereNull'}('tasks.completed_at')
             ->where('billable', $request->get('billable', 'true') === 'true')
@@ -113,7 +113,7 @@ class ReportController extends Controller
 
     public function fixedPriceSum(Request $request): Response
     {
-        Gate::allowIf(fn(User $user) => $user->can('view fixed price sum report'));
+        Gate::allowIf(fn (User $user) => $user->can('view fixed price sum report'));
 
         $completed = $request->get('completed', 'true') === 'true';
 
@@ -121,17 +121,17 @@ class ReportController extends Controller
             'users' => DB::table('tasks')
                 ->join('projects', 'projects.id', '=', 'tasks.project_id')
                 ->join('users', 'tasks.assigned_to_user_id', '=', 'users.id')
-                ->when($request->projects, fn($query) => $query->whereIn('projects.id', $request->projects))
-                ->when($request->users, fn($query) => $query->whereIn('tasks.assigned_to_user_id', $request->users))
+                ->when($request->projects, fn ($query) => $query->whereIn('projects.id', $request->projects))
+                ->when($request->users, fn ($query) => $query->whereIn('tasks.assigned_to_user_id', $request->users))
                 ->when(
                     $request->dateRange,
                     function ($query) use ($request, $completed) {
-                        $query->whereBetween('tasks.' . ($completed ? 'completed_at' : 'created_at'), [
+                        $query->whereBetween('tasks.'.($completed ? 'completed_at' : 'created_at'), [
                             Carbon::parse($request->dateRange[0])->startOfDay(),
                             Carbon::parse($request->dateRange[1])->endOfDay(),
                         ]);
                     },
-                    fn($query) => $query->where('tasks.' . ($completed ? 'completed_at' : 'created_at'), '>', now()->subWeek())
+                    fn ($query) => $query->where('tasks.'.($completed ? 'completed_at' : 'created_at'), '>', now()->subWeek())
                 )
                 ->{$completed ? 'whereNotNull' : 'whereNull'}('tasks.completed_at')
                 ->where('tasks.pricing_type', PricingType::FIXED->value)
@@ -158,7 +158,7 @@ class ReportController extends Controller
 
     public function memberReport(Request $request): Response
     {
-        Gate::allowIf(fn(User $user) => $user->can('view team capacity report'));
+        Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
 
         $start = $request->dateRange ? Carbon::parse($request->dateRange[0])->startOfDay() : null;
         $end = $request->dateRange ? Carbon::parse($request->dateRange[1])->endOfDay() : null;
@@ -169,7 +169,7 @@ class ReportController extends Controller
         }
         if ($request->projects && count($request->projects)) {
             $projectIds = $request->projects;
-            $usersQuery->whereHas('projects', fn($q) => $q->whereIn('projects.id', $projectIds));
+            $usersQuery->whereHas('projects', fn ($q) => $q->whereIn('projects.id', $projectIds));
         }
         $users = $usersQuery->get(['id', 'name', 'avatar']);
         $userIds = $users->pluck('id');
@@ -262,7 +262,7 @@ class ReportController extends Controller
                 $q->where(function ($qq) use ($start, $end) {
                     $qq->whereBetween(DB::raw('COALESCE(tasks.assigned_at, tasks.created_at)'), [$start, $end])
                         ->orWhereBetween('tasks.completed_at', [$start, $end])
-                        ->orWhere(fn($qqq) => $qqq->whereNull('tasks.completed_at'));
+                        ->orWhere(fn ($qqq) => $qqq->whereNull('tasks.completed_at'));
                 });
             })
             ->select([
@@ -355,7 +355,7 @@ class ReportController extends Controller
 
     public function projectReport(Request $request): Response
     {
-        Gate::allowIf(fn(User $user) => $user->can('view team capacity report'));
+        Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
 
         $start = $request->dateRange ? Carbon::parse($request->dateRange[0])->startOfDay() : null;
         $end = $request->dateRange ? Carbon::parse($request->dateRange[1])->endOfDay() : null;
@@ -388,7 +388,7 @@ class ReportController extends Controller
             // Get direct children info for display
             $subProjectsMap[$project->id] = Project::where('parent_id', $project->id)
                 ->get(['id', 'name'])
-                ->map(fn($sp) => ['id' => $sp->id, 'name' => $sp->name])
+                ->map(fn ($sp) => ['id' => $sp->id, 'name' => $sp->name])
                 ->toArray();
         }
 
@@ -519,7 +519,7 @@ class ReportController extends Controller
             ->groupBy('project_id');
 
         // Helper to aggregate counts across a set of project IDs
-        $sumForIds = fn($collection, $ids) => collect($ids)->sum(fn($id) => (int) ($collection[$id] ?? 0));
+        $sumForIds = fn ($collection, $ids) => collect($ids)->sum(fn ($id) => (int) ($collection[$id] ?? 0));
 
         $result = $projects->map(function ($project) use (
             $projectScopeMap,
@@ -553,9 +553,9 @@ class ReportController extends Controller
 
             // Aggregate members across all scope projects (deduplicated)
             $members = collect($scopeIds)
-                ->flatMap(fn($id) => $membersPerProject[$id] ?? collect())
+                ->flatMap(fn ($id) => $membersPerProject[$id] ?? collect())
                 ->unique('id')
-                ->map(fn($m) => [
+                ->map(fn ($m) => [
                     'id' => $m->id,
                     'name' => $m->name,
                     'avatar' => $m->avatar,
@@ -565,19 +565,19 @@ class ReportController extends Controller
 
             // Aggregate nearest due
             $nearestDue = collect($scopeIds)
-                ->map(fn($id) => $nearestDueAll[$id] ?? null)
+                ->map(fn ($id) => $nearestDueAll[$id] ?? null)
                 ->filter()
                 ->sort()
                 ->first();
 
             // Aggregate task rows from all scope projects
             $allTasks = collect($scopeIds)
-                ->flatMap(fn($id) => $taskRows[$id] ?? collect())
+                ->flatMap(fn ($id) => $taskRows[$id] ?? collect())
                 ->values()
                 ->toArray();
 
             $allSubtasks = collect($scopeIds)
-                ->flatMap(fn($id) => $subTaskRows[$id] ?? collect())
+                ->flatMap(fn ($id) => $subTaskRows[$id] ?? collect())
                 ->values()
                 ->toArray();
 
@@ -615,7 +615,7 @@ class ReportController extends Controller
 
     public function workloadReport(Request $request): Response
     {
-        Gate::allowIf(fn(User $user) => $user->can('view team capacity report'));
+        Gate::allowIf(fn (User $user) => $user->can('view team capacity report'));
 
         $start = $request->dateRange ? Carbon::parse($request->dateRange[0])->startOfDay() : null;
         $end = $request->dateRange ? Carbon::parse($request->dateRange[1])->endOfDay() : null;
@@ -626,7 +626,7 @@ class ReportController extends Controller
         }
         if ($request->projects && count($request->projects)) {
             $projectIds = $request->projects;
-            $usersQuery->whereHas('projects', fn($q) => $q->whereIn('projects.id', $projectIds));
+            $usersQuery->whereHas('projects', fn ($q) => $q->whereIn('projects.id', $projectIds));
         }
         $users = $usersQuery->get(['id', 'name', 'avatar']);
         $userIds = $users->pluck('id');
@@ -788,7 +788,7 @@ class ReportController extends Controller
             $totalDone = $done + $doneSub;
             $totalEstHours = round($estH + $estSubH, 1);
 
-            $projectBreakdown = ($perUserProject[$user->id] ?? collect())->map(fn($r) => [
+            $projectBreakdown = ($perUserProject[$user->id] ?? collect())->map(fn ($r) => [
                 'project_id' => $r->project_id,
                 'project_name' => $r->project_name,
                 'open_tasks' => (int) $r->open_tasks,
