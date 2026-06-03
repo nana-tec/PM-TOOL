@@ -29,6 +29,7 @@ import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import {
   IconChevronDown,
   IconChevronRight,
+  IconFolder,
   IconSubtask,
   IconUsers,
   IconTrophy,
@@ -133,10 +134,8 @@ const MemberReport = () => {
     const totalPending = members.reduce((s, m) => s + m.total_pending, 0);
     const totalOverdue = members.reduce((s, m) => s + m.tasks_overdue, 0);
     const totalMembers = members.length;
-    const avgCompletion =
-      totalMembers > 0
-        ? Math.round(members.reduce((s, m) => s + m.completion_rate, 0) / totalMembers)
-        : 0;
+    const totalUnits = totalCompleted + totalPending;
+    const avgCompletion = totalUnits > 0 ? Math.round((totalCompleted / totalUnits) * 100) : 0;
     return { totalCompleted, totalPending, totalOverdue, totalMembers, avgCompletion };
   }, [members]);
 
@@ -597,6 +596,63 @@ const MemberReport = () => {
                             colSpan={11}
                             style={{ background: expandedBg, padding: '16px 24px' }}
                           >
+                            {member.projects?.length > 0 && (
+                              <>
+                                <Text
+                                  fw={600}
+                                  mb='xs'
+                                  size='sm'
+                                >
+                                  <Group gap={4}>
+                                    <IconFolder size={16} /> Projects ({member.projects.length})
+                                  </Group>
+                                </Text>
+                                <Group
+                                  gap='xs'
+                                  mb='md'
+                                >
+                                  {member.projects.map(p => (
+                                    <Badge
+                                      key={p.id}
+                                      size='sm'
+                                      variant='light'
+                                      color='blue'
+                                    >
+                                      {p.name}
+                                    </Badge>
+                                  ))}
+                                </Group>
+                              </>
+                            )}
+                            {member.subprojects?.length > 0 && (
+                              <>
+                                <Text
+                                  fw={600}
+                                  mb='xs'
+                                  size='sm'
+                                >
+                                  <Group gap={4}>
+                                    <IconSubtask size={16} /> Subprojects (
+                                    {member.subprojects.length})
+                                  </Group>
+                                </Text>
+                                <Group
+                                  gap='xs'
+                                  mb='md'
+                                >
+                                  {member.subprojects.map(sp => (
+                                    <Badge
+                                      key={sp.id}
+                                      size='sm'
+                                      variant='light'
+                                      color='grape'
+                                    >
+                                      {sp.name}
+                                    </Badge>
+                                  ))}
+                                </Group>
+                              </>
+                            )}
                             <Text
                               fw={600}
                               mb='xs'

@@ -7,13 +7,11 @@ import OverdueTasks from './Cards/OverdueTasks';
 import { ProjectCard } from './Cards/ProjectCard';
 import RecentComments from './Cards/RecentComments';
 import RecentlyAssignedTasks from './Cards/RecentlyAssignedTasks';
-import TeamCapacityCard from './Cards/TeamCapacityCard';
 import TeamInsightsCard from './Cards/TeamInsights';
 import RecentVcs from './Cards/RecentVcs';
 
 const Dashboard = () => {
-  const { projects, overdueTasks, recentlyAssignedTasks, recentComments, teamCapacity } =
-    usePage().props;
+  const { projects, overdueTasks, recentlyAssignedTasks, recentComments } = usePage().props;
   const [projectView, setProjectView] = useState('cards');
 
   return (
@@ -32,17 +30,8 @@ const Dashboard = () => {
         recentlyAssignedTasks={recentlyAssignedTasks}
       />
 
-      {/* Team capacity + Team insights */}
-      <Grid gutter='lg'>
-        {teamCapacity && (
-          <Grid.Col span={{ base: 12, md: 8 }}>
-            <TeamCapacityCard capacityData={teamCapacity} />
-          </Grid.Col>
-        )}
-        <Grid.Col span={{ base: 12, md: teamCapacity ? 4 : 12 }}>
-          <TeamInsightsCard />
-        </Grid.Col>
-      </Grid>
+      {/* Team insights */}
+      <TeamInsightsCard />
 
       {/* Projects section */}
       <Stack gap='sm'>

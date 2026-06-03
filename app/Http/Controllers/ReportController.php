@@ -228,23 +228,45 @@ class ReportController extends Controller
             ->selectRaw('assigned_to_user_id AS user_id, COUNT(*) AS cnt')
             ->pluck('cnt', 'user_id');
 
-        $projectCounts = Project::query()
-            ->selectRaw('tasks.assigned_to_user_id AS user_id, COUNT(DISTINCT projects.id) AS cnt')
-            ->join('tasks', 'tasks.project_id', '=', 'projects.id')
+        $projectCounts = DB::table('tasks')
+            ->join('projects', 'projects.id', '=', 'tasks.project_id')
             ->whereIn('tasks.assigned_to_user_id', $userIds)
             ->whereNull('tasks.archived_at')
-            ->whereNull('projects.parent_id')
+            ->selectRaw('tasks.assigned_to_user_id AS user_id, COUNT(DISTINCT COALESCE(projects.parent_id, projects.id)) AS cnt')
             ->groupBy('tasks.assigned_to_user_id')
             ->pluck('cnt', 'user_id');
 
-        $subProjectCounts = Project::query()
-            ->selectRaw('tasks.assigned_to_user_id AS user_id, COUNT(DISTINCT projects.id) AS cnt')
-            ->join('tasks', 'tasks.project_id', '=', 'projects.id')
+        $subProjectCounts = DB::table('tasks')
+            ->join('projects', 'projects.id', '=', 'tasks.project_id')
             ->whereIn('tasks.assigned_to_user_id', $userIds)
             ->whereNull('tasks.archived_at')
             ->whereNotNull('projects.parent_id')
+            ->selectRaw('tasks.assigned_to_user_id AS user_id, COUNT(DISTINCT projects.id) AS cnt')
             ->groupBy('tasks.assigned_to_user_id')
             ->pluck('cnt', 'user_id');
+
+        // Project names per user (resolve sub-projects to their parent projects)
+        $projectNames = DB::table('tasks')
+            ->join('projects', 'projects.id', '=', 'tasks.project_id')
+            ->join('projects AS parent_proj', DB::raw('parent_proj.id'), '=', DB::raw('COALESCE(projects.parent_id, projects.id)'))
+            ->whereIn('tasks.assigned_to_user_id', $userIds)
+            ->whereNull('tasks.archived_at')
+            ->selectRaw('tasks.assigned_to_user_id AS user_id, parent_proj.id, parent_proj.name')
+            ->distinct()
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($items) => $items->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->toArray());
+
+        $subProjectNames = DB::table('tasks')
+            ->join('projects', 'projects.id', '=', 'tasks.project_id')
+            ->whereIn('tasks.assigned_to_user_id', $userIds)
+            ->whereNull('tasks.archived_at')
+            ->whereNotNull('projects.parent_id')
+            ->selectRaw('tasks.assigned_to_user_id AS user_id, projects.id, projects.name')
+            ->distinct()
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($items) => $items->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->toArray());
 
         $nearestDue = (clone $tasksBase)
             ->whereNull('completed_at')
@@ -300,6 +322,8 @@ class ReportController extends Controller
             $subPending,
             $projectCounts,
             $subProjectCounts,
+            $projectNames,
+            $subProjectNames,
             $nearestDue,
             $taskRows,
             $subTaskRows
@@ -327,6 +351,8 @@ class ReportController extends Controller
                 'completion_rate' => $completionRate,
                 'projects_count' => $projects,
                 'subprojects_count' => $subProjects,
+                'projects' => $projectNames[$user->id] ?? [],
+                'subprojects' => $subProjectNames[$user->id] ?? [],
                 'nearest_due' => $nearestDue[$user->id] ?? null,
                 'rank' => 0,
                 'tasks' => ($taskRows[$user->id] ?? collect())->values()->toArray(),

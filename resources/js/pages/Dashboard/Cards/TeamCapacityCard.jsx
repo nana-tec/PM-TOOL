@@ -93,26 +93,6 @@ export default function TeamCapacityCard({ capacityData }) {
             />
           </Group>
         </Stack>
-
-        <Stack gap={4}>
-          <Text
-            size='xs'
-            c='dimmed'
-            tt='uppercase'
-            fw={600}
-          >
-            Available Hours
-          </Text>
-          <Group gap='xs'>
-            <IconClock size={16} />
-            <Text
-              size='lg'
-              fw={700}
-            >
-              {summary.total_available?.toFixed(0)}h
-            </Text>
-          </Group>
-        </Stack>
       </SimpleGrid>
 
       <SimpleGrid
