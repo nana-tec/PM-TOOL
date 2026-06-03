@@ -607,7 +607,10 @@ const MemberReport = () => {
                                     <IconFolder size={16} /> Projects ({member.projects.length})
                                   </Group>
                                 </Text>
-                                <Group gap='xs' mb='md'>
+                                <Group
+                                  gap='xs'
+                                  mb='md'
+                                >
                                   {member.projects.map(p => (
                                     <Badge
                                       key={p.id}
@@ -629,10 +632,14 @@ const MemberReport = () => {
                                   size='sm'
                                 >
                                   <Group gap={4}>
-                                    <IconSubtask size={16} /> Subprojects ({member.subprojects.length})
+                                    <IconSubtask size={16} /> Subprojects (
+                                    {member.subprojects.length})
                                   </Group>
                                 </Text>
-                                <Group gap='xs' mb='md'>
+                                <Group
+                                  gap='xs'
+                                  mb='md'
+                                >
                                   {member.subprojects.map(sp => (
                                     <Badge
                                       key={sp.id}

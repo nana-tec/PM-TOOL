@@ -11,8 +11,7 @@ import TeamInsightsCard from './Cards/TeamInsights';
 import RecentVcs from './Cards/RecentVcs';
 
 const Dashboard = () => {
-  const { projects, overdueTasks, recentlyAssignedTasks, recentComments } =
-    usePage().props;
+  const { projects, overdueTasks, recentlyAssignedTasks, recentComments } = usePage().props;
   const [projectView, setProjectView] = useState('cards');
 
   return (
