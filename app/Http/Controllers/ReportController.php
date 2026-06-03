@@ -246,6 +246,29 @@ class ReportController extends Controller
             ->groupBy('tasks.assigned_to_user_id')
             ->pluck('cnt', 'user_id');
 
+        // Project names per user
+        $projectNames = Project::query()
+            ->selectRaw('tasks.assigned_to_user_id AS user_id, projects.id, projects.name')
+            ->join('tasks', 'tasks.project_id', '=', 'projects.id')
+            ->whereIn('tasks.assigned_to_user_id', $userIds)
+            ->whereNull('tasks.archived_at')
+            ->whereNull('projects.parent_id')
+            ->distinct()
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($items) => $items->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->toArray());
+
+        $subProjectNames = Project::query()
+            ->selectRaw('tasks.assigned_to_user_id AS user_id, projects.id, projects.name')
+            ->join('tasks', 'tasks.project_id', '=', 'projects.id')
+            ->whereIn('tasks.assigned_to_user_id', $userIds)
+            ->whereNull('tasks.archived_at')
+            ->whereNotNull('projects.parent_id')
+            ->distinct()
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($items) => $items->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->toArray());
+
         $nearestDue = (clone $tasksBase)
             ->whereNull('completed_at')
             ->whereNotNull('due_on')
@@ -300,6 +323,8 @@ class ReportController extends Controller
             $subPending,
             $projectCounts,
             $subProjectCounts,
+            $projectNames,
+            $subProjectNames,
             $nearestDue,
             $taskRows,
             $subTaskRows
@@ -327,6 +352,8 @@ class ReportController extends Controller
                 'completion_rate' => $completionRate,
                 'projects_count' => $projects,
                 'subprojects_count' => $subProjects,
+                'projects' => $projectNames[$user->id] ?? [],
+                'subprojects' => $subProjectNames[$user->id] ?? [],
                 'nearest_due' => $nearestDue[$user->id] ?? null,
                 'rank' => 0,
                 'tasks' => ($taskRows[$user->id] ?? collect())->values()->toArray(),

@@ -23,11 +23,14 @@ export default function DashboardStats({ projects, overdueTasks, recentlyAssigne
   const completedTasks = projects.reduce((s, p) => s + (p.completed_tasks_count || 0), 0);
   const pendingTasks = totalTasks - completedTasks;
   const overdueCount = overdueTasks?.length || 0;
-  const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const totalSubtasks = projects.reduce((s, p) => s + (p.all_subtasks_count || 0), 0);
   const completedSubtasks = projects.reduce((s, p) => s + (p.completed_subtasks_count || 0), 0);
   const pendingSubtasks = totalSubtasks - completedSubtasks;
+
+  const totalItems = totalTasks + totalSubtasks;
+  const completedItems = completedTasks + completedSubtasks;
+  const progressPct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
   const stats = [
     {
