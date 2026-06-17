@@ -137,7 +137,18 @@ const MemberReport = () => {
   const csvEscape = val => `"${String(val ?? '').replace(/"/g, '""')}"`;
 
   const generateMembersCSV = () => {
-    const headers = ['Rank', 'Name', 'Tasks Completed', 'Tasks Pending', 'Subtasks Done', 'Subtasks Pending', 'Completion %', 'Overdue', 'Nearest Due', 'Projects'];
+    const headers = [
+      'Rank',
+      'Name',
+      'Tasks Completed',
+      'Tasks Pending',
+      'Subtasks Done',
+      'Subtasks Pending',
+      'Completion %',
+      'Overdue',
+      'Nearest Due',
+      'Projects',
+    ];
     const rows = members.map(m => [
       m.rank,
       m.user.name,
@@ -155,7 +166,12 @@ const MemberReport = () => {
 
   const exportMembersCSV = () => {
     const csv = generateMembersCSV();
-    download(csv, `member-report-${dayjs().format('YYYY-MM-DD')}.csv`, 'text/csv;charset=utf-8', '\uFEFF');
+    download(
+      csv,
+      `member-report-${dayjs().format('YYYY-MM-DD')}.csv`,
+      'text/csv;charset=utf-8',
+      '\uFEFF'
+    );
   };
 
   const exportMemberTasksCSV = member => {
@@ -165,15 +181,46 @@ const MemberReport = () => {
     if (tasks.length) {
       lines.push('Tasks');
       lines.push(['Task', 'Project', 'Priority', 'Due Date', 'Status'].map(csvEscape).join(','));
-      tasks.forEach(t => lines.push([t.name, t.project_name, t.priority || '—', t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—', t.completed_at ? 'Done' : 'Pending'].map(csvEscape).join(',')));
+      tasks.forEach(t =>
+        lines.push(
+          [
+            t.name,
+            t.project_name,
+            t.priority || '—',
+            t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—',
+            t.completed_at ? 'Done' : 'Pending',
+          ]
+            .map(csvEscape)
+            .join(',')
+        )
+      );
       lines.push('');
     }
     if (subtasks.length) {
       lines.push('Subtasks');
-      lines.push(['Subtask', 'Parent Task', 'Project', 'Due Date', 'Status'].map(csvEscape).join(','));
-      subtasks.forEach(s => lines.push([s.name, s.parent_task_name, s.project_name, s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—', s.completed_at ? 'Done' : 'Pending'].map(csvEscape).join(',')));
+      lines.push(
+        ['Subtask', 'Parent Task', 'Project', 'Due Date', 'Status'].map(csvEscape).join(',')
+      );
+      subtasks.forEach(s =>
+        lines.push(
+          [
+            s.name,
+            s.parent_task_name,
+            s.project_name,
+            s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—',
+            s.completed_at ? 'Done' : 'Pending',
+          ]
+            .map(csvEscape)
+            .join(',')
+        )
+      );
     }
-    download(lines.join('\n'), `tasks-${member.user.name.replace(/\s+/g, '-')}-${dayjs().format('YYYY-MM-DD')}.csv`, 'text/csv;charset=utf-8', '\uFEFF');
+    download(
+      lines.join('\n'),
+      `tasks-${member.user.name.replace(/\s+/g, '-')}-${dayjs().format('YYYY-MM-DD')}.csv`,
+      'text/csv;charset=utf-8',
+      '\uFEFF'
+    );
   };
 
   const exportPDF = () => {
@@ -202,7 +249,9 @@ const MemberReport = () => {
         </div>`
       : '';
 
-    const memberRows = members.map(m => `
+    const memberRows = members
+      .map(
+        m => `
       <tr>
         <td style="padding:8px 12px;border:1px solid #dee2e6;">#${m.rank}</td>
         <td style="padding:8px 12px;border:1px solid #dee2e6;font-weight:600;">${m.user.name}</td>
@@ -214,9 +263,12 @@ const MemberReport = () => {
         <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.tasks_overdue}</td>
         <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.nearest_due ? dayjs(m.nearest_due).format('MMM D, YYYY') : '—'}</td>
         <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.projects_count}</td>
-      </tr>`).join('');
+      </tr>`
+      )
+      .join('');
 
-    const filterLabel = taskFilter === 'all' ? 'All' : taskFilter === 'pending' ? 'Pending' : 'Completed';
+    const filterLabel =
+      taskFilter === 'all' ? 'All' : taskFilter === 'pending' ? 'Pending' : 'Completed';
 
     const html = `<!DOCTYPE html>
 <html>
