@@ -3,6 +3,7 @@ import useForm from '@/hooks/useForm';
 import ContainerBox from '@/layouts/ContainerBox';
 import Layout from '@/layouts/MainLayout';
 import { currentUrlParams, redirectTo } from '@/utils/route';
+import { download } from '@/utils/file';
 import { usePage } from '@inertiajs/react';
 import {
   Avatar,
@@ -29,6 +30,8 @@ import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import {
   IconChevronDown,
   IconChevronRight,
+  IconFileTypeCsv,
+  IconFileTypePdf,
   IconFolder,
   IconSubtask,
   IconUsers,
@@ -36,6 +39,7 @@ import {
   IconMedal,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
+import printJS from 'print-js';
 import { useMemo, useState } from 'react';
 
 function StatusBadge({ completed_at }) {
@@ -128,6 +132,177 @@ const MemberReport = () => {
     return subs;
   };
 
+  // --- Export utilities ---
+
+  const csvEscape = val => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+  const generateMembersCSV = () => {
+    const headers = [
+      'Rank',
+      'Name',
+      'Tasks Completed',
+      'Tasks Pending',
+      'Subtasks Done',
+      'Subtasks Pending',
+      'Completion %',
+      'Overdue',
+      'Nearest Due',
+      'Projects',
+    ];
+    const rows = members.map(m => [
+      m.rank,
+      m.user.name,
+      m.tasks_completed,
+      m.tasks_pending,
+      m.subtasks_completed,
+      m.subtasks_pending,
+      `${m.completion_rate}%`,
+      m.tasks_overdue,
+      m.nearest_due ? dayjs(m.nearest_due).format('MMM D, YYYY') : '—',
+      m.projects_count,
+    ]);
+    return [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
+  };
+
+  const exportMembersCSV = () => {
+    const csv = generateMembersCSV();
+    download(
+      csv,
+      `member-report-${dayjs().format('YYYY-MM-DD')}.csv`,
+      'text/csv;charset=utf-8',
+      '\uFEFF'
+    );
+  };
+
+  const exportMemberTasksCSV = member => {
+    const tasks = filteredTasksFor(member);
+    const subtasks = filteredSubtasksFor(member);
+    const lines = [];
+    if (tasks.length) {
+      lines.push('Tasks');
+      lines.push(['Task', 'Project', 'Priority', 'Due Date', 'Status'].map(csvEscape).join(','));
+      tasks.forEach(t =>
+        lines.push(
+          [
+            t.name,
+            t.project_name,
+            t.priority || '—',
+            t.due_on ? dayjs(t.due_on).format('MMM D, YYYY') : '—',
+            t.completed_at ? 'Done' : 'Pending',
+          ]
+            .map(csvEscape)
+            .join(',')
+        )
+      );
+      lines.push('');
+    }
+    if (subtasks.length) {
+      lines.push('Subtasks');
+      lines.push(
+        ['Subtask', 'Parent Task', 'Project', 'Due Date', 'Status'].map(csvEscape).join(',')
+      );
+      subtasks.forEach(s =>
+        lines.push(
+          [
+            s.name,
+            s.parent_task_name,
+            s.project_name,
+            s.due_on ? dayjs(s.due_on).format('MMM D, YYYY') : '—',
+            s.completed_at ? 'Done' : 'Pending',
+          ]
+            .map(csvEscape)
+            .join(',')
+        )
+      );
+    }
+    download(
+      lines.join('\n'),
+      `tasks-${member.user.name.replace(/\s+/g, '-')}-${dayjs().format('YYYY-MM-DD')}.csv`,
+      'text/csv;charset=utf-8',
+      '\uFEFF'
+    );
+  };
+
+  const exportPDF = () => {
+    const summaryHtml = members.length
+      ? `<div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;background:#f8f9fa;padding:12px 16px;border-radius:8px;">
+            <div style="font-size:11px;color:#868e96;text-transform:uppercase;font-weight:600;">Team members</div>
+            <div style="font-size:24px;font-weight:700;margin-top:4px;">${summary.totalMembers}</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:#f8f9fa;padding:12px 16px;border-radius:8px;">
+            <div style="font-size:11px;color:#868e96;text-transform:uppercase;font-weight:600;">Completed</div>
+            <div style="font-size:24px;font-weight:700;color:#2f9e44;margin-top:4px;">${summary.totalCompleted}</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:#f8f9fa;padding:12px 16px;border-radius:8px;">
+            <div style="font-size:11px;color:#868e96;text-transform:uppercase;font-weight:600;">Pending</div>
+            <div style="font-size:24px;font-weight:700;color:#f08c00;margin-top:4px;">${summary.totalPending}</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:#f8f9fa;padding:12px 16px;border-radius:8px;">
+            <div style="font-size:11px;color:#868e96;text-transform:uppercase;font-weight:600;">Overdue</div>
+            <div style="font-size:24px;font-weight:700;color:#e03131;margin-top:4px;">${summary.totalOverdue}</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:#f8f9fa;padding:12px 16px;border-radius:8px;">
+            <div style="font-size:11px;color:#868e96;text-transform:uppercase;font-weight:600;">Avg completion</div>
+            <div style="font-size:24px;font-weight:700;margin-top:4px;">${summary.avgCompletion}%</div>
+          </div>
+        </div>`
+      : '';
+
+    const memberRows = members
+      .map(
+        m => `
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">#${m.rank}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;font-weight:600;">${m.user.name}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.tasks_completed}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.tasks_pending}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.subtasks_completed}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.subtasks_pending}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;font-weight:600;">${m.completion_rate}%</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.tasks_overdue}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.nearest_due ? dayjs(m.nearest_due).format('MMM D, YYYY') : '—'}</td>
+        <td style="padding:8px 12px;border:1px solid #dee2e6;">${m.projects_count}</td>
+      </tr>`
+      )
+      .join('');
+
+    const filterLabel =
+      taskFilter === 'all' ? 'All' : taskFilter === 'pending' ? 'Pending' : 'Completed';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head><title>Member Report</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:40px;color:#212529;}
+  h1{font-size:28px;margin:0 0 4px;}
+  .sub{color:#868e96;font-size:14px;margin-bottom:24px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{background:#f1f3f5;padding:8px 12px;border:1px solid #dee2e6;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;color:#495057;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+  .tag-green{background:#d3f9d8;color:#2b8a3e;}
+  .tag-orange{background:#fff3bf;color:#e67700;}
+  @media print{body{padding:20px;}}
+</style></head>
+<body>
+  <h1>Member Report</h1>
+  <div class="sub">Generated ${dayjs().format('MMMM D, YYYY')} &middot; Filter: ${filterLabel}</div>
+  ${summaryHtml}
+  <table>
+    <thead><tr>
+      <th>Rank</th><th>Member</th><th>Completed</th><th>Pending</th><th>Sub done</th><th>Sub pending</th><th>Completion %</th><th>Overdue</th><th>Nearest due</th><th>Projects</th>
+    </tr></thead>
+    <tbody>${memberRows}</tbody>
+  </table>
+</body></html>`;
+
+    printJS({
+      printable: html,
+      type: 'html',
+      documentTitle: `Member-Report-${dayjs().format('YYYY-MM-DD')}`,
+    });
+  };
+
   // Summary stats
   const summary = useMemo(() => {
     const totalCompleted = members.reduce((s, m) => s + m.total_completed, 0);
@@ -217,12 +392,32 @@ const MemberReport = () => {
                 />
               </DatesProvider>
             </Group>
-            <Button
-              type='submit'
-              disabled={form.processing}
-            >
-              Apply
-            </Button>
+            <Group gap='xs'>
+              <Button
+                type='submit'
+                disabled={form.processing}
+              >
+                Apply
+              </Button>
+              <Button
+                variant='light'
+                color='green'
+                leftSection={<IconFileTypeCsv size={16} />}
+                disabled={members.length === 0}
+                onClick={exportMembersCSV}
+              >
+                CSV
+              </Button>
+              <Button
+                variant='light'
+                color='red'
+                leftSection={<IconFileTypePdf size={16} />}
+                disabled={members.length === 0}
+                onClick={exportPDF}
+              >
+                PDF
+              </Button>
+            </Group>
           </Group>
         </form>
       </ContainerBox>
@@ -653,13 +848,31 @@ const MemberReport = () => {
                                 </Group>
                               </>
                             )}
-                            <Text
-                              fw={600}
+                            <Group
+                              gap='xs'
                               mb='xs'
-                              size='sm'
                             >
-                              Tasks ({tasks.length})
-                            </Text>
+                              <Text
+                                fw={600}
+                                size='sm'
+                              >
+                                Tasks ({tasks.length})
+                              </Text>
+                              {tasks.length > 0 && (
+                                <Button
+                                  size='compact-xs'
+                                  variant='subtle'
+                                  color='green'
+                                  leftSection={<IconFileTypeCsv size={14} />}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    exportMemberTasksCSV(member);
+                                  }}
+                                >
+                                  Export CSV
+                                </Button>
+                              )}
+                            </Group>
                             {tasks.length === 0 ? (
                               <Text
                                 c='dimmed'
@@ -756,16 +969,34 @@ const MemberReport = () => {
                               </>
                             )}
 
-                            <Text
-                              fw={600}
+                            <Group
+                              gap='xs'
                               mt='md'
                               mb='xs'
-                              size='sm'
                             >
-                              <Group gap={4}>
-                                <IconSubtask size={16} /> Subtasks ({subtasks.length})
-                              </Group>
-                            </Text>
+                              <Text
+                                fw={600}
+                                size='sm'
+                              >
+                                <Group gap={4}>
+                                  <IconSubtask size={16} /> Subtasks ({subtasks.length})
+                                </Group>
+                              </Text>
+                              {subtasks.length > 0 && (
+                                <Button
+                                  size='compact-xs'
+                                  variant='subtle'
+                                  color='green'
+                                  leftSection={<IconFileTypeCsv size={14} />}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    exportMemberTasksCSV(member);
+                                  }}
+                                >
+                                  Export CSV
+                                </Button>
+                              )}
+                            </Group>
                             {subtasks.length === 0 ? (
                               <Text
                                 c='dimmed'
