@@ -106,7 +106,7 @@ const ProjectOpen = () => {
             <Button
               variant='light'
               leftSection={<IconFileTypeCsv size={16} />}
-              onClick={() => window.location.href = route('projects.export.csv', item.id)}
+              onClick={() => (window.location.href = route('projects.export.csv', item.id))}
             >
               CSV
             </Button>
