@@ -25,6 +25,8 @@ import {
   IconAlertTriangle,
   IconChartBar,
   IconListDetails,
+  IconFileTypeCsv,
+  IconFileTypePdf,
 } from '@tabler/icons-react';
 import ProjectCard from './Index/ProjectCard';
 
@@ -101,6 +103,20 @@ const ProjectOpen = () => {
           </Stack>
 
           <Group gap='sm'>
+            <Button
+              variant='light'
+              leftSection={<IconFileTypeCsv size={16} />}
+              onClick={() => window.location.href = route('projects.export.csv', item.id)}
+            >
+              CSV
+            </Button>
+            <Button
+              variant='light'
+              leftSection={<IconFileTypePdf size={16} />}
+              onClick={() => redirectTo('projects.export.pdf', item.id)}
+            >
+              PDF
+            </Button>
             <Button
               variant='light'
               leftSection={<IconListDetails size={16} />}

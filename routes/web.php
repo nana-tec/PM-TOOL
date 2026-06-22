@@ -10,6 +10,7 @@ use App\Http\Controllers\Invoice\InvoiceTasksController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\MyWork\ActivityController;
 use App\Http\Controllers\MyWork\MyWorkTaskController;
+use App\Http\Controllers\Project\ExportController;
 use App\Http\Controllers\Project\NoteController;
 use App\Http\Controllers\Project\VcsController;
 use App\Http\Controllers\ProjectController;
@@ -41,6 +42,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('{projectId}/restore', [ProjectController::class, 'restore'])->name('restore');
         Route::put('{project}/favorite/toggle', [ProjectController::class, 'favoriteToggle'])->name('favorite.toggle');
         Route::post('{project}/user-access', [ProjectController::class, 'userAccess'])->name('user_access');
+
+        // Export
+        Route::get('{project}/export/csv', [ExportController::class, 'csv'])->name('export.csv')->scopeBindings();
+        Route::get('{project}/export/pdf', [ExportController::class, 'pdf'])->name('export.pdf')->scopeBindings();
 
         // Open project: show subprojects or redirect to tasks
         Route::get('{project}/open', [ProjectController::class, 'open'])->name('open')->scopeBindings();
