@@ -80,22 +80,30 @@ const ExportPdf = () => {
       <div class="stat-value" style="color:#e67700;">${stats.pending}</div>
     </div>
   </div>
-  ${completedRows ? `
+  ${
+    completedRows
+      ? `
   <h2>Completed Tasks (${stats.completed})</h2>
   <table>
     <thead><tr>
       <th>ID</th><th>Name</th><th>Priority</th><th>Assignee</th><th>Group</th><th>Due Date</th><th>Completed At</th>
     </tr></thead>
     <tbody>${completedRows}</tbody>
-  </table>` : ''}
-  ${pendingRows ? `
+  </table>`
+      : ''
+  }
+  ${
+    pendingRows
+      ? `
   <h2>Pending Tasks (${stats.pending})</h2>
   <table>
     <thead><tr>
       <th>ID</th><th>Name</th><th>Priority</th><th>Assignee</th><th>Group</th><th>Due Date</th><th>Labels</th>
     </tr></thead>
     <tbody>${pendingRows}</tbody>
-  </table>` : ''}
+  </table>`
+      : ''
+  }
 </body></html>`;
 
     printJS({
