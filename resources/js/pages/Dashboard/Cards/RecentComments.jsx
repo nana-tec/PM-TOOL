@@ -40,7 +40,7 @@ export default function RecentComments({ comments }) {
                 key={comment.id}
                 className={classes.item}
                 onClick={() =>
-                  redirectTo('projects.tasks.open', [comment.task.project_id, comment.task_id])
+                  redirectTo('projects.tasks.open', [comment.task?.project_id, comment.task_id])
                 }
               >
                 <Group justify='space-between'>
@@ -49,7 +49,7 @@ export default function RecentComments({ comments }) {
                     align='start'
                   >
                     <Avatar
-                      src={comment.user.avatar}
+                      src={comment.user?.avatar}
                       radius='xl'
                       color='blue'
                     />
@@ -59,14 +59,14 @@ export default function RecentComments({ comments }) {
                         c='blue'
                         fw={600}
                       >
-                        {comment.user.name}
+                        {comment.user?.name ?? 'Deleted user'}
                       </Text>
                       <Text
                         fz={11}
                         fw={500}
                         c='dimmed'
                       >
-                        {comment.task.project.name}
+                        {comment.task?.project?.name}
                       </Text>
                     </div>
                   </Group>
