@@ -122,7 +122,7 @@ export default function Timer({ task, ...props }) {
                   className={classes.row}
                 >
                   <Text fz={14}>
-                    <Link href={route('users.edit', timeLog.user_id)}>{timeLog.user.name}</Link>
+                    <Link href={route('users.edit', timeLog.user_id)}>{timeLog.user?.name ?? 'Deleted user'}</Link>
                   </Text>
                   {isTimerRunning(timeLog) ? (
                     <Text
