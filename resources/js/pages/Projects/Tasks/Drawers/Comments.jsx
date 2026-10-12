@@ -78,7 +78,7 @@ export default function Comments({ task }) {
               <Group justify='space-between'>
                 <Group>
                   <Avatar
-                    src={comment.user.avatar}
+                    src={comment.user?.avatar}
                     radius='xl'
                     color='blue'
                   />
@@ -88,13 +88,13 @@ export default function Comments({ task }) {
                       c='blue'
                       fw={500}
                     >
-                      {comment.user.name}
+                      {comment.user?.name ?? 'Deleted user'}
                     </Text>
                     <Text
                       size='xs'
                       c='dimmed'
                     >
-                      {comment.user.job_title}
+                      {comment.user?.job_title}
                     </Text>
                   </div>
                 </Group>
