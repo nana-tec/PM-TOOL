@@ -135,12 +135,12 @@ class Task extends Model implements AuditableContract, Sortable
 
     public function createdByUser(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by_user_id');
+        return $this->belongsTo(User::class, 'created_by_user_id')->withArchived();
     }
 
     public function assignedToUser(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'assigned_to_user_id');
+        return $this->belongsTo(User::class, 'assigned_to_user_id')->withArchived();
     }
 
     public function invoice(): BelongsTo
